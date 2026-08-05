@@ -1,44 +1,176 @@
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * ============================================================================
+ * DESIGN SYSTEM — VetCore
+ * Paleta "teal verde clínico" (decidida con el dueño del producto, Subfase 0.4)
+ *
+ * - Tipografía: Inter (Google Fonts) con jerarquía por pesos y tamaños.
+ * - Espaciado: escala de 4px/8px (default de Tailwind).
+ * - Radios, sombras y estados definidos deliberadamente, no defaults genéricos.
+ * ============================================================================
+ */
+
+:root {
+  --radius: 0.625rem;
+
+  /* Neutrales base (ligero tinte cálido-verde para no verse "gris genérico") */
+  --background: #f6f9f8;
+  --foreground: #14201d;
+  --card: #ffffff;
+  --card-foreground: #14201d;
+  --popover: #ffffff;
+  --popover-foreground: #14201d;
+
+  /* Primario: teal profundo (salud, cuidado, confianza) */
+  --primary: #0f766e;
+  --primary-hover: #0d9488;
+  --primary-foreground: #ffffff;
+
+  /* Superficies secundarias y acentos */
+  --secondary: #e6f5f1;
+  --secondary-foreground: #115e59;
+  --muted: #eef2f0;
+  --muted-foreground: #5c6b66;
+  --accent: #d9f0ea;
+  --accent-foreground: #134e4a;
+
+  /* Estados semánticos */
+  --destructive: #d92d20;
+  --destructive-foreground: #ffffff;
+  --success: #21813e;
+  --success-foreground: #ffffff;
+  --warning: #b45309;
+  --warning-foreground: #ffffff;
+  --info: #2563eb;
+  --info-foreground: #ffffff;
+
+  /* Bordes y anillos */
+  --border: #dfe7e4;
+  --input: #cdd9d5;
+  --ring: #0f766e;
+
+  /* Colores de gráficas (Dashboards, Fase 2) */
+  --chart-1: #0f766e;
+  --chart-2: #2dd4bf;
+  --chart-3: #eab308;
+  --chart-4: #f97316;
+  --chart-5: #2563eb;
 }
 
-html {
-  font-size: 16px;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+.dark {
+  --background: #0f1412;
+  --foreground: #e9efec;
+  --card: #151b18;
+  --card-foreground: #e9efec;
+  --popover: #151b18;
+  --popover-foreground: #e9efec;
+  --primary: #2dd4bf;
+  --primary-hover: #5eead4;
+  --primary-foreground: #0b1a17;
+  --secondary: #1c2b27;
+  --secondary-foreground: #99f6e4;
+  --muted: #1c211f;
+  --muted-foreground: #9aa8a3;
+  --accent: #1c2b27;
+  --accent-foreground: #99f6e4;
+  --destructive: #f97066;
+  --destructive-foreground: #3c0b07;
+  --success: #6fcf97;
+  --success-foreground: #0b1f14;
+  --warning: #fbbf24;
+  --warning-foreground: #3b2706;
+  --info: #60a5fa;
+  --info-foreground: #0b1b33;
+  --border: #22312c;
+  --input: #2a3a34;
+  --ring: #2dd4bf;
+  --chart-1: #2dd4bf;
+  --chart-2: #0f766e;
+  --chart-3: #fbbf24;
+  --chart-4: #fb923c;
+  --chart-5: #60a5fa;
 }
 
-body {
-  font-family:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  line-height: 1.5;
-  color: #1a202c;
-  background: #f7f7f8;
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  /* Tipografía del sistema */
+  --font-sans:
+    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    sans-serif;
+
+  /* Radios coherentes sobre la base de 0.625rem */
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  /* Sombras de elevación propias (sin "sombras genéricas" de template) */
+  --shadow-card: 0 1px 2px 0 rgb(20 32 29 / 0.04), 0 1px 3px 0 rgb(20 32 29 / 0.06);
+  --shadow-elevated: 0 4px 12px -2px rgb(20 32 29 / 0.1), 0 2px 4px -2px rgb(20 32 29 / 0.06);
+  --shadow-dialog: 0 12px 32px -4px rgb(20 32 29 / 0.18), 0 4px 8px -4px rgb(20 32 29 / 0.08);
 }
 
-/* Placeholder transitorio — será reemplazado por el design system (Subfase 0.4) */
-.placeholder {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  text-align: center;
-  padding: 2rem;
-}
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
 
-.placeholder h1 {
-  font-size: 2.5rem;
-  font-weight: 700;
-  color: #2d6a4f;
-}
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: 'cv11', 'ss01';
+    text-rendering: optimizeLegibility;
+  }
 
-.placeholder .sub {
-  color: #6b7280;
-  font-size: 0.875rem;
+  /* Jerarquía tipográfica base */
+  h1 {
+    @apply text-3xl font-semibold tracking-tight;
+  }
+  h2 {
+    @apply text-2xl font-semibold tracking-tight;
+  }
+  h3 {
+    @apply text-xl font-semibold;
+  }
+  h4 {
+    @apply text-base font-semibold;
+  }
+
+  ::selection {
+    @apply bg-primary/20 text-primary;
+  }
 }

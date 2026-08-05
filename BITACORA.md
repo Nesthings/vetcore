@@ -102,4 +102,39 @@ Registro de avance por subfase: qué se hizo, decisiones técnicas tomadas y por
 
 ---
 
-**Siguiente subfase:** 0.4 — Sistema de diseño base (design system): paleta, tipografía, espaciado y componentes base. Esto debe completarse ANTES de construir cualquier pantalla (Fase 1).
+## Subfase 0.4 — Sistema de diseño base (design system) ✅
+
+**Fecha:** 2026-08-05
+
+### Qué se hizo
+- Configurado **Tailwind CSS v4** (plugin Vite) + **shadcn/ui** (estilo new-york, Radix).
+- Definidos los **tokens de diseño** en `src/styles/index.css` (paleta, tipografía, espaciado, radios, sombras, colores de gráficas).
+- Agregados componentes base shadcn: `Button`, `Input`, `Badge`, `Card`, `Table`, `Dialog`, `Select`, `Label`, `Textarea`, `Separator`, `Skeleton`.
+- Creados **estados diseñados**: `EmptyState`, `LoadingState`, `ErrorState` (requisito de la sección 4: sin placeholders genéricos).
+- Página de preview `src/pages/DesignSystem.tsx` que muestra todos los componentes con su uso.
+- Alias `@/*` → `src/*` en Vite y TypeScript.
+- Fuente **Inter** cargada desde Google Fonts.
+
+### Decisiones técnicas y por qué
+- **Tailwind v4 + shadcn/ui (aprobado por el usuario):** acelera consistencia visual con componentes accesibles (Radix) y 100% customizables. El documento (sección 4) recomienda evaluar esta librería.
+- **Paleta "teal clínico" (aprobada por el usuario):** primario `#0f766e` (teal profundo) sobre neutros con ligero tinte cálido-verde (`#f6f9f8`). Transmite salud/cuidado, se aleja del look "admin panel genérico" y del Bootstrap default. Incluye variantes semánticas `success/warning/info` para badges de estado y 5 colores `chart-*` para las gráficas de los Dashboards (Fase 2).
+- **Tipografía Inter** (sugerida por el documento) con jerarquía base en `@layer base` (h1-h4, selection, etc.).
+- **Espaciado en múltiplos de 4px** (escala default de Tailwind, cumple la regla del documento).
+- **Radios y sombras propios:** `--radius` 0.625rem escalado (sm/md/lg/xl) y sombras `card/elevated/dialog` suaves — sin las "sombras genéricas" de template.
+- **Modo oscuro incluido** en los tokens (`.dark`) aunque el producto arranca en claro: es gratis de mantener y útil para el futuro.
+- **shadcn colocó los archivos en `@/` literal** por el CLI v4; se movieron a `src/components/ui/` donde corresponde.
+- **`import.meta.dirname`** en vite.config (Vite 8 depreca `__dirname` en el config loader nativo).
+
+### Verificado
+- `npm run lint` pasa (solo 2 warnings de react-refresh, patrón estándar de shadcn: export de `cva` junto al componente) ✓
+- `npm run build` compila (1902 módulos, tsc + vite OK) ✓
+- Dev server responde HTTP 200 con el título "VetCore — Gestión Veterinaria" ✓
+- Prettier formatea sin errores ✓
+
+### Notas / pendientes
+- La página `DesignSystem` es transitoria; se reemplazará cuando existan las pantallas reales (el routing se introduce en la Subfase 1.2).
+- El dark mode está disponible en tokens pero no habrá toggle por ahora.
+
+---
+
+**Siguiente subfase:** FASE 1 (MVP) — 1.1 Endpoints core del backend: CRUD de `clinics`, `clinic_branches`, `users`, `pets`, `pet_weight_records`, `consultations`, `appointments`, `inventory_products`, `invoices`. Aquí se crean los modelos ORM SQLAlchemy y las rutas CRUD.
