@@ -2,6 +2,8 @@ from app.schemas.appointment import (
     AppointmentCreate,
     AppointmentRead,
     AppointmentUpdate,
+    ScheduleBlockCreate,
+    ScheduleBlockRead,
 )
 from app.schemas.billing import (
     InvoiceCreate,
@@ -61,6 +63,8 @@ __all__ = [
     "PetUpdate",
     "PetWeightCreate",
     "PetWeightRead",
+    "ScheduleBlockCreate",
+    "ScheduleBlockRead",
     "UserCreate",
     "UserRead",
     "UserUpdate",

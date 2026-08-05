@@ -8,10 +8,42 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import CurrentClinic, get_current_clinic, require_clinic_roles
 from app.db.session import get_db
-from app.models import Appointment, Pet
+from app.models import Appointment, ClinicBranch, Pet, User
 from app.schemas.appointment import AppointmentCreate, AppointmentRead, AppointmentUpdate
 
 router = APIRouter(prefix="/appointments", tags=["appointments"])
+
+
+def _with_names(db: Session, appointments: list[Appointment]) -> list[dict]:
+    """Enriquece las citas con nombres legibles para la UI de la agenda."""
+    if not appointments:
+        return []
+    pet_ids = {a.pet_id for a in appointments}
+    vet_ids = {a.vet_user_id for a in appointments if a.vet_user_id}
+    branch_ids = {a.branch_id for a in appointments}
+
+    pets = dict(db.execute(select(Pet.id, Pet.name).where(Pet.id.in_(pet_ids))).all())
+    vets = (
+        dict(db.execute(select(User.id, User.full_name).where(User.id.in_(vet_ids))).all())
+        if vet_ids
+        else {}
+    )
+    branches = dict(
+        db.execute(
+            select(ClinicBranch.id, ClinicBranch.name).where(ClinicBranch.id.in_(branch_ids))
+        ).all()
+    )
+
+    out = []
+    for a in appointments:
+        data = AppointmentRead.model_validate(a).model_dump()
+        data.update(
+            pet_name=pets.get(a.pet_id),
+            vet_name=vets.get(a.vet_user_id),
+            branch_name=branches.get(a.branch_id),
+        )
+        out.append(data)
+    return out
 
 
 @router.get("", response_model=list[AppointmentRead])
@@ -24,7 +56,7 @@ def list_appointments(
     to: datetime | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
-) -> list[Appointment]:
+) -> list[dict]:
     stmt = select(Appointment).where(Appointment.clinic_id == ctx.clinic["id"])
     if branch_id:
         stmt = stmt.where(Appointment.branch_id == branch_id)
@@ -35,7 +67,7 @@ def list_appointments(
     if to:
         stmt = stmt.where(Appointment.start_time <= to)
     stmt = stmt.order_by(Appointment.start_time).limit(limit).offset(offset)
-    return list(db.scalars(stmt))
+    return _with_names(db, list(db.scalars(stmt)))
 
 
 def _get_appointment_or_404(db: Session, clinic_id: str, appointment_id: str) -> Appointment:
@@ -69,8 +101,9 @@ def get_appointment(
     appointment_id: str,
     ctx: CurrentClinic = Depends(get_current_clinic),
     db: Session = Depends(get_db),
-) -> Appointment:
-    return _get_appointment_or_404(db, ctx.clinic["id"], appointment_id)
+) -> dict:
+    appointment = _get_appointment_or_404(db, ctx.clinic["id"], appointment_id)
+    return _with_names(db, [appointment])[0]
 
 
 @router.post("", response_model=AppointmentRead, status_code=status.HTTP_201_CREATED)

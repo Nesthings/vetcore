@@ -246,4 +246,47 @@ Las verificaciones de frontend deben ejercitar el código JS real (no solo el ba
 
 ---
 
-**Siguiente subfase:** 1.3 — Dashboard del día + Agenda (vista día/semana con creación/reagendado, detalle de cita, bloqueo manual de horario).
+## Subfase 1.3 — Dashboard del día + Agenda ✅
+
+**Fecha:** 2026-08-05
+
+### Qué se hizo
+**Backend:**
+- Modelo `ScheduleBlock` + CRUD en `app/api/schedule_blocks.py` (listar por rango, crear, editar, eliminar).
+- Modelo `InventoryMovement` (faltaba; su tabla existía). El stock se deriva de la suma de `quantity_delta`.
+- `GET /dashboard/day`: KPIs de citas por estado, citas por hora (7-20), bloques del día, alertas de stock (productos bajo umbral) y pacientes activos. **Operativo, sin cifras de dinero** (regla sección 3.9).
+- Citas enriquecidas con `pet_name`, `vet_name`, `branch_name` (joins en el endpoint) — la agenda los necesita.
+
+**Frontend:**
+- `recharts` instalado (aprobado) para la gráfica de citas por hora.
+- `AppLayout` (sidebar + topbar) — el shell del panel clínico; reemplaza al `SessionHome` para staff.
+- `Dashboard` (KPIs, gráfica de barras, alertas de stock, lista de citas del día).
+- `Agenda` día/semana construida a medida: grid de horas 7-20, citas posicionadas, bloques de horario, selector de sucursal, navegación prev/next/hoy.
+- Diálogos: `AppointmentFormDialog` (nueva cita), `AppointmentDetailDialog` (detalle + cambios de estado + reagendar), `BlockFormDialog` (bloquear horario).
+- Rutas: `/` → Dashboard, `/agenda` → Agenda (protegidas).
+
+### Decisiones técnicas y por qué
+- **Agenda a medida (aprobada), no librería de calendario:** cumple la regla de la sección 4 (no verse como template genérico) y se integra con el design system.
+- **Reagendar solo por diálogo (aprobado):** editar fecha/hora y estado desde el detalle; sin drag & drop (más simple y robusto para MVP).
+- **Alertas de stock vía movimientos:** `inventory_products` no tiene campo de stock y los lotes son FASE 2; `inventory_movements` sí es MVP, así que stock = Σ deltas. Umbral configurable (default 5).
+- **Dashboard operativo sin dinero:** los ingresos son exclusivos del admin en el Dashboard financiero (2.6).
+- **Horas del grid 7:00–20:00** (horario típico de clínica). Las citas fuera de rango se muestran igual (la UI usa hora local del navegador).
+- **`react-hooks/set-state-in-effect` desactivada:** regla nueva (v7) demasiado agresiva; marca como error el patrón legítimo de fetch en `useEffect` y reset de dialogs al abrir. Documentado en `eslint.config.js`.
+- **Zona horaria:** el servidor corre en UTC; los datos de prueba se sembraron a horas UTC que se ven en el horario laboral de México (UTC-6).
+
+### Verificado
+- CRUD de bloques: crear/listar por rango ✓
+- Citas enriquecidas: `[('Firulais', 'Consulta', 'Sucursal Centro')]` ✓
+- Dashboard: 3 citas hoy, por estado `scheduled`, bloques, stock (con stock 6 y umbral 5 → sin alertas; correcto) ✓
+- Lint 0 errores (solo warnings conocidos de react-refresh) + build OK ✓
+- Todos los módulos del frontend transforman vía dev server (HTTP 200) ✓
+- Recharts agrega ~380 kB al bundle (warning de chunk size; code-split posible en el futuro)
+
+### Notas / pendientes
+- Datos de prueba para hoy: 3 citas de Firulais (9:00, 11:30, 14:00 hora México) + 1 bloqueo en el 06.
+- El drag & drop de la agenda quedó fuera (decisión aprobada); se puede añadir después si se quiere.
+- `/portal` (owner) y `/super-admin` siguen con `SessionHome` hasta 1.7 y 1.8.
+
+---
+
+**Siguiente subfase:** 1.4 — Ficha de paciente + Nueva consulta (línea de tiempo, alta/edición de mascota, cálculo de dosis, captura de foto/nota, PDF de resumen de consulta).

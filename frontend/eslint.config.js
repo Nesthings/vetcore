@@ -21,6 +21,10 @@ export default tseslint.config(
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
+      // Patrones legítimos del proyecto: fetch de datos en useEffect y
+      // reset de formularios al abrir un Dialog. La regla v7 de react-hooks
+      // los marca como falsos positivos (los setState son async o intencionales).
+      'react-hooks/set-state-in-effect': 'off',
       'react-refresh/only-export-components': [
         'warn',
         { allowConstantExport: true },

@@ -6,6 +6,8 @@ import { Activate } from '@/pages/auth/Activate'
 import { ForgotPassword } from '@/pages/auth/ForgotPassword'
 import { Login } from '@/pages/auth/Login'
 import { ResetPassword } from '@/pages/auth/ResetPassword'
+import { Agenda } from '@/pages/Agenda'
+import { Dashboard } from '@/pages/Dashboard'
 import { DesignSystem } from '@/pages/DesignSystem'
 import { SessionHome } from '@/pages/SessionHome'
 
@@ -24,7 +26,15 @@ function App() {
             path="/"
             element={
               <ProtectedRoute>
-                <SessionHome />
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/agenda"
+            element={
+              <ProtectedRoute>
+                <Agenda />
               </ProtectedRoute>
             }
           />

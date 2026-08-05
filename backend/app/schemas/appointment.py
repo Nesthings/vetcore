@@ -41,3 +41,29 @@ class AppointmentRead(BaseModel):
     end_time: datetime
     status: str
     created_at: datetime
+
+    # Nombres enriquecidos (para la UI de la agenda)
+    pet_name: str | None = None
+    vet_name: str | None = None
+    branch_name: str | None = None
+
+
+class ScheduleBlockCreate(BaseModel):
+    branch_id: uuid.UUID
+    vet_user_id: uuid.UUID | None = None
+    start_time: datetime
+    end_time: datetime
+    reason: str | None = Field(default=None, max_length=200)
+
+
+class ScheduleBlockRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    clinic_id: uuid.UUID
+    branch_id: uuid.UUID
+    vet_user_id: uuid.UUID | None
+    start_time: datetime
+    end_time: datetime
+    reason: str | None
+    vet_name: str | None = None

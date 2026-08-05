@@ -7,10 +7,12 @@ from app.api import (
     branches,
     clinics,
     consultations,
+    dashboard,
     health,
     inventory,
     invoices,
     pets,
+    schedule_blocks,
     users,
 )
 from app.core.config import settings
@@ -38,5 +40,7 @@ app.include_router(users.router, prefix="/api/v1")
 app.include_router(pets.router, prefix="/api/v1")
 app.include_router(consultations.router, prefix="/api/v1")
 app.include_router(appointments.router, prefix="/api/v1")
+app.include_router(schedule_blocks.router, prefix="/api/v1")
+app.include_router(dashboard.router, prefix="/api/v1")
 app.include_router(inventory.router, prefix="/api/v1")
 app.include_router(invoices.router, prefix="/api/v1")
