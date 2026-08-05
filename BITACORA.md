@@ -177,4 +177,47 @@ Registro de avance por subfase: qué se hizo, decisiones técnicas tomadas y por
 
 ---
 
-**Siguiente subfase:** 1.2 — Pantallas de autenticación (Login/selección de rol, Activar cuenta con token del owner, Recuperación de contraseña). Aquí se introduce el routing del frontend.
+## Subfase 1.2 — Pantallas de autenticación ✅
+
+**Fecha:** 2026-08-05
+
+### Qué se hizo
+**Backend:**
+- Migración `0003`: tabla `password_reset_tokens`.
+- Endpoints nuevos en `auth.py`:
+  - `POST /auth/activate-token` — activación de cuenta del owner con el token de invitación (crea o **reutiliza** el owner global y vincula la mascota).
+  - `POST /auth/forgot-password` — genera token de reset (30 min de expiración).
+  - `POST /auth/reset-password` — nueva contraseña con token (una sola vez).
+
+**Frontend:**
+- `react-router-dom` (BrowserRouter) + cliente API `src/lib/api.ts` + contexto de sesión `src/lib/auth.tsx` (persistencia en localStorage).
+- `AuthLayout` + páginas: `Login` (tabs Clínica/Dueño/Super Admin), `Activate`, `ForgotPassword`, `ResetPassword`.
+- `ProtectedRoute` (guard de rutas autenticadas) + `SessionHome` (placeholder post-login por rol).
+- `App.tsx` ahora es el Router; `/design-system` se conserva como herramienta de dev.
+- Componente shadcn `Tabs` agregado.
+
+### Decisiones técnicas y por qué
+- **Tabla `password_reset_tokens` (nueva, aprobada):** el esquema del documento no contempla reset de contraseña; se agregó con token único, expiración de 30 min y `used_at` (una sola vez).
+- **Activación de token en 1.2:** la pantalla "Activar cuenta" necesita su endpoint para ser funcional. La generación de invitaciones y la Cartilla completa quedan para 1.7. La lógica de activación sigue textualmente los pasos de la sección 5: validar token → buscar owner por phone/email → reutilizar o crear → crear link → marcar usado.
+- **Regla de identidad global aplicada:** al activar un segundo token con el mismo email, el `owner` se reutiliza (nunca se duplica). El `ON CONFLICT (owner_id, pet_id) DO UPDATE` mantiene el link único por pareja.
+- **Recuperación de contraseña solo para staff** (`users`), según el documento. En dev el reset token se devuelve en la respuesta (no hay servicio de email); en producción sería por correo/WhatsApp.
+- **Login unificado con tabs** (checklist "Login / selección de rol"): misma pantalla, tres endpoints de login según la pestaña.
+- **Cliente API con relativo `/api/v1`:** aprovecha el proxy de Vite en dev y la misma URL en prod; manejo de 401 (limpia el token) y errores tipados.
+- **Decodificación del JWT en el cliente solo para UI** (role/clinic_id); la autorización real sigue siendo del backend.
+
+### Verificado
+- Activar token → crea owner + link y devuelve token de owner; login posterior OK ✓
+- Token ya usado → 400 "Este token ya fue utilizado" ✓
+- **Identidad global:** 2 activaciones con el mismo email → **1 solo owner** ✓
+- forgot-password devuelve token (dev); reset-password 204; login con la nueva contraseña OK; reuso del token → 400 ✓
+- `npm run build` compila (0 errores); dev server responde y HMR aplica los cambios ✓
+
+### Notas / pendientes
+- ⚠️ La contraseña de `admin@test.com` cambió a **`<redactado>`** durante la prueba de reset (era `<redactado>`).
+- Credenciales dev útiles: super-admin `admin@vetcore.app`/`<redactado>`; owner `owner@test.com`/`<redactado>`; recepción `recepcion@test.com`/`<redactado>`.
+- Datos de prueba: 2 invitaciones usadas del owner; mascota Firulais.
+- El flujo de *generación* de invitaciones (token al dar de alta mascota, envío WhatsApp) y la Cartilla completa son de la Subfase 1.7.
+
+---
+
+**Siguiente subfase:** 1.3 — Dashboard del día + Agenda (vista día/semana con creación/reagendado, detalle de cita, bloqueo manual de horario).
