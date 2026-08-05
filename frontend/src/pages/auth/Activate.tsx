@@ -37,7 +37,7 @@ export function Activate() {
     }
     setSubmitting(true)
     try {
-      const res = await apiFetch<ActivateResponse>('/api/v1/auth/activate-token', {
+      const res = await apiFetch<ActivateResponse>('/auth/activate-token', {
         method: 'POST',
         body: JSON.stringify({ token, password }),
       })

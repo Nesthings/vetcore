@@ -15,9 +15,9 @@ interface LoginResponse {
 }
 
 const ROLE_TARGETS: Record<string, string> = {
-  staff: '/api/v1/auth/login',
-  owner: '/api/v1/auth/login/owner',
-  'super-admin': '/api/v1/auth/login/super-admin',
+  staff: '/auth/login',
+  owner: '/auth/login/owner',
+  'super-admin': '/auth/login/super-admin',
 }
 
 export function Login() {

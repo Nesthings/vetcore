@@ -31,7 +31,7 @@ export function ResetPassword() {
     }
     setSubmitting(true)
     try {
-      await apiFetch('/api/v1/auth/reset-password', {
+      await apiFetch('/auth/reset-password', {
         method: 'POST',
         body: JSON.stringify({ token, password }),
       })

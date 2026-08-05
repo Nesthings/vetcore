@@ -220,4 +220,30 @@ Registro de avance por subfase: qué se hizo, decisiones técnicas tomadas y por
 
 ---
 
+## Fix — Doble prefijo `/api/v1` en las llamadas del frontend (Subfase 1.2)
+
+**Fecha:** 2026-08-05
+
+### Bug
+Al iniciar sesión con cualquier rol, la app mostraba **"Not Found"**. Causa: `apiFetch()` en `src/lib/api.ts` antepone `BASE_URL = '/api/v1'` a la ruta, y las páginas pasaban rutas que **ya incluían** `/api/v1` (`'/api/v1/auth/login'`). Resultado: la app pedía `/api/v1/api/v1/auth/login` → 404.
+
+El log del backend lo evidenciaba: `POST /api/v1/api/v1/auth/login 404`. Mis pruebas de la subfase no lo detectaron porque usé `curl` directo al backend (no ejecuta el JS del frontend).
+
+### Corrección
+Normalizar los callers para que pasen la ruta sin el prefijo (que ya lo agrega `apiFetch`):
+- `Login.tsx`: `ROLE_TARGETS` → `/auth/login`, `/auth/login/owner`, `/auth/login/super-admin`
+- `Activate.tsx` → `/auth/activate-token`
+- `ForgotPassword.tsx` → `/auth/forgot-password`
+- `ResetPassword.tsx` → `/auth/reset-password`
+
+### Verificado
+- `npm run lint` 0 errores; `npm run build` OK ✓
+- Vía el proxy de Vite (`:5173`): `POST /api/v1/auth/login` con credenciales de staff → **200** ✓
+- El log del backend ya no muestra el doble prefijo ✓
+
+### Lección anotada
+Las verificaciones de frontend deben ejercitar el código JS real (no solo el backend con curl). A partir de aquí, al verificar subfases con frontend, probar también el flujo a través del navegador/proxy.
+
+---
+
 **Siguiente subfase:** 1.3 — Dashboard del día + Agenda (vista día/semana con creación/reagendado, detalle de cita, bloqueo manual de horario).

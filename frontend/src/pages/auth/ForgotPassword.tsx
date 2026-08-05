@@ -25,7 +25,7 @@ export function ForgotPassword() {
     setError(null)
     setSubmitting(true)
     try {
-      const res = await apiFetch<ForgotResponse>('/api/v1/auth/forgot-password', {
+      const res = await apiFetch<ForgotResponse>('/auth/forgot-password', {
         method: 'POST',
         body: JSON.stringify({ email }),
       })
