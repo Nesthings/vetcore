@@ -78,6 +78,24 @@ def require_staff(user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
     return user
 
 
+def require_clinic_roles(*roles: str):
+    """Restringe una ruta tenant a roles específicos del staff.
+
+    Combina la validación de suscripción (get_current_clinic) con el chequeo
+    de rol, devolviendo el contexto de clínica ya validado.
+    """
+
+    def dependency(ctx: CurrentClinic = Depends(get_current_clinic)) -> CurrentClinic:
+        if ctx.user.role not in roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tienes permisos para esta acción",
+            )
+        return ctx
+
+    return dependency
+
+
 @dataclass
 class CurrentClinic:
     user: CurrentUser

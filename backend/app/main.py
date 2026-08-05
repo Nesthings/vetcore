@@ -1,8 +1,18 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.auth import router as auth_router
-from app.api.health import router as health_router
+from app.api import (
+    appointments,
+    auth,
+    branches,
+    clinics,
+    consultations,
+    health,
+    inventory,
+    invoices,
+    pets,
+    users,
+)
 from app.core.config import settings
 
 app = FastAPI(
@@ -20,5 +30,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(health_router, prefix="/api/v1")
-app.include_router(auth_router, prefix="/api/v1")
+app.include_router(health.router, prefix="/api/v1")
+app.include_router(auth.router, prefix="/api/v1")
+app.include_router(clinics.router, prefix="/api/v1")
+app.include_router(branches.router, prefix="/api/v1")
+app.include_router(users.router, prefix="/api/v1")
+app.include_router(pets.router, prefix="/api/v1")
+app.include_router(consultations.router, prefix="/api/v1")
+app.include_router(appointments.router, prefix="/api/v1")
+app.include_router(inventory.router, prefix="/api/v1")
+app.include_router(invoices.router, prefix="/api/v1")

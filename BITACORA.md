@@ -137,4 +137,44 @@ Registro de avance por subfase: qué se hizo, decisiones técnicas tomadas y por
 
 ---
 
-**Siguiente subfase:** FASE 1 (MVP) — 1.1 Endpoints core del backend: CRUD de `clinics`, `clinic_branches`, `users`, `pets`, `pet_weight_records`, `consultations`, `appointments`, `inventory_products`, `invoices`. Aquí se crean los modelos ORM SQLAlchemy y las rutas CRUD.
+## Subfase 1.1 — Endpoints core del backend ✅
+
+**Fecha:** 2026-08-05
+
+### Qué se hizo
+- **Modelos ORM SQLAlchemy 2.0** (`app/models/`): `Clinic`, `ClinicBranch`, `User`, `Pet`, `PetWeightRecord`, `Consultation`+`ConsultationItem`, `Appointment`, `InventoryProduct`, `Invoice`+`InvoiceItem`, con mixins `UUIDPkMixin`/`TimestampMixin`.
+- **Schemas Pydantic** Create/Update/Read por entidad (`app/schemas/`).
+- **Routers CRUD** (`app/api/`): clinics (super-admin), branches, users, pets (+pesos), consultations, appointments, inventory, invoices.
+- Helper `require_clinic_roles(*roles)` en `deps.py` que combina validación de suscripción + chequeo de rol.
+- Registro Core (`app/models/_references.py`) de tablas referenciadas por FK sin modelo propio aún.
+
+### Decisiones técnicas y por qué
+- **Modelos = reflejo exacto del DDL:** la migración 0001 (SQL del documento) sigue siendo la fuente de verdad; los modelos solo replican el esquema para el ORM. No se usa `alembic autogenerate`.
+- **Matriz de permisos** aplicada (aprobada en el plan):
+  - `clinics` → solo super-admin (sin tenant).
+  - `branches`, `users` → admin muta, staff lee.
+  - `pets`/pesos, `consultations`, `inventory` → admin+veterinario mutan, staff lee.
+  - `appointments` → todo el staff.
+  - `invoices` (dinero, sección 3.9) → solo admin, incluso para leer.
+- **Aislamiento multi-tenant duro:** cada query filtra por `clinic_id` del token. Los `GET /{id}` devuelven 404 (no 403) cuando el recurso no pertenece a la clínica — no filtra información de existencia.
+- **Total de factura calculado en servidor** (`_compute_total`), nunca se confía en el total del cliente.
+- **Soft-deletes:** clínica → `subscription_status='cancelled'`; usuario y mascota → `is_active=false`; factura → `status='cancelled'` (integridad financiera). Sucursal y producto usan hard-delete con 409 si hay dependencias FK.
+- **`require_clinic_roles` registrado en `extend-immutable-calls`** de Ruff (patrón factory de dependencias de FastAPI).
+- **Registro Core de tablas sin modelo** (`owners`, `consultation_templates`, `service_catalog`): SQLAlchemy necesita las tablas de destino de las FK en el metadata para ordenar las operaciones de flush. Se registran como `Table` Core sin clases ORM (los modelos llegan en 1.5/1.7/2.1).
+
+### Verificado
+- CRUD completo en Clínica Test: sucursal, mascota, peso (con `latest_weight_kg` en la lectura), consulta con items, cita, producto, factura con items ✓
+- Total de factura calculado en servidor: 450.50 + 2×350.25 = **1151.00** ✓
+- **Aislamiento:** admin de Clínica Beta ve 0 mascotas/facturas de Clínica Test; al acceder por id → 404 ✓
+- **Roles:** recepción → 403 en facturas y alta de mascotas; 201 en citas; 200 al listar pacientes ✓
+- Super-admin crea clínica y lista las 3 clínicas ✓
+- Ruff pasa sin errores ✓
+
+### Notas / pendientes
+- **Gap detectado:** no hay endpoint para crear el PRIMER admin de una clínica (chicken-egg: los users los crea el admin). El flujo de onboarding super-admin → primer admin se resuelve en la Subfase 1.8 (Panel Super-Admin). Para pruebas se creó el admin de Clínica Beta directo en DB.
+- Datos de prueba nuevos en dev: Clínica Beta (`admin@beta.com`/`<redactado>`), recepcionista (`recepcion@test.com`/`<redactado>`), mascota "Firulais" con peso, consulta, cita, producto y factura.
+- No se modelaron `owners`, `consultation_templates`, `service_catalog` (son 1.7, 2.1, 1.5) — solo su registro Core para las FKs.
+
+---
+
+**Siguiente subfase:** 1.2 — Pantallas de autenticación (Login/selección de rol, Activar cuenta con token del owner, Recuperación de contraseña). Aquí se introduce el routing del frontend.

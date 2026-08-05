@@ -1,0 +1,43 @@
+import uuid
+from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class AppointmentCreate(BaseModel):
+    branch_id: uuid.UUID
+    pet_id: uuid.UUID
+    vet_user_id: uuid.UUID | None = None
+    procedure_type: str = Field(min_length=1, max_length=50)
+    start_time: datetime
+    end_time: datetime
+    status: str = Field(
+        default="scheduled", pattern="^(scheduled|confirmed|completed|cancelled|no_show)$"
+    )
+
+
+class AppointmentUpdate(BaseModel):
+    branch_id: uuid.UUID | None = None
+    pet_id: uuid.UUID | None = None
+    vet_user_id: uuid.UUID | None = None
+    procedure_type: str | None = Field(default=None, min_length=1, max_length=50)
+    start_time: datetime | None = None
+    end_time: datetime | None = None
+    status: str | None = Field(
+        default=None, pattern="^(scheduled|confirmed|completed|cancelled|no_show)$"
+    )
+
+
+class AppointmentRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    clinic_id: uuid.UUID
+    branch_id: uuid.UUID
+    pet_id: uuid.UUID
+    vet_user_id: uuid.UUID | None
+    procedure_type: str
+    start_time: datetime
+    end_time: datetime
+    status: str
+    created_at: datetime
