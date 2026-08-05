@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_access_token_expire_minutes: int = 480
 
+    super_admin_email: str = "admin@vetcore.app"
+    super_admin_password: str = "change-me-in-production"
+    super_admin_name: str = "Super Admin"
+
     r2_endpoint: str = ""
     r2_access_key_id: str = ""
     r2_secret_access_key: str = ""

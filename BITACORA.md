@@ -67,4 +67,39 @@ Registro de avance por subfase: qué se hizo, decisiones técnicas tomadas y por
 
 ---
 
-**Siguiente subfase:** 0.3 — Autenticación y middleware multi-tenant (JWT, roles, y validación de `subscription_status` en cada request).
+## Subfase 0.3 — Autenticación y middleware multi-tenant ✅
+
+**Fecha:** 2026-08-05
+
+### Qué se hizo
+- Creada tabla `super_admins` (migración `0002`) para la identidad del dueño del producto.
+- `app/core/security.py`: hashing bcrypt + creación/decodificación de JWT.
+- `app/api/deps.py`: `get_current_user`, guard por rol (`require_roles`, `require_staff`) y `get_current_clinic` que valida `subscription_status` en cada request protegido.
+- `app/api/auth.py`: `POST /auth/login` (staff), `/auth/login/owner`, `/auth/login/super-admin`, `GET /auth/me`, y endpoint demo `GET /auth/clinic-check` para probar el middleware.
+- Seed idempotente `scripts/seed_super_admin.py` (lee `SUPER_ADMIN_*` del `.env`).
+- Variables `SUPER_ADMIN_*` agregadas a `.env` y `.env.example`.
+
+### Decisiones técnicas y por qué
+- **Tabla `super_admins` (agregada al esquema del documento):** el documento define el rol `super-admin` pero su esquema no tiene dónde guardar sus credenciales. Se creó una tabla pequeña en DB (aprobada por el usuario en el plan) en vez de hardcodear credenciales: consistente con el resto del sistema, auditable y extensible.
+- **Tokens por identidad:** `sub` + `role` siempre; `clinic_id`/`branch_id` solo para staff. Los tokens de `owner` no llevan `clinic_id` (identidad global, principio 2). El rol del token es informativo; los permisos se re-validan contra la DB.
+- **Middleware como dependencia FastAPI (`get_current_clinic`):** se aplica ruta por ruta, más flexible y testeable que un middleware global de Starlette. Devuelve `CurrentClinic` (dataclass con `user` + `clinic`) para que los endpoints futuros de la Subfase 1.1 tengan ambas cosas.
+- **Pin `bcrypt==4.0.1`:** bcrypt 5.x rompe `passlib` 1.7.4 (error conocido `__about__`). Se fijó la versión compatible.
+- **SQL directo (no ORM) en login/validación:** los modelos SQLAlchemy son de la Subfase 1.1; para no adelantar trabajo se consulta con `text()`.
+- **Ruff B008:** `Depends()` en defaults es el patrón oficial de FastAPI; se configuró `extend-immutable-calls` en lugar de silenciar la regla globalmente.
+
+### Verificado
+- Login super-admin devuelve token; `/auth/me` devuelve la identidad correcta ✓
+- Sin token → 401; token inválido → 401; password incorrecta → 401 ✓
+- Staff de clínica activa pasa `clinic-check` con su `clinic_id` ✓
+- Staff de clínica **suspendida** → 403 "Suscripción de la clínica no activa" ✓
+- Owner inexistente → 401 ✓
+- `/docs` (Swagger) responde 200 ✓
+- Ruff pasa sin errores ✓
+
+### Notas / pendientes
+- Quedan datos de prueba en la DB de desarrollo: clínica "Clínica Test" (activa) con `admin@test.com`/`<redactado>`, y "Clínica Suspendida" con `vet@susp.com`/`<redactado>`. Útiles para validar las subfases siguientes; se pueden eliminar antes de producción.
+- El flujo de invitación por token del owner NO se construye aquí (es 1.2/1.7, por orden del documento).
+
+---
+
+**Siguiente subfase:** 0.4 — Sistema de diseño base (design system): paleta, tipografía, espaciado y componentes base. Esto debe completarse ANTES de construir cualquier pantalla (Fase 1).

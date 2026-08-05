@@ -7,5 +7,8 @@ exclude = [".venv", "alembic"]
 select = ["E", "F", "I", "W", "UP", "B", "SIM"]
 ignore = []
 
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
+
 [tool.ruff.format]
 quote-style = "double"
