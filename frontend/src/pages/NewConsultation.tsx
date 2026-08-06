@@ -58,14 +58,6 @@ interface ProductLine {
   quantity: number
 }
 
-interface OwnerForm {
-  full_name: string
-  phone: string
-  email: string
-  alt_contact_name: string
-  alt_phone: string
-}
-
 interface CheckoutResult {
   consultation_id: string
   invoice_id: string
@@ -106,13 +98,6 @@ export function NewConsultation() {
   const [weight, setWeight] = useState('')
   const [dateTime, setDateTime] = useState(toLocalInput(new Date()))
   const [sendWhatsapp, setSendWhatsapp] = useState(false)
-  const [ownerForm, setOwnerForm] = useState<OwnerForm>({
-    full_name: '',
-    phone: '',
-    email: '',
-    alt_contact_name: '',
-    alt_phone: '',
-  })
 
   const [serviceLines, setServiceLines] = useState<ServiceLine[]>([])
   const [productLines, setProductLines] = useState<ProductLine[]>([])
@@ -150,13 +135,6 @@ export function NewConsultation() {
       setVaccination(vac)
       const ow = p.owners?.find((o) => o.is_active) ?? null
       setOwner(ow)
-      setOwnerForm({
-        full_name: ow?.full_name ?? '',
-        phone: ow?.phone ?? '',
-        email: ow?.email ?? '',
-        alt_contact_name: ow?.alt_contact_name ?? '',
-        alt_phone: ow?.alt_phone ?? '',
-      })
       setWeight(p.latest_weight_kg ? String(p.latest_weight_kg) : '')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo cargar el paciente')
@@ -250,9 +228,6 @@ export function NewConsultation() {
   const productStock = (productId: string) =>
     products.find((p) => p.id === productId)?.stock_quantity ?? 0
 
-  const updateOwnerForm = (field: keyof OwnerForm, value: string) =>
-    setOwnerForm((f) => ({ ...f, [field]: value }))
-
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
@@ -270,17 +245,6 @@ export function NewConsultation() {
     }
     setSubmitting(true)
     try {
-      if (owner) {
-        const changed = (Object.keys(ownerForm) as (keyof OwnerForm)[]).some(
-          (k) => String(owner[k] ?? '') !== String(ownerForm[k] ?? ''),
-        )
-        if (changed) {
-          await apiFetch(`/pets/${pet.id}/owner-contact`, {
-            method: 'PUT',
-            body: JSON.stringify(ownerForm),
-          })
-        }
-      }
       const res = await apiFetch<CheckoutResult>('/consultations/checkout', {
         method: 'POST',
         body: JSON.stringify({
@@ -469,47 +433,41 @@ export function NewConsultation() {
               <CardHeader>
                 <CardTitle>2. Dueño y contacto</CardTitle>
                 <CardDescription>
-                  La recepcionista verifica y puede corregir los datos antes de cobrar
+                  Datos del dueño para el recibo — solo visualización (verifícalos)
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 {owner ? (
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-2">
+                    <div>
                       <Label>Nombre del dueño</Label>
-                      <Input
-                        value={ownerForm.full_name}
-                        onChange={(e) => updateOwnerForm('full_name', e.target.value)}
-                      />
+                      <p className="rounded-md border border-border bg-secondary/40 px-3 py-2 text-sm">
+                        {owner.full_name || '—'}
+                      </p>
                     </div>
-                    <div className="space-y-2">
+                    <div>
                       <Label>Teléfono</Label>
-                      <Input
-                        value={ownerForm.phone}
-                        onChange={(e) => updateOwnerForm('phone', e.target.value)}
-                      />
+                      <p className="rounded-md border border-border bg-secondary/40 px-3 py-2 text-sm">
+                        {owner.phone || '—'}
+                      </p>
                     </div>
-                    <div className="space-y-2">
+                    <div>
                       <Label>Correo</Label>
-                      <Input
-                        type="email"
-                        value={ownerForm.email}
-                        onChange={(e) => updateOwnerForm('email', e.target.value)}
-                      />
+                      <p className="rounded-md border border-border bg-secondary/40 px-3 py-2 text-sm">
+                        {owner.email || '—'}
+                      </p>
                     </div>
-                    <div className="space-y-2">
+                    <div>
                       <Label>Contacto alternativo</Label>
-                      <Input
-                        value={ownerForm.alt_contact_name}
-                        onChange={(e) => updateOwnerForm('alt_contact_name', e.target.value)}
-                      />
+                      <p className="rounded-md border border-border bg-secondary/40 px-3 py-2 text-sm">
+                        {owner.alt_contact_name || '—'}
+                      </p>
                     </div>
-                    <div className="space-y-2">
+                    <div>
                       <Label>Teléfono alternativo</Label>
-                      <Input
-                        value={ownerForm.alt_phone}
-                        onChange={(e) => updateOwnerForm('alt_phone', e.target.value)}
-                      />
+                      <p className="rounded-md border border-border bg-secondary/40 px-3 py-2 text-sm">
+                        {owner.alt_phone || '—'}
+                      </p>
                     </div>
                   </div>
                 ) : (
