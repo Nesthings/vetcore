@@ -3,8 +3,10 @@
 La identidad del owner es GLOBAL: un dueño puede tener mascotas en varias
 clínicas de la red. El acceso NO se bloquea por suscripción (principio 8):
 si la clínica está suspendida, el dueño conserva lectura (badge read_only).
+Incluye preferencias (opt-in WhatsApp, principio 10) y encuestas (2.4).
 """
 
+from datetime import UTC, datetime
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
@@ -28,6 +30,12 @@ from app.models import (
     Pet,
     PetWeightRecord,
     User,
+)
+from app.schemas.crm import (
+    OwnerPreferencesRead,
+    OwnerPreferencesUpdate,
+    SurveyCreate,
+    SurveyRead,
 )
 
 router = APIRouter(prefix="/owner", tags=["owner"])
@@ -157,6 +165,12 @@ def owner_pet_detail(
             select(ConsultationSummaryPdf.consultation_id, ConsultationSummaryPdf.pdf_url)
         ).all()
     }
+    surveys = {
+        row.consultation_id: {"rating": row.rating, "comments": row.comments}
+        for row in db.execute(
+            text("SELECT consultation_id, rating, comments FROM consultation_surveys")
+        ).mappings()
+    }
 
     base["consultations"] = [
         {
@@ -168,9 +182,11 @@ def owner_pet_detail(
             "care_instructions": c.care_instructions,
             "vet_name": vets.get(c.vet_user_id),
             "items": [
-                {"description": i.description, "quantity": float(i.quantity)} for i in c.items
+                {"description": i.description, "quantity": float(i.quantity)}
+                for i in c.items
             ],
             "summary_pdf_url": pdfs.get(c.id),
+            "survey": surveys.get(c.id),
         }
         for c in consultations
     ]
@@ -250,3 +266,182 @@ def revert_cartilla_photo(
     db.commit()
     db.refresh(pet)
     return {"cartilla_photo_url": pet.cartilla_photo_url, "revertible": False}
+
+
+@router.get(
+    "/preferences",
+    response_model=OwnerPreferencesRead,
+    summary="Preferencias del dueño (canal y opt-in de recordatorios)",
+)
+def owner_preferences(
+    owner: CurrentUser = Depends(get_current_owner),
+    db: Session = Depends(get_db),
+) -> OwnerPreferencesRead:
+    row = (
+        db.execute(
+            text(
+                "SELECT preferred_channel, accepts_reminders, accepts_reminders_at "
+                "FROM owner_preferences WHERE owner_id = :o"
+            ),
+            {"o": owner.sub},
+        )
+        .mappings()
+        .first()
+    )
+    if row is None:
+        return OwnerPreferencesRead(
+            owner_id=owner.sub, preferred_channel="whatsapp", accepts_reminders=False
+        )
+    return OwnerPreferencesRead(owner_id=owner.sub, **dict(row))
+
+
+@router.put(
+    "/preferences",
+    response_model=OwnerPreferencesRead,
+    summary="Actualiza preferencias (opt-in WhatsApp registrado)",
+)
+def update_owner_preferences(
+    body: OwnerPreferencesUpdate,
+    owner: CurrentUser = Depends(get_current_owner),
+    db: Session = Depends(get_db),
+) -> OwnerPreferencesRead:
+    current = (
+        db.execute(
+            text(
+                "SELECT preferred_channel, accepts_reminders, accepts_reminders_at "
+                "FROM owner_preferences WHERE owner_id = :o"
+            ),
+            {"o": owner.sub},
+        )
+        .mappings()
+        .first()
+    )
+    channel = body.preferred_channel or (current["preferred_channel"] if current else "whatsapp")
+    accepts = body.accepts_reminders
+    accepts_at = None
+    if accepts is None:
+        accepts = current["accepts_reminders"] if current else False
+        accepts_at = current["accepts_reminders_at"] if current else None
+    elif accepts:
+        accepts_at = datetime.now(UTC)
+
+    db.execute(
+        text(
+            "INSERT INTO owner_preferences "
+            "(owner_id, preferred_channel, accepts_reminders, accepts_reminders_at) "
+            "VALUES (:o, :ch, :ac, :at) "
+            "ON CONFLICT (owner_id) DO UPDATE SET "
+            "preferred_channel = EXCLUDED.preferred_channel, "
+            "accepts_reminders = EXCLUDED.accepts_reminders, "
+            "accepts_reminders_at = EXCLUDED.accepts_reminders_at"
+        ),
+        {"o": owner.sub, "ch": channel, "ac": accepts, "at": accepts_at},
+    )
+    db.commit()
+    row = (
+        db.execute(
+            text(
+                "SELECT preferred_channel, accepts_reminders, accepts_reminders_at "
+                "FROM owner_preferences WHERE owner_id = :o"
+            ),
+            {"o": owner.sub},
+        )
+        .mappings()
+        .first()
+    )
+    return OwnerPreferencesRead(owner_id=owner.sub, **dict(row))
+
+
+def _owner_consultation(db: Session, owner_id: str, consultation_id: str) -> Consultation:
+    """Consulta de una mascota vinculada al dueño, o 404."""
+    consultation = db.get(Consultation, consultation_id)
+    if consultation is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Consulta no encontrada")
+    link = db.execute(
+        text(
+            "SELECT 1 FROM owner_pet_links WHERE owner_id = :o AND pet_id = :p AND is_active = true"
+        ),
+        {"o": owner_id, "p": consultation.pet_id},
+    ).scalar()
+    if not link:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="La consulta no pertenece a una mascota tuya",
+        )
+    return consultation
+
+
+@router.post(
+    "/consultations/{consultation_id}/survey",
+    response_model=SurveyRead,
+    status_code=status.HTTP_201_CREATED,
+    summary="Califica la consulta (encuesta post-consulta)",
+)
+def submit_survey(
+    consultation_id: str,
+    body: SurveyCreate,
+    owner: CurrentUser = Depends(get_current_owner),
+    db: Session = Depends(get_db),
+) -> SurveyRead:
+    consultation = _owner_consultation(db, owner.sub, consultation_id)
+    existing = db.execute(
+        text("SELECT id FROM consultation_surveys WHERE consultation_id = :c"),
+        {"c": consultation.id},
+    ).scalar()
+    if existing:
+        db.execute(
+            text("UPDATE consultation_surveys SET rating = :r, comments = :cm WHERE id = :id"),
+            {"r": body.rating, "cm": body.comments, "id": existing},
+        )
+        db.commit()
+        row = (
+            db.execute(
+                text(
+                    "SELECT id, consultation_id, rating, comments, created_at "
+                    "FROM consultation_surveys WHERE id = :id"
+                ),
+                {"id": existing},
+            )
+            .mappings()
+            .first()
+        )
+    else:
+        row = (
+            db.execute(
+                text(
+                    "INSERT INTO consultation_surveys (consultation_id, rating, comments) "
+                    "VALUES (:c, :r, :cm) "
+                    "RETURNING id, consultation_id, rating, comments, created_at"
+                ),
+                {"c": consultation.id, "r": body.rating, "cm": body.comments},
+            )
+            .mappings()
+            .first()
+        )
+    db.commit()
+    return SurveyRead(**dict(row))
+
+
+@router.get(
+    "/consultations/{consultation_id}/survey",
+    response_model=SurveyRead | None,
+    summary="Encuesta de la consulta (si existe)",
+)
+def get_survey(
+    consultation_id: str,
+    owner: CurrentUser = Depends(get_current_owner),
+    db: Session = Depends(get_db),
+) -> SurveyRead | None:
+    _owner_consultation(db, owner.sub, consultation_id)
+    row = (
+        db.execute(
+            text(
+                "SELECT id, consultation_id, rating, comments, created_at "
+                "FROM consultation_surveys WHERE consultation_id = :c"
+            ),
+            {"c": consultation_id},
+        )
+        .mappings()
+        .first()
+    )
+    return SurveyRead(**dict(row)) if row else None

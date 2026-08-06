@@ -1,15 +1,22 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { LogOut, PawPrint } from 'lucide-react'
+import { BellRing, LogOut, PawPrint } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState } from '@/components/ui/error-state'
 import { LoadingState } from '@/components/ui/loading-state'
 import { apiFetch } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
+
+interface Preferences {
+  owner_id: string
+  preferred_channel: string
+  accepts_reminders: boolean
+  accepts_reminders_at?: string | null
+}
 
 export interface OwnerPet {
   pet: {
@@ -34,13 +41,18 @@ export function OwnerPortal() {
   const [pets, setPets] = useState<OwnerPet[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [prefs, setPrefs] = useState<Preferences | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const res = await apiFetch<OwnerPet[]>('/owner/pets')
+      const [res, p] = await Promise.all([
+        apiFetch<OwnerPet[]>('/owner/pets'),
+        apiFetch<Preferences>('/owner/preferences'),
+      ])
       setPets(res)
+      setPrefs(p)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudieron cargar tus mascotas')
     } finally {
@@ -51,6 +63,19 @@ export function OwnerPortal() {
   useEffect(() => {
     load()
   }, [load])
+
+  const updatePrefs = async (patch: Partial<Preferences>) => {
+    setError(null)
+    try {
+      const res = await apiFetch<Preferences>('/owner/preferences', {
+        method: 'PUT',
+        body: JSON.stringify(patch),
+      })
+      setPrefs(res)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudieron guardar las preferencias')
+    }
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -81,6 +106,45 @@ export function OwnerPortal() {
 
         {error && <ErrorState description={error} onRetry={load} className="mb-6" />}
         {loading && <LoadingState label="Cargando tus mascotas…" />}
+
+        {prefs && (
+          <Card className="mb-6 shadow-card">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <BellRing className="size-4 text-primary" aria-hidden="true" />
+                Preferencias de contacto
+              </CardTitle>
+              <CardDescription>
+                Recordatorios de citas por WhatsApp (opt-in). Sin tu consentimiento no se envían.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-wrap items-center gap-4">
+              <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
+                <input
+                  type="checkbox"
+                  checked={prefs.accepts_reminders}
+                  onChange={(e) => updatePrefs({ accepts_reminders: e.target.checked })}
+                  className="size-4"
+                />
+                Recibir recordatorios
+              </label>
+              {prefs.accepts_reminders_at && (
+                <span className="text-xs text-muted-foreground">
+                  Desde el {new Date(prefs.accepts_reminders_at).toLocaleDateString('es-MX')}
+                </span>
+              )}
+              <select
+                value={prefs.preferred_channel}
+                onChange={(e) => updatePrefs({ preferred_channel: e.target.value })}
+                className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+              >
+                <option value="whatsapp">WhatsApp</option>
+                <option value="email">Correo</option>
+                <option value="sms">SMS</option>
+              </select>
+            </CardContent>
+          </Card>
+        )}
 
         {!loading && !error && pets.length === 0 && (
           <EmptyState

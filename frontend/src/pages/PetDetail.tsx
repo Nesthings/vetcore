@@ -24,6 +24,7 @@ import {
 
 import { AppLayout } from '@/components/layout/AppLayout'
 import { InviteOwnerDialog } from '@/components/pets/InviteOwnerDialog'
+import { PhotoComparison } from '@/components/pets/PhotoComparison'
 import { TransferOwnerDialog } from '@/components/pets/TransferOwnerDialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -59,6 +60,13 @@ interface ClinicalAlert {
   created_at: string
 }
 
+interface PhotoEvolutionItem {
+  url: string
+  consultation_id: string
+  consultation_date: string
+  reason?: string | null
+}
+
 const ALERT_TYPES = [
   'Alergia',
   'Enfermedad crónica',
@@ -73,6 +81,8 @@ export function PetDetail() {
   const [timeline, setTimeline] = useState<TimelineEvent[]>([])
   const [weights, setWeights] = useState<WeightRecord[]>([])
   const [alerts, setAlerts] = useState<ClinicalAlert[]>([])
+  const [photos, setPhotos] = useState<PhotoEvolutionItem[]>([])
+  const [compareIdx, setCompareIdx] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [inviteOpen, setInviteOpen] = useState(false)
@@ -86,16 +96,18 @@ export function PetDetail() {
     setLoading(true)
     setError(null)
     try {
-      const [p, tl, w, al] = await Promise.all([
+      const [p, tl, w, al, ph] = await Promise.all([
         apiFetch<Pet>(`/pets/${id}`),
         apiFetch<TimelineEvent[]>(`/pets/${id}/timeline`),
         apiFetch<WeightRecord[]>(`/pets/${id}/weights`),
         apiFetch<ClinicalAlert[]>(`/pets/${id}/alerts`),
+        apiFetch<PhotoEvolutionItem[]>(`/pets/${id}/photo-evolution`),
       ])
       setPet(p)
       setTimeline(tl)
       setWeights(w)
       setAlerts(al)
+      setPhotos(ph)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo cargar el paciente')
     } finally {
@@ -294,6 +306,7 @@ export function PetDetail() {
             <TabsList>
               <TabsTrigger value="timeline">Línea de tiempo</TabsTrigger>
               <TabsTrigger value="peso">Peso histórico</TabsTrigger>
+              <TabsTrigger value="fotos">Fotos de evolución</TabsTrigger>
             </TabsList>
 
             <TabsContent value="timeline" className="space-y-4">
@@ -392,6 +405,52 @@ export function PetDetail() {
                   )}
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            <TabsContent value="fotos" className="space-y-4">
+              {photos.length === 0 ? (
+                <EmptyState
+                  title="Sin fotos de evolución"
+                  description="Las fotos adjuntas a las consultas aparecerán aquí para comparar la evolución."
+                  icon={Camera}
+                />
+              ) : (
+                <div className="flex flex-col items-center gap-4">
+                  <div className="flex w-full max-w-md items-center justify-between gap-3">
+                    <select
+                      value={compareIdx}
+                      onChange={(e) => setCompareIdx(Number(e.target.value))}
+                      className="h-9 flex-1 rounded-md border border-input bg-background px-2 text-sm"
+                    >
+                      {photos.map((p, i) => (
+                        <option key={p.consultation_id} value={i}>
+                          Antes: {new Date(p.consultation_date).toLocaleDateString('es-MX')}{' '}
+                          {p.reason ? `· ${p.reason}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="text-sm text-muted-foreground">
+                      vs.{' '}
+                      {new Date(photos[photos.length - 1].consultation_date).toLocaleDateString(
+                        'es-MX',
+                      )}
+                    </span>
+                  </div>
+                  <PhotoComparison
+                    before={photos[compareIdx].url}
+                    after={photos[photos.length - 1].url}
+                    beforeLabel={new Date(photos[compareIdx].consultation_date).toLocaleDateString(
+                      'es-MX',
+                    )}
+                    afterLabel={new Date(
+                      photos[photos.length - 1].consultation_date,
+                    ).toLocaleDateString('es-MX')}
+                  />
+                  <p className="text-center text-xs text-muted-foreground">
+                    Arrastra el divisor para comparar la evolución entre dos consultas.
+                  </p>
+                </div>
+              )}
             </TabsContent>
           </Tabs>
         </div>

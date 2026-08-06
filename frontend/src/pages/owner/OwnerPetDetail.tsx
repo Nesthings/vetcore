@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, Camera, CalendarDays, FileText, Loader2, RotateCcw } from 'lucide-react'
+import { ArrowLeft, Camera, CalendarDays, FileText, Loader2, RotateCcw, Star } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -21,6 +21,7 @@ interface ConsultationView {
   vet_name?: string | null
   items: { description: string; quantity: number }[]
   summary_pdf_url?: string | null
+  survey?: { rating: number; comments?: string | null } | null
 }
 
 interface AppointmentView {
@@ -83,6 +84,65 @@ export function OwnerPetDetail() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo restaurar la foto')
     }
+  }
+
+  const rateConsultation = async (consultationId: string, rating: number) => {
+    setError(null)
+    try {
+      await apiFetch(`/owner/consultations/${consultationId}/survey`, {
+        method: 'POST',
+        body: JSON.stringify({ rating }),
+      })
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo enviar la encuesta')
+    }
+  }
+
+  function SurveyStars({ consultation }: { consultation: ConsultationView }) {
+    const [hover, setHover] = useState(0)
+    if (consultation.survey) {
+      return (
+        <div className="mt-2 flex items-center gap-1.5">
+          <div className="flex">
+            {[1, 2, 3, 4, 5].map((s) => (
+              <Star
+                key={s}
+                className={`size-4 ${s <= consultation.survey!.rating ? 'fill-warning text-warning' : 'text-muted'}`}
+                aria-hidden="true"
+              />
+            ))}
+          </div>
+          <span className="text-xs text-muted-foreground">
+            Tu calificación: {consultation.survey.rating}/5
+            {consultation.survey.comments ? ` · "${consultation.survey.comments}"` : ''}
+          </span>
+        </div>
+      )
+    }
+    return (
+      <div className="mt-2 flex items-center gap-2">
+        <span className="text-xs text-muted-foreground">Califica esta consulta:</span>
+        <div className="flex">
+          {[1, 2, 3, 4, 5].map((s) => (
+            <button
+              key={s}
+              type="button"
+              aria-label={`${s} estrellas`}
+              onMouseEnter={() => setHover(s)}
+              onMouseLeave={() => setHover(0)}
+              onClick={() => rateConsultation(consultation.id, s)}
+            >
+              <Star
+                className={`size-5 transition-colors ${
+                  s <= hover ? 'fill-warning text-warning' : 'text-muted'
+                }`}
+              />
+            </button>
+          ))}
+        </div>
+      </div>
+    )
   }
 
   const pet = data?.pet
@@ -223,6 +283,7 @@ export function OwnerPetDetail() {
                             <FileText className="size-4" /> Ver resumen (PDF)
                           </a>
                         )}
+                        {!data.read_only && <SurveyStars consultation={c} />}
                       </div>
                     ))}
                   </div>

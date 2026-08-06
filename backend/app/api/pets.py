@@ -23,7 +23,16 @@ from app.core.storage import (
     validate_extension,
 )
 from app.db.session import get_db
-from app.models import Appointment, ClinicalAlert, Consultation, Pet, PetWeightRecord, User
+from app.models import (
+    Appointment,
+    ClinicalAlert,
+    Consultation,
+    ConsultationAttachment,
+    Pet,
+    PetWeightRecord,
+    User,
+)
+from app.schemas.crm import PhotoEvolutionItem
 from app.schemas.pet import (
     ClinicalAlertCreate,
     ClinicalAlertRead,
@@ -537,3 +546,54 @@ def _get_alert_or_404(db: Session, pet_id: str, alert_id: str) -> ClinicalAlert:
     if alert is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alerta no encontrada")
     return alert
+
+
+@router.get(
+    "/{pet_id}/photo-evolution",
+    response_model=list[PhotoEvolutionItem],
+    summary="Fotos de las consultas (evolución) en orden cronológico",
+)
+def photo_evolution(
+    pet_id: str,
+    ctx: CurrentClinic = Depends(get_current_clinic),
+    db: Session = Depends(get_db),
+) -> list[PhotoEvolutionItem]:
+    pet = _get_pet_or_404(db, ctx.clinic["id"], pet_id)
+
+    consultations = list(
+        db.scalars(
+            select(Consultation)
+            .where(Consultation.pet_id == pet.id, Consultation.clinic_id == ctx.clinic["id"])
+            .order_by(Consultation.created_at.asc())
+        )
+    )
+    if not consultations:
+        return []
+    consultation_ids = [c.id for c in consultations]
+
+    attachments = list(
+        db.scalars(
+            select(ConsultationAttachment)
+            .where(
+                ConsultationAttachment.consultation_id.in_(consultation_ids),
+                ConsultationAttachment.type == "photo",
+            )
+            .order_by(ConsultationAttachment.created_at.asc())
+        )
+    )
+
+    consult_by_id = {c.id: c for c in consultations}
+    out = []
+    for att in attachments:
+        c = consult_by_id.get(att.consultation_id)
+        if c is None:
+            continue
+        out.append(
+            PhotoEvolutionItem(
+                url=att.url,
+                consultation_id=c.id,
+                consultation_date=c.created_at,
+                reason=c.reason,
+            )
+        )
+    return out

@@ -5,7 +5,7 @@ subida de adjuntos (foto/nota).
 """
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import CurrentClinic, get_current_clinic, require_clinic_roles
@@ -31,6 +31,7 @@ from app.schemas.consultation import (
     ConsultationRead,
     ConsultationUpdate,
 )
+from app.schemas.crm import SurveyRead
 from app.services.pdf import build_consultation_summary_pdf
 
 router = APIRouter(prefix="/consultations", tags=["consultations"])
@@ -231,3 +232,28 @@ def upload_attachment(
     db.add(attachment)
     db.commit()
     return {"id": str(attachment.id), "url": attachment.url, "type": "photo"}
+
+
+@router.get(
+    "/{consultation_id}/survey",
+    response_model=SurveyRead | None,
+    summary="Encuesta de la consulta (lectura para staff)",
+)
+def consultation_survey(
+    consultation_id: str,
+    ctx: CurrentClinic = Depends(get_current_clinic),
+    db: Session = Depends(get_db),
+) -> dict | None:
+    _get_consultation_or_404(db, ctx.clinic["id"], consultation_id)
+    row = (
+        db.execute(
+            text(
+                "SELECT id, consultation_id, rating, comments, created_at "
+                "FROM consultation_surveys WHERE consultation_id = :c"
+            ),
+            {"c": consultation_id},
+        )
+        .mappings()
+        .first()
+    )
+    return dict(row) if row else None

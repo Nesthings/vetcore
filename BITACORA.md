@@ -630,4 +630,39 @@ Las verificaciones de frontend deben ejercitar el código JS real (no solo el ba
 
 ---
 
-**Siguiente subfase:** 2.4 — CRM básico + Encuestas post-consulta + Comparador de fotos de evolución.
+## Subfase 2.4 — CRM básico + Encuestas + Comparador de fotos de evolución ✅
+
+**Fecha:** 2026-08-05
+
+### Qué se hizo
+**Backend:**
+- **Preferencias del dueño (CRM, opt-in principio 10):** `GET/PUT /owner/preferences` — `preferred_channel` y `accepts_reminders` con `accepts_reminders_at` (timestamp al activar). Completa el flujo de 2.3.
+- **Encuestas post-consulta** (`consultation_surveys`):
+  - `POST /owner/consultations/{id}/survey` — el dueño califica (1-5 + comentarios) una consulta de su mascota (valida el vínculo por `owner_pet_links`); actualiza si ya existía.
+  - `GET /owner/consultations/{id}/survey` y `GET /consultations/{id}/survey` (staff).
+  - El detalle del dueño (`GET /owner/pets/{id}`) ahora incluye `survey` por consulta.
+- **Fotos de evolución:** `GET /pets/{id}/photo-evolution` — fotos de `consultation_attachments` en orden cronológico con fecha/motivo.
+
+**Frontend:**
+- Portal del dueño: tarjeta **"Preferencias de contacto"** (toggle opt-in + canal) y **encuesta con estrellas** en cada consulta del historial (interactiva si no hay, visual si ya calificó).
+- Ficha clínica: pestaña **"Fotos de evolución"** con **comparador before/after** (slider arrastrable entre dos consultas) — componente `PhotoComparison` con pointer events, sin librería extra.
+
+### Decisiones técnicas y por qué
+- **Opt-in completo:** el dueño activa/desactiva; `accepts_reminders_at` registra el momento. El motor de 2.3 lo respeta (nunca por defecto).
+- **Encuesta solo del dueño** sobre sus propias mascotas; el staff solo lee.
+- **Comparador before/after a medida** (clip-path + divisor arrastrable) sobre el design system.
+- El detalle del dueño incluye la encuesta para no hacer N llamadas desde el frontend.
+
+### Verificado
+- Preferencias: GET + PUT con opt-in y timestamp ✓
+- Encuesta: dueño califica 5 estrellas; staff la lee; detalle del dueño la incluye (1 de 4 consultas) ✓
+- Fotos de evolución: 3 fotos en orden cronológico con motivo ✓
+- Ruff + lint 0 errores + build OK ✓
+
+### Notas / pendientes
+- Datos: el dueño activo de Firulais ahora es `nuevodueno@test.com` / `dueno123456`.
+- El comparador compara contra la última foto; se puede ampliar a elegir ambas fechas.
+
+---
+
+**Siguiente subfase:** 2.5 — Portal del dueño ampliado (ver próximas citas, descargar facturas).
