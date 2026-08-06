@@ -3,11 +3,7 @@ import { Eraser } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 
-export function SignaturePad({
-  onDataUrl,
-}: {
-  onDataUrl: (dataUrl: string | null) => void
-}) {
+export function SignaturePad({ onDataUrl }: { onDataUrl: (dataUrl: string | null) => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const drawing = useRef(false)
   const [hasInk, setHasInk] = useState(false)

@@ -27,6 +27,7 @@ from app.api import (
     services,
     templates,
     users,
+    vaccination_plans,
     waitlist,
 )
 from app.core.config import settings
@@ -69,6 +70,7 @@ app.include_router(automation.router, prefix="/api/v1")
 app.include_router(reports.router, prefix="/api/v1")
 app.include_router(notifications.router, prefix="/api/v1")
 app.include_router(audit.router, prefix="/api/v1")
+app.include_router(vaccination_plans.router, prefix="/api/v1")
 
 # Media (MVP local). La URL pública /media/... es la que devuelven los endpoints.
 media_dir = Path(settings.media_root)

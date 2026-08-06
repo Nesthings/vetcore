@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import CurrentClinic, get_current_clinic, require_clinic_roles, require_component
 from app.core.events import notify_user, record_audit
 from app.db.session import get_db
-from app.models import Appointment, ClinicBranch, Pet, User
+from app.models import Appointment, ClinicBranch, Pet, PetVaccinationDose, User
 from app.schemas.appointment import AppointmentCreate, AppointmentRead, AppointmentUpdate
 
 router = APIRouter(
@@ -145,6 +145,14 @@ def update_appointment(
     old_status = appointment.status
     for field, value in data.items():
         setattr(appointment, field, value)
+
+    # Si la cita es una dosis de vacunación y se completa, la dosis se marca completada.
+    if "status" in data and data["status"] == "completed" and old_status != "completed":
+        dose = db.scalar(
+            select(PetVaccinationDose).where(PetVaccinationDose.appointment_id == appointment.id)
+        )
+        if dose is not None:
+            dose.status = "completed"
 
     # Auditoría + notificación al cambiar estado (cancelación/no-show)
     if "status" in data and data["status"] != old_status:

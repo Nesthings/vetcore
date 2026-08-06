@@ -67,6 +67,16 @@ from app.schemas.purchase import (
 from app.schemas.reminder import PendingReminder, ReminderRunResult, ReminderSchedule, ReminderStage
 from app.schemas.services import ServiceCreate, ServiceRead, ServiceUpdate
 from app.schemas.staff import ProfileUpdate, UserCreate, UserRead, UserUpdate
+from app.schemas.vaccination import (
+    DoseRead,
+    PetVaccinationPlanRead,
+    PlanStepCreate,
+    PlanStepRead,
+    VaccinationAssignRequest,
+    VaccinationPlanCreate,
+    VaccinationPlanRead,
+    VaccinationPlanUpdate,
+)
 from app.schemas.waitlist import WaitlistCreate, WaitlistRead, WaitlistUpdate
 
 __all__ = [
@@ -91,6 +101,7 @@ __all__ = [
     "ConsultationItemRead",
     "ConsultationRead",
     "ConsultationUpdate",
+    "DoseRead",
     "InventoryProductCreate",
     "InventoryProductRead",
     "InventoryProductUpdate",
@@ -109,9 +120,12 @@ __all__ = [
     "PetCreate",
     "PetRead",
     "PetUpdate",
+    "PetVaccinationPlanRead",
     "PetWeightCreate",
     "PetWeightRead",
     "PhotoEvolutionItem",
+    "PlanStepCreate",
+    "PlanStepRead",
     "ProfileUpdate",
     "PurchaseOrderCreate",
     "PurchaseOrderItemCreate",
@@ -132,6 +146,10 @@ __all__ = [
     "UserCreate",
     "UserRead",
     "UserUpdate",
+    "VaccinationAssignRequest",
+    "VaccinationPlanCreate",
+    "VaccinationPlanRead",
+    "VaccinationPlanUpdate",
     "WaitlistCreate",
     "WaitlistRead",
     "WaitlistUpdate",

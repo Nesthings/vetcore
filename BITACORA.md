@@ -1110,4 +1110,44 @@ El usuario consideró los kits redundantes y pidió eliminar el módulo y todas 
 
 ---
 
+## Módulo — Planes de vacunación (programación automática de citas) ✅
+
+**Fecha:** 2026-08-06
+
+### Qué se hizo
+El admin define planes de vacunación (nombre, compuesto activo, notas y una lista de **dosis** con su intervalo). Al **asignar un plan a una mascota** (desde el alta de mascota), el sistema genera **todas las dosis de golpe** y una **cita automática por dosis** en la agenda.
+
+**Decisiones del usuario (2026-08-06):**
+- Estructura del plan: **la define el admin** (multi-dosis / intervalo según el esquema).
+- Programación: **todas las dosis de golpe** al asignar.
+- Primera dosis: **desde la fecha de asignación**.
+- Cita: **sucursal, veterinario (opcional) y hora se eligen al asignar**; duración 30 min por defecto.
+
+**Backend:**
+- Migración `0015_vaccination_plans`: `vaccination_plans` + `vaccination_plan_steps` (label, offset_days desde la dosis anterior, position) + `pet_vaccination_plans` (asignación: pet, plan, branch, vet?, start_date, start_time, duration) + `pet_vaccination_doses` (dosis generadas con su cita).
+- `api/vaccination_plans.py`: CRUD de planes (admin) con pasos; `POST /vaccination-plans/assign` (pet_id, plan_id, branch_id, vet?, start_date, start_time) → genera la asignación + dosis + citas en una transacción (409 si el plan ya está asignado a la mascota); `GET /vaccination-plans/pets/{pet_id}` → agenda de vacunación con nombres y cita asociada.
+- **Hook en `appointments.py`:** al completar una cita de vacunación, la dosis vinculada se marca `completed`.
+- Permisos: componente `vaccination_plans` (admin y veterinario por defecto; mutaciones solo admin).
+- Auditoría: `plan_created/updated/deleted`, `vaccination_plan_assigned`.
+
+**Frontend:**
+- Página `VaccinationPlans` (`/vaccination-plans`, sidebar con jeringa, admin) + `PlanFormDialog`: nombre, compuesto, notas, activo/inactivo y **editor de dosis** (etiqueta + "cada" días/meses/años + agregar/quitar).
+- `PetFormDialog`: sección **"Agregar plan de vacunación"** (toggle) → plan, sucursal, veterinario, fecha y hora de inicio; al guardar la mascota se asigna el plan.
+- `PetDetail`: nuevo tab **"Vacunación"** con las asignaciones y sus dosis (fecha, hora, estado: Programada/Completada/Omitida).
+
+### Verificado
+- Plan quintuple 0/+60d/+60d/+365d → 4 dosis y 4 citas con fechas acumuladas correctas ✓
+- Hora elegida respetada (ej. 11:30 UTC) y `procedure_type` "Vacunación: {compuesto}" ✓
+- Duplicado de asignación → 409 ✓
+- Completar la cita → la dosis pasa a `completed` ✓
+- Historial por mascota y componente en permisos del admin ✓
+- Ruff + lint 0 errores + build OK ✓
+- Datos de prueba eliminados.
+
+### Notas / pendientes
+- La estructura del plan es de pasos fijos (no hay recursión infinita: si se quiere un refuerzo anual recurrente, el admin agrega las dosis que quiera).
+- Los intervalos se guardan en **días** (1 mes = 30, 1 año = 365) para fechas deterministas.
+
+---
+
 **Siguiente subfase:** por decidir (Fase 3 en hold).

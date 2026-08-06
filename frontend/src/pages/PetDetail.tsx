@@ -9,6 +9,7 @@ import {
   MailPlus,
   PawPrint,
   Plus,
+  Syringe,
   TriangleAlert,
   UserRound,
   UserRoundCog,
@@ -38,6 +39,7 @@ import { LoadingState } from '@/components/ui/loading-state'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import type { Pet } from '@/pages/Pets'
 import { apiFetch } from '@/lib/api'
+import type { PetVaccinationPlan } from '@/lib/vaccination'
 
 interface TimelineEvent {
   type: 'consulta' | 'cita'
@@ -96,6 +98,7 @@ export function PetDetail() {
   const [alerts, setAlerts] = useState<ClinicalAlert[]>([])
   const [photos, setPhotos] = useState<PhotoEvolutionItem[]>([])
   const [consents, setConsents] = useState<Consent[]>([])
+  const [vaccination, setVaccination] = useState<PetVaccinationPlan[]>([])
   const [compareIdx, setCompareIdx] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -111,13 +114,14 @@ export function PetDetail() {
     setLoading(true)
     setError(null)
     try {
-      const [p, tl, w, al, ph, cs] = await Promise.all([
+      const [p, tl, w, al, ph, cs, vp] = await Promise.all([
         apiFetch<Pet>(`/pets/${id}`),
         apiFetch<TimelineEvent[]>(`/pets/${id}/timeline`),
         apiFetch<WeightRecord[]>(`/pets/${id}/weights`),
         apiFetch<ClinicalAlert[]>(`/pets/${id}/alerts`),
         apiFetch<PhotoEvolutionItem[]>(`/pets/${id}/photo-evolution`),
         apiFetch<Consent[]>(`/consents/pets/${id}`),
+        apiFetch<PetVaccinationPlan[]>(`/vaccination-plans/pets/${id}`),
       ])
       setPet(p)
       setTimeline(tl)
@@ -125,6 +129,7 @@ export function PetDetail() {
       setAlerts(al)
       setPhotos(ph)
       setConsents(cs)
+      setVaccination(vp)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo cargar el paciente')
     } finally {
@@ -391,6 +396,7 @@ export function PetDetail() {
               <TabsTrigger value="peso">Peso histórico</TabsTrigger>
               <TabsTrigger value="fotos">Fotos de evolución</TabsTrigger>
               <TabsTrigger value="consents">Consentimientos</TabsTrigger>
+              <TabsTrigger value="vacunacion">Vacunación</TabsTrigger>
             </TabsList>
 
             <TabsContent value="timeline" className="space-y-4">
@@ -583,6 +589,70 @@ export function PetDetail() {
                     </div>
                   ))}
                 </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="vacunacion" className="space-y-4">
+              {vaccination.length === 0 ? (
+                <EmptyState
+                  title="Sin plan de vacunación"
+                  description="Asigna un plan al dar de alta a la mascota para generar sus citas de vacunación automáticamente."
+                  icon={Syringe}
+                />
+              ) : (
+                vaccination.map((vp) => (
+                  <div key={vp.id} className="space-y-2 rounded-md border border-border/60 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <p className="font-medium">
+                          {vp.plan_name}
+                          {vp.compound ? ` · ${vp.compound}` : ''}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {vp.branch_name}
+                          {vp.vet_name ? ` · ${vp.vet_name}` : ''} · Inicia{' '}
+                          {new Date(`${vp.start_date}T00:00:00`).toLocaleDateString('es-MX')}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {vp.doses.map((d) => (
+                        <div
+                          key={d.id}
+                          className="flex items-center justify-between gap-2 rounded-md border border-border/60 px-3 py-2"
+                        >
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium">{d.label}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(`${d.due_date}T00:00:00`).toLocaleDateString('es-MX')}
+                              {d.appointment_start
+                                ? ` · ${new Date(d.appointment_start).toLocaleTimeString('es-MX', {
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  })}`
+                                : ''}
+                            </p>
+                          </div>
+                          <Badge
+                            variant={
+                              d.status === 'completed'
+                                ? 'success'
+                                : d.status === 'skipped'
+                                  ? 'outline'
+                                  : 'warning'
+                            }
+                          >
+                            {d.status === 'completed'
+                              ? 'Completada'
+                              : d.status === 'skipped'
+                                ? 'Omitida'
+                                : 'Programada'}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))
               )}
             </TabsContent>
           </Tabs>

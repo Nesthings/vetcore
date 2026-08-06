@@ -1,0 +1,85 @@
+import uuid
+from datetime import date, datetime, time
+
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class PlanStepCreate(BaseModel):
+    label: str = Field(min_length=1, max_length=150)
+    offset_days: int = Field(ge=0)
+
+
+class PlanStepRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    label: str
+    offset_days: int
+    position: int
+
+
+class VaccinationPlanCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=150)
+    compound: str = Field(min_length=1, max_length=200)
+    notes: str | None = Field(default=None, max_length=2000)
+    steps: list[PlanStepCreate] = Field(default_factory=list)
+
+
+class VaccinationPlanUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=150)
+    compound: str | None = Field(default=None, min_length=1, max_length=200)
+    notes: str | None = Field(default=None, max_length=2000)
+    active: bool | None = None
+    steps: list[PlanStepCreate] | None = None
+
+
+class VaccinationPlanRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    clinic_id: uuid.UUID
+    name: str
+    compound: str
+    notes: str | None
+    active: bool
+    created_at: datetime
+    steps: list[PlanStepRead] = Field(default_factory=list)
+
+
+class VaccinationAssignRequest(BaseModel):
+    pet_id: uuid.UUID
+    plan_id: uuid.UUID
+    branch_id: uuid.UUID
+    vet_user_id: uuid.UUID | None = None
+    start_date: date
+    start_time: time = Field(default=time(10, 0))
+    duration_minutes: int = Field(default=30, ge=5, le=240)
+
+
+class DoseRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    label: str
+    due_date: date
+    status: str
+    appointment_id: uuid.UUID | None
+    appointment_start: datetime | None = None
+
+
+class PetVaccinationPlanRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    pet_id: uuid.UUID
+    plan_id: uuid.UUID
+    plan_name: str | None = None
+    compound: str | None = None
+    branch_id: uuid.UUID
+    branch_name: str | None = None
+    vet_user_id: uuid.UUID | None
+    vet_name: str | None = None
+    start_date: date
+    start_time: time
+    duration_minutes: int
+    doses: list[DoseRead] = Field(default_factory=list)

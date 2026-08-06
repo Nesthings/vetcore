@@ -29,6 +29,7 @@ import { Services } from '@/pages/Services'
 import { Settings } from '@/pages/Settings'
 import { SetupWizard } from '@/pages/SetupWizard'
 import { Templates } from '@/pages/Templates'
+import { VaccinationPlans } from '@/pages/VaccinationPlans'
 import { Waitlist } from '@/pages/Waitlist'
 
 function App() {
@@ -129,6 +130,14 @@ function App() {
                 element={
                   <ProtectedRoute component="inventory">
                     <Inventory />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/vaccination-plans"
+                element={
+                  <ProtectedRoute roles={['admin']} component="vaccination_plans">
+                    <VaccinationPlans />
                   </ProtectedRoute>
                 }
               />

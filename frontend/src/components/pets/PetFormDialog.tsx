@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Loader2, Plus, Trash2, UserRound } from 'lucide-react'
+import { Loader2, Plus, Syringe, Trash2, UserRound } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -74,6 +74,16 @@ export function PetFormDialog({
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const [assignPlan, setAssignPlan] = useState(false)
+  const [planId, setPlanId] = useState('')
+  const [planBranchId, setPlanBranchId] = useState('')
+  const [planVetId, setPlanVetId] = useState('')
+  const [planStartDate, setPlanStartDate] = useState('')
+  const [planStartTime, setPlanStartTime] = useState('10:00')
+  const [plans, setPlans] = useState<{ id: string; name: string }[]>([])
+  const [branches, setBranches] = useState<{ id: string; name: string }[]>([])
+  const [vets, setVets] = useState<{ id: string; full_name: string }[]>([])
+
   const loadCatalog = useCallback(async () => {
     try {
       const res = await apiFetch<BreedsCatalog>('/pets/breeds-catalog')
@@ -86,6 +96,22 @@ export function PetFormDialog({
   useEffect(() => {
     if (open) loadCatalog()
   }, [open, loadCatalog])
+
+  useEffect(() => {
+    if (!open) return
+    Promise.all([
+      apiFetch<{ id: string; name: string }[]>('/vaccination-plans?active_only=true'),
+      apiFetch<{ id: string; name: string }[]>('/branches'),
+      apiFetch<{ id: string; full_name: string; role: string }[]>('/users'),
+    ])
+      .then(([p, b, u]) => {
+        setPlans(p)
+        setBranches(b)
+        setVets(u.filter((x) => x.role === 'admin' || x.role === 'veterinario'))
+        setPlanBranchId((cur) => cur || (b[0]?.id ?? ''))
+      })
+      .catch(() => undefined)
+  }, [open])
 
   useEffect(() => {
     if (!open) return
@@ -122,6 +148,11 @@ export function PetFormDialog({
     setConfirmDelete(false)
     setDeleting(false)
     setSubmitting(false)
+    setAssignPlan(false)
+    setPlanId('')
+    setPlanVetId('')
+    setPlanStartDate(new Date().toISOString().slice(0, 10))
+    setPlanStartTime('10:00')
     setError(null)
   }, [open, pet])
 
@@ -206,10 +237,28 @@ export function PetFormDialog({
                 alt_phone: altPhone || null,
               }
             : null
-        await apiFetch('/pets', {
+        const created = await apiFetch<{ id: string }>('/pets', {
           method: 'POST',
           body: JSON.stringify({ ...payload, owner }),
         })
+        if (assignPlan) {
+          if (!planId) {
+            setError('Selecciona un plan de vacunación.')
+            return
+          }
+          await apiFetch('/vaccination-plans/assign', {
+            method: 'POST',
+            body: JSON.stringify({
+              pet_id: created.id,
+              plan_id: planId,
+              branch_id: planBranchId,
+              vet_user_id: planVetId || null,
+              start_date: planStartDate,
+              start_time: planStartTime ? `${planStartTime}:00` : '10:00:00',
+              duration_minutes: 30,
+            }),
+          })
+        }
       }
       onSaved()
     } catch (err) {
@@ -435,6 +484,102 @@ export function PetFormDialog({
               placeholder="Ej. Muerde al ser manipulado; epiléptico…"
             />
           </div>
+
+          {!pet && (
+            <div className="rounded-md border border-border p-4">
+              <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
+                <input
+                  type="checkbox"
+                  checked={assignPlan}
+                  onChange={(e) => setAssignPlan(e.target.checked)}
+                  className="size-4 rounded border-border"
+                />
+                <Syringe className="size-4 text-primary" aria-hidden="true" />
+                Agregar plan de vacunación
+              </label>
+              {assignPlan && (
+                <div className="mt-3 grid gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="vp-plan">Plan de vacunación *</Label>
+                    <select
+                      id="vp-plan"
+                      value={planId}
+                      onChange={(e) => setPlanId(e.target.value)}
+                      className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                      required
+                    >
+                      <option value="">— Selecciona un plan —</option>
+                      {plans.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="vp-branch">Sucursal *</Label>
+                      <select
+                        id="vp-branch"
+                        value={planBranchId}
+                        onChange={(e) => setPlanBranchId(e.target.value)}
+                        className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                        required
+                      >
+                        {branches.map((b) => (
+                          <option key={b.id} value={b.id}>
+                            {b.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="vp-vet">Veterinario</Label>
+                      <select
+                        id="vp-vet"
+                        value={planVetId}
+                        onChange={(e) => setPlanVetId(e.target.value)}
+                        className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                      >
+                        <option value="">— Sin asignar —</option>
+                        {vets.map((v) => (
+                          <option key={v.id} value={v.id}>
+                            {v.full_name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="vp-date">Fecha de inicio *</Label>
+                      <Input
+                        id="vp-date"
+                        type="date"
+                        value={planStartDate}
+                        onChange={(e) => setPlanStartDate(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="vp-time">Hora *</Label>
+                      <Input
+                        id="vp-time"
+                        type="time"
+                        value={planStartTime}
+                        onChange={(e) => setPlanStartTime(e.target.value)}
+                        required
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Se agendarán automáticamente todas las dosis del plan como citas en la agenda, a
+                    partir de esta fecha y hora.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
           {!pet && (
             <div className="rounded-md border border-border p-4">
