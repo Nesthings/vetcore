@@ -44,7 +44,6 @@ from app.schemas.inventory import (
     InventoryProductUpdate,
     StockEntryCreate,
 )
-from app.schemas.kit import KitCreate, KitItemCreate, KitItemRead, KitRead, KitUpdate
 from app.schemas.pet import (
     ClinicalAlertCreate,
     ClinicalAlertRead,
@@ -102,11 +101,6 @@ __all__ = [
     "InvoiceItemRead",
     "InvoiceRead",
     "InvoiceUpdate",
-    "KitCreate",
-    "KitItemCreate",
-    "KitItemRead",
-    "KitRead",
-    "KitUpdate",
     "OwnerLinkRead",
     "OwnerTransferRequest",
     "OwnerTransferResponse",

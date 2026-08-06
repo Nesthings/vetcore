@@ -1091,4 +1091,23 @@ El staff genera un consentimiento informado (título + texto), el dueño lo **fi
 
 ---
 
+## Eliminación — Módulo de kits de inventario (redundante)
+
+**Fecha:** 2026-08-06
+
+### Contexto
+El usuario consideró los kits redundantes y pidió eliminar el módulo y todas sus referencias (código, esquema, permisos, navegación y documento maestro).
+
+### Qué se eliminó
+- **Backend:** `api/kits.py`, `schemas/kit.py`, modelos `InventoryKit`/`InventoryKitItem` (de `models/inventory.py` y exports), registro del router en `main.py`, componente `kits` del catálogo y defaults de `core/permissions.py`.
+- **Migración `0014_remove_kits`:** dropea las tablas `inventory_kits` e `inventory_kit_items` (aplicada; la BD no tenía datos de kits).
+- **Frontend:** `pages/Kits.tsx`, `components/kits/KitFormDialog.tsx`, ruta `/kits` e import en `App.tsx`, entrada del nav en `lib/nav.ts`, icono en `AppLayout.tsx`, y el optgroup/estado/fetch de kits en `InvoiceFormDialog.tsx` (la facturación queda solo con servicios + productos + conceptos manuales).
+- **Documento maestro:** definiciones de `inventory_kits`/`inventory_kit_items`, mención de kits en la 2.2 y el ítem "Inventario por kit" del checklist.
+
+### Notas
+- Los registros históricos de la subfase 2.2 se conservan como bitácora del trabajo realizado.
+- La facturación por conjunto se puede reproducir como línea manual con descuento.
+
+---
+
 **Siguiente subfase:** por decidir (Fase 3 en hold).

@@ -414,19 +414,6 @@ CREATE TABLE inventory_movements (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE inventory_kits ( -- [FASE 2]
-    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    clinic_id   UUID NOT NULL REFERENCES clinics(id),
-    name        VARCHAR(150) NOT NULL
-);
-
-CREATE TABLE inventory_kit_items ( -- [FASE 2]
-    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    kit_id      UUID NOT NULL REFERENCES inventory_kits(id),
-    product_id  UUID NOT NULL REFERENCES inventory_products(id),
-    quantity    NUMERIC(10,2) NOT NULL
-);
-
 CREATE TABLE purchase_orders ( -- [FASE 2]
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     clinic_id     UUID NOT NULL REFERENCES clinics(id),
@@ -623,7 +610,7 @@ CREATE TABLE lab_orders (
 ### FASE 2 — Secundarias
 
 - **2.1 — Plantillas de consulta + Alertas clínicas visuales**
-- **2.2 — Inventario avanzado**: lotes con FIFO por caducidad, kits (descuento múltiple), predicción de agotamiento, órdenes de compra a proveedores.
+- **2.2 — Inventario avanzado**: lotes con FIFO por caducidad, predicción de agotamiento, órdenes de compra a proveedores.
 - **2.3 — Agenda avanzada**: lista de espera + confirmación automática escalonada (48h/24h/2h).
 - **2.4 — CRM básico + Encuestas + Comparador de fotos de evolución**
 - **2.5 — Portal del dueño ampliado**: ver próximas citas, descargar facturas.
@@ -678,18 +665,17 @@ CREATE TABLE lab_orders (
 30. Editor de plantillas de consulta
 31. Vista de alertas clínicas en ficha de paciente
 32. Inventario por lote (FIFO)
-33. Inventario por kit
-34. Órdenes de compra a proveedores
-35. Lista de espera de citas
-36. Perfil del dueño (CRM)
-37. Encuesta post-consulta
-38. Comparador de fotos de evolución
-39. Portal del dueño: próximas citas
-40. Portal del dueño: facturas descargables
-41. Reportes operativos (vet/recepción)
-42. Dashboard financiero (admin)
-43. Centro de notificaciones internas
-44. Bitácora/auditoría
+33. Órdenes de compra a proveedores
+34. Lista de espera de citas
+35. Perfil del dueño (CRM)
+36. Encuesta post-consulta
+37. Comparador de fotos de evolución
+38. Portal del dueño: próximas citas
+39. Portal del dueño: facturas descargables
+40. Reportes operativos (vet/recepción)
+41. Dashboard financiero (admin)
+42. Centro de notificaciones internas
+43. Bitácora/auditoría
 
 ### Fase 3
 45. Transcripción por voz (integrada en Nueva consulta)

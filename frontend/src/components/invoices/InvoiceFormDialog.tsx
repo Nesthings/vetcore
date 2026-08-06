@@ -26,12 +26,6 @@ interface ProductOption {
   name: string
 }
 
-interface KitOption {
-  id: string
-  name: string
-  price: number
-}
-
 interface Branch {
   id: string
   name: string
@@ -75,7 +69,6 @@ export function InvoiceFormDialog({
   const [pets, setPets] = useState<Pet[]>([])
   const [services, setServices] = useState<ServiceOption[]>([])
   const [products, setProducts] = useState<ProductOption[]>([])
-  const [kits, setKits] = useState<KitOption[]>([])
   const [branchId, setBranchId] = useState('')
   const [petId, setPetId] = useState('')
   const [lines, setLines] = useState<Line[]>([emptyLine()])
@@ -91,14 +84,12 @@ export function InvoiceFormDialog({
       apiFetch<Pet[]>('/pets'),
       apiFetch<ServiceOption[]>('/services'),
       apiFetch<ProductOption[]>('/inventory'),
-      apiFetch<KitOption[]>('/kits'),
     ])
-      .then(([b, p, s, pr, k]) => {
+      .then(([b, p, s, pr]) => {
         setBranches(b)
         setPets(p)
         setServices(s)
         setProducts(pr)
-        setKits(k)
         if (b.length > 0) setBranchId((cur) => cur || b[0].id)
       })
       .catch((err) =>
@@ -124,13 +115,6 @@ export function InvoiceFormDialog({
           if (prod) {
             next.product_id = prod.id
             next.description = prod.name
-          }
-        } else if (source.startsWith('kit:')) {
-          const kit = kits.find((k) => k.id === source.slice(4))
-          if (kit) {
-            next.description = `Kit: ${kit.name}`
-            next.unit_price = String(kit.price)
-            next.discount_percent = '0'
           }
         } else {
           next.description = ''
@@ -247,15 +231,6 @@ export function InvoiceFormDialog({
                         </option>
                       ))}
                     </optgroup>
-                    {kits.length > 0 && (
-                      <optgroup label="Kits">
-                        {kits.map((k) => (
-                          <option key={k.id} value={`kit:${k.id}`}>
-                            {k.name} · ${k.price}
-                          </option>
-                        ))}
-                      </optgroup>
-                    )}
                   </select>
                   <Button
                     type="button"

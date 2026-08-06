@@ -1,4 +1,4 @@
-"""Modelos de productos, lotes, movimientos, kits y órdenes de compra."""
+"""Modelos de productos, lotes, movimientos y órdenes de compra."""
 
 import uuid
 from datetime import date, datetime
@@ -64,40 +64,6 @@ class InventoryMovement(UUIDPkMixin, Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
-
-
-class InventoryKit(UUIDPkMixin, Base):
-    """Kit: paquete de productos con precio propio (descuento por bundle)."""
-
-    __tablename__ = "inventory_kits"
-
-    clinic_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("clinics.id"), nullable=False, index=True
-    )
-    name: Mapped[str] = mapped_column(String(150), nullable=False)
-    price: Mapped[float] = mapped_column(
-        Numeric(10, 2), nullable=False, default=0, server_default="0"
-    )
-
-    items: Mapped[list["InventoryKitItem"]] = relationship(
-        back_populates="kit", cascade="all, delete-orphan"
-    )
-
-
-class InventoryKitItem(UUIDPkMixin, Base):
-    """Componente de un kit (producto + cantidad)."""
-
-    __tablename__ = "inventory_kit_items"
-
-    kit_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("inventory_kits.id"), nullable=False, index=True
-    )
-    product_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("inventory_products.id"), nullable=False
-    )
-    quantity: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
-
-    kit: Mapped[InventoryKit] = relationship(back_populates="items")
 
 
 class PurchaseOrder(UUIDPkMixin, Base):

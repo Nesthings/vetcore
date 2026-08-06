@@ -12,8 +12,6 @@ from app.models.consultation import (
     ConsultationTemplate,
 )
 from app.models.inventory import (
-    InventoryKit,
-    InventoryKitItem,
     InventoryLot,
     InventoryMovement,
     InventoryProduct,
@@ -39,8 +37,6 @@ __all__ = [
     "ConsultationTemplate",
     "DigitalConsent",
     "CustomBreed",
-    "InventoryKit",
-    "InventoryKitItem",
     "InventoryLot",
     "InventoryMovement",
     "InventoryProduct",

@@ -14,7 +14,6 @@ export const NAV_ROUTES: NavRoute[] = [
   { to: '/waitlist', label: 'Lista de espera', component: 'waitlist' },
   { to: '/pets', label: 'Pacientes', component: 'pets' },
   { to: '/inventory', label: 'Inventario', component: 'inventory' },
-  { to: '/kits', label: 'Kits', component: 'kits' },
   { to: '/purchase-orders', label: 'Compras', component: 'purchase_orders' },
   { to: '/automation', label: 'Automatización', component: 'automation' },
   { to: '/reports', label: 'Reportes', component: 'reports' },

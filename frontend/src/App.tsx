@@ -16,7 +16,6 @@ import { DesignSystem } from '@/pages/DesignSystem'
 import { FinancialDashboard } from '@/pages/FinancialDashboard'
 import { Inventory } from '@/pages/Inventory'
 import { Invoices } from '@/pages/Invoices'
-import { Kits } from '@/pages/Kits'
 import { NewConsultation } from '@/pages/NewConsultation'
 import { OwnerPetDetail } from '@/pages/owner/OwnerPetDetail'
 import { OwnerInvoices } from '@/pages/owner/OwnerInvoices'
@@ -130,14 +129,6 @@ function App() {
                 element={
                   <ProtectedRoute component="inventory">
                     <Inventory />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/kits"
-                element={
-                  <ProtectedRoute roles={['admin', 'veterinario']} component="kits">
-                    <Kits />
                   </ProtectedRoute>
                 }
               />
