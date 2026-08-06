@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Loader2 } from 'lucide-react'
+import { Loader2, UserRound } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -28,6 +28,7 @@ export interface StaffUser {
   job_title?: string | null
   description?: string | null
   specialty?: string | null
+  is_visible_on_login?: boolean
 }
 
 interface UserComponents {
@@ -69,6 +70,8 @@ export function UserFormDialog({
   const [specialty, setSpecialty] = useState('')
   const [components, setComponents] = useState<UserComponents | null>(null)
   const [access, setAccess] = useState<Record<string, AccessValue>>({})
+  const [photoFile, setPhotoFile] = useState<File | null>(null)
+  const [visibleOnLogin, setVisibleOnLogin] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -102,6 +105,8 @@ export function UserFormDialog({
     setCedula(user?.cedula ?? '')
     setJobTitle(user?.job_title ?? '')
     setSpecialty(user?.specialty ?? '')
+    setVisibleOnLogin(user?.is_visible_on_login ?? true)
+    setPhotoFile(null)
     setError(null)
     setComponents(null)
     setAccess({})
@@ -126,6 +131,7 @@ export function UserFormDialog({
           cedula: cedula || null,
           job_title: jobTitle || null,
           specialty: specialty || null,
+          is_visible_on_login: visibleOnLogin,
         }
         if (password) body.password = password
         await apiFetch(`/users/${user.id}`, { method: 'PATCH', body: JSON.stringify(body) })
@@ -142,9 +148,16 @@ export function UserFormDialog({
             cedula: cedula || null,
             job_title: jobTitle || null,
             specialty: specialty || null,
+            is_visible_on_login: visibleOnLogin,
           }),
         })
         userId = created.id
+      }
+
+      if (userId && photoFile) {
+        const form = new FormData()
+        form.append('file', photoFile)
+        await apiFetch(`/users/${userId}/photo`, { method: 'POST', body: form })
       }
 
       if (userId && Object.keys(access).length > 0) {
@@ -228,6 +241,45 @@ export function UserFormDialog({
               </select>
             </div>
           </div>
+
+          <div className="flex items-center gap-3 rounded-md border border-border/60 p-3">
+            <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-secondary">
+              {photoFile ? (
+                <img
+                  src={URL.createObjectURL(photoFile)}
+                  alt="Foto nueva"
+                  className="size-full object-cover"
+                />
+              ) : user?.photo_url ? (
+                <img src={user.photo_url} alt={user.full_name} className="size-full object-cover" />
+              ) : (
+                <UserRound className="size-6 text-muted-foreground" />
+              )}
+            </div>
+            <div className="min-w-0 flex-1 space-y-1.5">
+              <input
+                id="user-form-photo"
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => setPhotoFile(e.target.files?.[0] ?? null)}
+              />
+              <Button type="button" variant="outline" size="sm">
+                <label htmlFor="user-form-photo" className="cursor-pointer">
+                  {photoFile || user?.photo_url ? 'Cambiar foto' : 'Subir foto'}
+                </label>
+              </Button>
+              <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={visibleOnLogin}
+                  onChange={(e) => setVisibleOnLogin(e.target.checked)}
+                />
+                Visible en la pantalla de inicio (login con foto)
+              </label>
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Título profesional</Label>

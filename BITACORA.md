@@ -915,7 +915,38 @@ Pantalla de configuración inicial tipo Ubuntu, que aparece **solo la primera ve
 
 ### Notas / pendientes
 - El wizard está pensado para el primer super-usuario; los demás admins también lo verán hasta completarlo (caso borde aceptable).
-- Queda en `IDEAS.txt` la idea 1 (login con selección de usuario con foto).
+
+---
+
+## Subfase 2.11 — Login con selección de usuario con foto (idea 1 de IDEAS.txt) ✅
+
+**Fecha:** 2026-08-06
+
+### Qué se hizo
+La pantalla de inicio ahora muestra la rejilla de perfiles con foto para seleccionar quién inicia sesión, en lugar del formulario email/contraseña como paso principal.
+
+**Backend:**
+- `GET /auth/login-candidates` (público): staff con `is_visible_on_login=true` agrupados por clínica (solo clínicas activas/trial) + super-admins. No expone emails de staff (se piden en el paso de contraseña).
+- `POST /auth/login/user` (público): login por `user_id` + contraseña. Evita la ambigüedad de emails repetidos entre clínicas y actualiza `last_login_at`.
+
+**Frontend:**
+- `Login` reescrito: rejilla de tarjetas con foto (avatar por inicial si no hay foto), agrupadas por clínica; clic → paso de contraseña → login. El super-admin se muestra en su propia sección (usa su email, que sí se expone).
+- `UserFormDialog`: ahora permite **subir foto** al crear/editar un usuario y un checkbox **"Visible en la pantalla de inicio"** (`is_visible_on_login`). Completa el requisito de "agregar usuarios con foto, nombre, cargo, cédula, descripción".
+
+### Decisiones técnicas y por qué
+- **Login por id en lugar de email**: los emails son únicos por clínica (no globales); seleccionar una tarjeta solo con la foto + contraseña es más robusto y evita colisiones.
+- **Los candidatos NO incluyen el email del staff**: la rejilla es de cara pública; el email solo se usa en el backend al autenticar por id. Solo los super-admins exponen email (porque su login es por email).
+- Se reutilizan los campos de la 2.8 (`photo_url`, `is_visible_on_login`); el endpoint `/users/{id}/photo` ya existía.
+
+### Verificado
+- `login-candidates` agrupa por clínica y filtra por visibilidad/suscripción ✓
+- Login por id: ok con contraseña correcta, 401 con incorrecta ✓
+- `is_visible_on_login=false` quita al usuario de la rejilla; true lo regresa ✓
+- Ruff + lint 0 errores + build OK ✓
+
+### Notas / pendientes
+- La idea 1 queda cerrada. El acceso del dueño por token sigue en `TODO.md`.
+- La pantalla con foto puede crecer después (multi-perfil de clínica, búsqueda), pero el core está listo.
 
 ---
 

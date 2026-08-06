@@ -6,6 +6,11 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class UserIdLoginRequest(BaseModel):
+    user_id: str = Field(description="Id del usuario de staff (tarjeta del login con foto)")
+    password: str
+
+
 class LoginResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
