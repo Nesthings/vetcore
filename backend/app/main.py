@@ -17,6 +17,7 @@ from app.api import (
     invoices,
     pets,
     schedule_blocks,
+    services,
     users,
 )
 from app.core.config import settings
@@ -48,6 +49,7 @@ app.include_router(schedule_blocks.router, prefix="/api/v1")
 app.include_router(dashboard.router, prefix="/api/v1")
 app.include_router(inventory.router, prefix="/api/v1")
 app.include_router(invoices.router, prefix="/api/v1")
+app.include_router(services.router, prefix="/api/v1")
 app.include_router(dose.router, prefix="/api/v1")
 
 # Media (MVP local). La URL pública /media/... es la que devuelven los endpoints.

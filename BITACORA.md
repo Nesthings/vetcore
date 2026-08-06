@@ -335,4 +335,44 @@ Las verificaciones de frontend deben ejercitar el código JS real (no solo el ba
 
 ---
 
-**Siguiente subfase:** 1.5 — Inventario básico + Facturación básica (alta de producto, lista con alertas de caducidad, descuento automático al facturar, detalle de factura/recibo, catálogo de servicios y precios).
+## Subfase 1.5 — Inventario básico + Facturación básica ✅
+
+**Fecha:** 2026-08-05
+
+### Qué se hizo
+**Backend:**
+- Migración `0004`: `discount_percent` en `invoice_items` y `service_catalog`.
+- Modelos reales `ServiceCatalog` e `InventoryLot` (se retiró el registro Core de `service_catalog`).
+- `api/services.py`: CRUD del catálogo de servicios (solo admin).
+- `api/inventory.py`: listado enriquecido con **stock** (Σ movimientos) y **alertas de caducidad** (vence ≤30 días / vencido); alta de producto, alta de lote (crea entrada de compra), movimiento manual de stock.
+- `api/invoices.py`: total con **descuento automático por servicio del catálogo**, descuento por línea editable, **movimiento de venta automático** al facturar productos (descuenta stock), **PDF de recibo** (`GET /invoices/{id}/receipt`), lectura enriquecida con `pet_name`/`branch_name` y `line_total`.
+
+**Frontend:**
+- Nav: **Inventario**, **Servicios**, **Facturación** (los dos últimos solo visibles para admin).
+- `Inventory`: tabla con badges de stock (agotado/bajo/en stock) y caducidad (vence pronto/vencido); alta de producto, lote y movimiento.
+- `Services`: catálogo con precio y descuento automático.
+- `Invoices`: lista con folio/paciente/total/estado, alta con editor de conceptos (servicios del catálogo con descuento automático, productos o manual), detalle y **descarga del recibo PDF** (fetch con token → blob).
+
+### Decisiones técnicas y por qué
+- **Descuento automático por servicio (aprobado):** el descuento vive en el catálogo; al facturar una línea con `service_id` y sin descuento explícito, el backend lo toma del catálogo. El admin puede ajustarlo por línea. Total recalculado en servidor.
+- **Caducidad con lotes** (`inventory_lots`, marcado FASE 2 en el esquema pero necesario para 1.5): producto → lotes con fecha; alerta a ≤30 días o vencido.
+- **Stock por movimientos:** el alta de lote crea un movimiento `purchase`; al facturar un producto, un movimiento `sale` negativo descuenta stock automáticamente (consistente con el dashboard).
+- **`service_catalog` sin `created_at`:** el esquema del documento NO lo tiene; se respetó tal cual (se descubrió al fallar el INSERT).
+- **Recibo vía `GET /invoices/{id}/receipt`** (no almacenado en DB): el frontend lo descarga con el token (fetch→blob) para no exponer la URL.
+- **Roles:** servicios y facturas = solo admin (backend 403 + nav oculto); inventario = admin/vet.
+
+### Verificado
+- Servicio con 10% de descuento; factura con 1 servicio + 2 productos → total 645.00 (405 + 240), dto 10% aplicado automáticamente ✓
+- Stock tras la venta: 20 − 2 = 18 ✓
+- Lote con caducidad 2026-09-01 → `expiring_soon: true` ✓
+- Recibo PDF: HTTP 200, `%PDF` ✓
+- Admin: servicios/facturas 200; recepción: 403 en ambos ✓
+- Ruff + lint 0 errores, build OK ✓
+
+### Notas / pendientes
+- Datos de prueba nuevos: servicio "Consulta general" (450, 10%), producto "Amoxicilina 250mg" con lote (20 uds, vence 2026-09-01), facturas con recibo.
+- El `discount_percent` de `service_catalog` es una adición al esquema (migración 0004) aprobada como parte de la decisión de descuento.
+
+---
+
+**Siguiente subfase:** 1.6 — Configuración de clínica + Multi-sucursal (gestión de usuarios/staff, sucursales con inventario y agenda independientes, catálogo de servicios).

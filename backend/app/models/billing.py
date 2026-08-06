@@ -13,6 +13,21 @@ from app.models.base import UUIDPkMixin
 INVOICE_STATUSES = ("pending", "paid", "cancelled")
 
 
+class ServiceCatalog(UUIDPkMixin, Base):
+    """Catálogo de servicios y precios de la clínica."""
+
+    __tablename__ = "service_catalog"
+
+    clinic_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("clinics.id"), nullable=False, index=True
+    )
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    price: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    discount_percent: Mapped[float] = mapped_column(
+        Numeric(5, 2), nullable=False, default=0, server_default="0"
+    )
+
+
 class Invoice(UUIDPkMixin, Base):
     __tablename__ = "invoices"
 
@@ -59,5 +74,8 @@ class InvoiceItem(UUIDPkMixin, Base):
         Numeric(10, 2), nullable=False, default=1, server_default="1"
     )
     unit_price: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    discount_percent: Mapped[float] = mapped_column(
+        Numeric(5, 2), nullable=False, default=0, server_default="0"
+    )
 
     invoice: Mapped[Invoice] = relationship(back_populates="items")

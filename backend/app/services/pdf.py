@@ -40,17 +40,13 @@ def build_consultation_summary_pdf(data: dict) -> bytes:
             textColor=colors.HexColor("#14201d"),
         )
     )
-    styles.add(
-        ParagraphStyle(name="VetBody", parent=styles["Normal"], fontSize=10.5, leading=15)
-    )
+    styles.add(ParagraphStyle(name="VetBody", parent=styles["Normal"], fontSize=10.5, leading=15))
 
     story: list = []
 
     story.append(Paragraph("VetCore", styles["VetTitle"]))
     story.append(
-        Paragraph(
-            f"<b>{data.get('clinic_name', '')}</b> — Resumen de consulta", styles["VetBody"]
-        )
+        Paragraph(f"<b>{data.get('clinic_name', '')}</b> — Resumen de consulta", styles["VetBody"])
     )
     story.append(Paragraph(data.get("date_str", ""), _CENTER))
     story.append(Spacer(1, 0.15 * inch))
@@ -132,6 +128,96 @@ def build_consultation_summary_pdf(data: dict) -> bytes:
     story.append(
         Paragraph(
             "Documento informativo generado por VetCore. No constituye una receta médica.",
+            _CENTER,
+        )
+    )
+
+    doc.build(story)
+    return buf.getvalue()
+
+
+def build_invoice_receipt_pdf(data: dict) -> bytes:
+    """Recibo de factura. Informativo; no es comprobante fiscal (CFDI)."""
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=letter, rightMargin=0.75 * inch, leftMargin=0.75 * inch)
+
+    styles = getSampleStyleSheet()
+    styles.add(
+        ParagraphStyle(name="VetTitle", parent=styles["Title"], fontSize=18, textColor=BRAND)
+    )
+    styles.add(
+        ParagraphStyle(
+            name="VetH2",
+            parent=styles["Heading2"],
+            fontSize=11,
+            textColor=colors.HexColor("#14201d"),
+        )
+    )
+    styles.add(ParagraphStyle(name="VetBody", parent=styles["Normal"], fontSize=10.5, leading=15))
+
+    story: list = []
+
+    story.append(Paragraph("VetCore", styles["VetTitle"]))
+    story.append(Paragraph(f"<b>{data.get('clinic_name', '')}</b> — Recibo", styles["VetBody"]))
+    story.append(Paragraph(data.get("date_str", ""), _CENTER))
+    story.append(Spacer(1, 0.15 * inch))
+
+    info = [
+        ["Folio", data.get("invoice_id", "")],
+        ["Paciente", data.get("pet_name", "—")],
+        ["Estado", data.get("status", "")],
+    ]
+    info_table = Table(info, colWidths=[1.4 * inch, 5.6 * inch])
+    info_table.setStyle(
+        TableStyle(
+            [
+                ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 10),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                ("TOPPADDING", (0, 0), (-1, -1), 3),
+            ]
+        )
+    )
+    story.append(info_table)
+    story.append(Spacer(1, 0.2 * inch))
+
+    story.append(Paragraph("Conceptos", styles["VetH2"]))
+    header = ["Descripción", "Cant.", "P. unit.", "Dto %", "Subtotal"]
+    rows = [header]
+    for item in data.get("items", []):
+        rows.append(
+            [
+                item.get("description", ""),
+                str(item.get("quantity", 1)),
+                f"${float(item.get('unit_price', 0)):,.2f}",
+                f"{float(item.get('discount_percent', 0)):g}%",
+                f"${float(item.get('line_total', 0)):,.2f}",
+            ]
+        )
+    rows.append(["", "", "", "TOTAL", f"${float(data.get('total', 0)):,.2f}"])
+    items_table = Table(
+        rows, colWidths=[3.2 * inch, 0.7 * inch, 1.0 * inch, 0.7 * inch, 1.4 * inch]
+    )
+    items_table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e6f5f1")),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 9.5),
+                ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#dfe7e4")),
+                ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                ("TOPPADDING", (0, 0), (-1, -1), 4),
+                ("FONTNAME", (0, len(rows) - 1), (-1, len(rows) - 1), "Helvetica-Bold"),
+                ("BACKGROUND", (0, len(rows) - 1), (-1, len(rows) - 1), colors.HexColor("#f0f4f3")),
+            ]
+        )
+    )
+    story.append(items_table)
+    story.append(Spacer(1, 0.3 * inch))
+    story.append(
+        Paragraph(
+            "Recibo informativo generado por VetCore. No constituye comprobante fiscal.",
             _CENTER,
         )
     )

@@ -1,18 +1,32 @@
-import { CalendarDays, LayoutDashboard, LogOut, PawPrint, Users } from 'lucide-react'
+import {
+  CalendarDays,
+  FileText,
+  LayoutDashboard,
+  LogOut,
+  Package,
+  PawPrint,
+  Receipt,
+  Users,
+} from 'lucide-react'
 import { NavLink, useNavigate } from 'react-router-dom'
 
 import { useAuth } from '@/lib/auth'
 import { cn } from '@/lib/utils'
 
-const NAV_ITEMS = [
-  { to: '/', label: 'Dashboard del día', icon: LayoutDashboard, end: true },
-  { to: '/agenda', label: 'Agenda', icon: CalendarDays, end: false },
-  { to: '/pets', label: 'Pacientes', icon: Users, end: false },
-]
-
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+
+  const isAdmin = user?.role === 'admin'
+
+  const NAV_ITEMS = [
+    { to: '/', label: 'Dashboard del día', icon: LayoutDashboard, end: true, adminOnly: false },
+    { to: '/agenda', label: 'Agenda', icon: CalendarDays, end: false, adminOnly: false },
+    { to: '/pets', label: 'Pacientes', icon: Users, end: false, adminOnly: false },
+    { to: '/inventory', label: 'Inventario', icon: Package, end: false, adminOnly: false },
+    { to: '/services', label: 'Servicios', icon: FileText, end: false, adminOnly: true },
+    { to: '/invoices', label: 'Facturación', icon: Receipt, end: false, adminOnly: true },
+  ].filter((i) => !i.adminOnly || isAdmin)
 
   const handleLogout = () => {
     logout()
