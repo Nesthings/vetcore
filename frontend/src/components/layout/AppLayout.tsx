@@ -50,17 +50,24 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate()
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [fullName, setFullName] = useState<string | null>(null)
+  const [clinicName, setClinicName] = useState<string>('')
+  const [clinicLogoUrl, setClinicLogoUrl] = useState<string | null>(null)
   const [profileOpen, setProfileOpen] = useState(false)
   const profileRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!user?.clinic_id) return
     let cancelled = false
-    apiFetch<{ photo_url?: string | null; full_name?: string | null }>('/auth/me')
-      .then((me) => {
+    Promise.all([
+      apiFetch<{ photo_url?: string | null; full_name?: string | null }>('/auth/me'),
+      apiFetch<{ name?: string; logo_url?: string | null }>('/clinics/me'),
+    ])
+      .then(([me, clinic]) => {
         if (cancelled) return
         if (me.photo_url) setAvatarUrl(me.photo_url)
         if (me.full_name) setFullName(me.full_name)
+        if (clinic.name) setClinicName(clinic.name)
+        if (clinic.logo_url) setClinicLogoUrl(clinic.logo_url)
       })
       .catch(() => undefined)
     return () => {
@@ -94,11 +101,17 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen bg-background">
       <aside className="sticky top-0 flex h-screen w-60 flex-col border-r border-border bg-card bg-gradient-to-b from-primary/10 via-transparent to-transparent">
         <div className="flex items-center gap-2 border-b border-border px-4 py-4">
-          <div className="bg-brand-gradient flex size-9 items-center justify-center rounded-lg text-primary-foreground shadow-glow">
-            <PawPrint className="size-5" aria-hidden="true" />
+          <div className="bg-brand-gradient flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-lg text-primary-foreground shadow-glow">
+            {clinicLogoUrl ? (
+              <img src={clinicLogoUrl} alt={clinicName} className="size-full object-cover" />
+            ) : (
+              <PawPrint className="size-5" aria-hidden="true" />
+            )}
           </div>
-          <div className="leading-tight">
-            <p className="text-sm font-semibold text-foreground">VetCore</p>
+          <div className="min-w-0 leading-tight">
+            <p className="truncate text-sm font-semibold text-foreground">
+              {clinicName || 'VetCore'}
+            </p>
             <p className="text-xs text-muted-foreground">Panel clínico</p>
           </div>
         </div>
