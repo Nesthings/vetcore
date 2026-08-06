@@ -593,4 +593,41 @@ Las verificaciones de frontend deben ejercitar el código JS real (no solo el ba
 
 ---
 
-**Siguiente subfase:** 2.3 — Agenda avanzada (lista de espera + confirmación automática escalonada 48h/24h/2h).
+## Subfase 2.3 — Agenda avanzada (Lista de espera + Confirmación escalonada 48h/24h/2h) ✅
+
+**Fecha:** 2026-08-05
+
+### Qué se hizo
+**Backend:**
+- Modelo `AppointmentWaitlist` + CRUD `/waitlist` (staff): alta, listar (filtros), cambiar estado (waiting/offered/fulfilled/expired), eliminar.
+- Modelo `OutboundNotification` (tabla existente).
+- **Motor de recordatorios escalonados** (`automation.py`):
+  - `GET /automation/appointments/{id}/reminder-schedule` — ventanas 48h/24h/2h con estado.
+  - `POST /automation/reminders/run` — procesa citas próximas (≤48h), calcula etapas vencidas, respeta el **opt-in** (`owner_preferences.accepts_reminders`) y registra en `outbound_notifications` (whatsapp, status 'sent' como stub) **sin duplicados**.
+  - `GET /automation/reminders/pending` — citas próximas con su estado de consentimiento.
+
+**Frontend:**
+- `Waitlist` (`/waitlist`, staff): tabla con estado, alta, ofrecer hueco, cumplida/expirar.
+- Detalle de cita: sección **"Recordatorios escalonados"** (48h/24h/2h con su estado + badge si el dueño no tiene opt-in).
+- `Automation` (`/automation`, admin): pendientes con consentimiento y botón **"Ejecutar recordatorios ahora"**.
+
+### Decisiones técnicas y por qué
+- **Envío WhatsApp como stub:** sin proveedor configurado, el motor deja todo listo (etapa, consentimiento, registro) y marca la notificación como 'sent'. El envío real se conecta cuando exista credencial de WhatsApp (Motor de Automatización).
+- **Deduplicación por template:** el template codifica `rem:<appointment_id>:<stage>` para saber si ya se envió, sin columnas extra en el esquema.
+- **Consentimiento obligatorio (principio 10):** sin `accepts_reminders`, la etapa se salta y cuenta en `skipped_no_consent`. Nunca por defecto.
+- **Nota de zona horaria:** el servidor local es UTC-6; `datetime.now()` (naive local) vs `datetime.now(UTC)` difieren 6h. Las citas creadas vía API usan ISO correcto; los seeds de prueba con `datetime.now()+Xh` quedaban en el pasado por esta mezcla. Los endpoints usan siempre UTC aware.
+
+### Verificado
+- Waitlist: alta + listar + ofrecer hueco ✓
+- Motor con cita a ~18h: cronograma 48h/24h `pending_due`, 2h `pending`; tras run → 48h/24h **sent**, 2h pendiente; re-ejecución → **0** (dedupe) ✓
+- Consentimiento: dueño con opt-in → procesa; sin opt-in → `skipped_no_consent` ✓
+- Pendientes: lista con estado de consentimiento ✓
+- Ruff + lint 0 errores + build OK ✓
+
+### Notas / pendientes
+- La UI de preferencias del dueño (opt-in) se construye en 2.4 (CRM); para probar se sembró `owner_preferences.accepts_reminders`.
+- `pending` muestra `next_stage: null` cuando ninguna etapa está vencida aún; el detalle completo está en el cronograma.
+
+---
+
+**Siguiente subfase:** 2.4 — CRM básico + Encuestas post-consulta + Comparador de fotos de evolución.

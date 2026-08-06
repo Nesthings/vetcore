@@ -56,3 +56,27 @@ class ScheduleBlock(UUIDPkMixin, Base):
     start_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     end_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     reason: Mapped[str | None] = mapped_column(String(200))
+
+
+class AppointmentWaitlist(UUIDPkMixin, Base):
+    """Lista de espera de citas."""
+
+    __tablename__ = "appointment_waitlist"
+
+    clinic_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("clinics.id"), nullable=False, index=True
+    )
+    branch_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("clinic_branches.id"), nullable=False, index=True
+    )
+    pet_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("pets.id"), nullable=False, index=True
+    )
+    desired_from: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    desired_to: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="waiting", server_default="waiting"
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )

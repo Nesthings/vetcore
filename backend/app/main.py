@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from app.api import (
     appointments,
     auth,
+    automation,
     branches,
     clinics,
     consultations,
@@ -23,6 +24,7 @@ from app.api import (
     services,
     templates,
     users,
+    waitlist,
 )
 from app.core.config import settings
 
@@ -59,6 +61,8 @@ app.include_router(services.router, prefix="/api/v1")
 app.include_router(templates.router, prefix="/api/v1")
 app.include_router(dose.router, prefix="/api/v1")
 app.include_router(owner.router, prefix="/api/v1")
+app.include_router(waitlist.router, prefix="/api/v1")
+app.include_router(automation.router, prefix="/api/v1")
 
 # Media (MVP local). La URL pública /media/... es la que devuelven los endpoints.
 media_dir = Path(settings.media_root)

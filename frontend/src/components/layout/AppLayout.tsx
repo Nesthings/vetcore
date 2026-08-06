@@ -1,4 +1,5 @@
 import {
+  BellRing,
   CalendarDays,
   FileText,
   LayoutDashboard,
@@ -9,6 +10,7 @@ import {
   Receipt,
   Settings2,
   ShoppingCart,
+  Timer,
   UserRound,
   Users,
 } from 'lucide-react'
@@ -32,6 +34,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   }[] = [
     { to: '/', label: 'Dashboard del día', icon: LayoutDashboard, end: true },
     { to: '/agenda', label: 'Agenda', icon: CalendarDays, end: false },
+    { to: '/waitlist', label: 'Lista de espera', icon: Timer, end: false },
     { to: '/pets', label: 'Pacientes', icon: Users, end: false },
     { to: '/inventory', label: 'Inventario', icon: Package, end: false },
     {
@@ -45,6 +48,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       to: '/purchase-orders',
       label: 'Compras',
       icon: ShoppingCart,
+      end: false,
+      roles: ['admin'],
+    },
+    {
+      to: '/automation',
+      label: 'Automatización',
+      icon: BellRing,
       end: false,
       roles: ['admin'],
     },

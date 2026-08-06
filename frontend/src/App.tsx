@@ -7,6 +7,7 @@ import { ForgotPassword } from '@/pages/auth/ForgotPassword'
 import { Login } from '@/pages/auth/Login'
 import { ResetPassword } from '@/pages/auth/ResetPassword'
 import { Agenda } from '@/pages/Agenda'
+import { Automation } from '@/pages/Automation'
 import { Dashboard } from '@/pages/Dashboard'
 import { DesignSystem } from '@/pages/DesignSystem'
 import { Inventory } from '@/pages/Inventory'
@@ -23,6 +24,7 @@ import { Services } from '@/pages/Services'
 import { Settings } from '@/pages/Settings'
 import { SuperAdminPanel } from '@/pages/superadmin/SuperAdminPanel'
 import { Templates } from '@/pages/Templates'
+import { Waitlist } from '@/pages/Waitlist'
 
 function App() {
   return (
@@ -48,6 +50,22 @@ function App() {
             element={
               <ProtectedRoute>
                 <Agenda />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/waitlist"
+            element={
+              <ProtectedRoute>
+                <Waitlist />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/automation"
+            element={
+              <ProtectedRoute roles={['admin']}>
+                <Automation />
               </ProtectedRoute>
             }
           />

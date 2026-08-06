@@ -59,8 +59,10 @@ from app.schemas.purchase import (
     PurchaseOrderRead,
     PurchaseOrderUpdate,
 )
+from app.schemas.reminder import PendingReminder, ReminderRunResult, ReminderSchedule, ReminderStage
 from app.schemas.services import ServiceCreate, ServiceRead, ServiceUpdate
 from app.schemas.staff import ProfileUpdate, UserCreate, UserRead, UserUpdate
+from app.schemas.waitlist import WaitlistCreate, WaitlistRead, WaitlistUpdate
 
 __all__ = [
     "AppointmentCreate",
@@ -106,12 +108,16 @@ __all__ = [
     "PetUpdate",
     "PetWeightCreate",
     "PetWeightRead",
+    "PendingReminder",
     "ProfileUpdate",
     "PurchaseOrderCreate",
     "PurchaseOrderItemCreate",
     "PurchaseOrderItemRead",
     "PurchaseOrderRead",
     "PurchaseOrderUpdate",
+    "ReminderRunResult",
+    "ReminderSchedule",
+    "ReminderStage",
     "ScheduleBlockCreate",
     "ScheduleBlockRead",
     "ServiceCreate",
@@ -121,4 +127,7 @@ __all__ = [
     "UserCreate",
     "UserRead",
     "UserUpdate",
+    "WaitlistCreate",
+    "WaitlistRead",
+    "WaitlistUpdate",
 ]
