@@ -120,6 +120,8 @@ export function PetFormDialog({
     setAltContactName('')
     setAltPhone('')
     setConfirmDelete(false)
+    setDeleting(false)
+    setSubmitting(false)
     setError(null)
   }, [open, pet])
 
