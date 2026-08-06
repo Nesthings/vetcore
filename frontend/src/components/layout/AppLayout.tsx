@@ -41,7 +41,6 @@ const NAV_ICONS: Record<string, React.ElementType> = {
   templates: FileText,
   services: Settings2,
   invoices: Receipt,
-  settings: Settings2,
 }
 
 export function AppLayout({ children }: { children: React.ReactNode }) {

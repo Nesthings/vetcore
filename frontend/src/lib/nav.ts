@@ -23,7 +23,6 @@ export const NAV_ROUTES: NavRoute[] = [
   { to: '/templates', label: 'Plantillas', component: 'templates' },
   { to: '/services', label: 'Servicios', component: 'services' },
   { to: '/invoices', label: 'Facturación', component: 'invoices' },
-  { to: '/settings', label: 'Configuración', component: 'settings' },
 ]
 
 export function routeForPath(pathname: string): NavRoute | undefined {
