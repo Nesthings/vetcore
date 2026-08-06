@@ -64,7 +64,7 @@ function KpiCard({
   hint?: string
 }) {
   return (
-    <Card className="shadow-card">
+    <Card className="bg-gradient-to-br from-primary/[0.06] via-transparent to-transparent">
       <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
         <CardDescription>{label}</CardDescription>
         <Icon className="size-4 text-primary" aria-hidden="true" />

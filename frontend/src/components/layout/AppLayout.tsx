@@ -91,9 +91,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen bg-background">
-      <aside className="sticky top-0 flex h-screen w-60 flex-col border-r border-border bg-card">
+      <aside className="sticky top-0 flex h-screen w-60 flex-col border-r border-border bg-card bg-gradient-to-b from-primary/10 via-transparent to-transparent">
         <div className="flex items-center gap-2 border-b border-border px-4 py-4">
-          <div className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+          <div className="bg-brand-gradient flex size-9 items-center justify-center rounded-lg text-primary-foreground shadow-glow">
             <PawPrint className="size-5" aria-hidden="true" />
           </div>
           <div className="leading-tight">
@@ -110,10 +110,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               end={item.end}
               className={({ isActive }) =>
                 cn(
-                  'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                  'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all duration-200',
                   isActive
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                    ? 'bg-gradient-to-r from-primary to-primary-hover text-primary-foreground shadow-glow'
+                    : 'text-muted-foreground hover:bg-accent/70 hover:text-accent-foreground',
                 )
               }
             >
@@ -125,7 +125,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       </aside>
 
       <main className="min-w-0 flex-1">
-        <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b border-border bg-background/80 px-6 backdrop-blur">
+        <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b border-border/70 bg-background/80 bg-gradient-to-b from-primary/[0.06] via-transparent to-transparent px-6 backdrop-blur">
           <p className="text-sm text-muted-foreground">
             Hola, <span className="font-medium text-foreground">{displayName}</span>
           </p>

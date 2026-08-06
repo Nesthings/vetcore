@@ -143,6 +143,14 @@
   --shadow-card: 0 1px 2px 0 rgb(20 32 29 / 0.04), 0 1px 3px 0 rgb(20 32 29 / 0.06);
   --shadow-elevated: 0 4px 12px -2px rgb(20 32 29 / 0.1), 0 2px 4px -2px rgb(20 32 29 / 0.06);
   --shadow-dialog: 0 12px 32px -4px rgb(20 32 29 / 0.18), 0 4px 8px -4px rgb(20 32 29 / 0.08);
+
+  /* Resplandores al hover ("iluminan" el elemento) */
+  --shadow-glow: 0 10px 34px -8px rgb(15 118 110 / 0.4), 0 2px 10px -4px rgb(15 118 110 / 0.22);
+  --shadow-glow-success: 0 10px 34px -8px rgb(33 129 62 / 0.45), 0 2px 10px -4px rgb(33 129 62 / 0.22);
+  --shadow-glow-destructive: 0 10px 34px -8px rgb(217 45 32 / 0.4), 0 2px 10px -4px rgb(217 45 32 / 0.22);
+
+  /* Gradiente de marca (teal → cyan) para acentos */
+  --gradient-brand: linear-gradient(135deg, var(--primary) 0%, #2dd4bf 100%);
 }
 
 @layer base {
@@ -151,7 +159,13 @@
   }
 
   body {
-    @apply bg-background text-foreground antialiased;
+    @apply text-foreground antialiased;
+    background-color: var(--background);
+    background-image:
+      radial-gradient(1100px 520px at 100% -5%, rgb(15 118 110 / 0.09), transparent 60%),
+      radial-gradient(900px 480px at -5% 100%, rgb(45 212 191 / 0.08), transparent 55%),
+      linear-gradient(180deg, var(--background) 0%, #eef5f2 45%, var(--background) 100%);
+    background-attachment: fixed;
     font-feature-settings: 'cv11', 'ss01';
     text-rendering: optimizeLegibility;
   }
@@ -172,5 +186,27 @@
 
   ::selection {
     @apply bg-primary/20 text-primary;
+  }
+}
+
+@layer utilities {
+  /* Fondo "vidrio": translúcido + desenfoque */
+  .glass {
+    background-color: color-mix(in srgb, var(--card) 82%, transparent);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+  }
+
+  /* Texto con degradado de marca */
+  .text-gradient {
+    background-image: var(--gradient-brand);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Gradiente de marca para fondos */
+  .bg-brand-gradient {
+    background-image: var(--gradient-brand);
   }
 }
