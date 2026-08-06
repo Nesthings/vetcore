@@ -140,12 +140,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 aria-label="Menú de perfil"
               >
                 {avatarUrl ? (
-                  <img
-                    src={avatarUrl}
-                    alt={displayName}
-                    className="size-full object-cover"
-                    onClick={() => setProfileOpen((o) => !o)}
-                  />
+                  <img src={avatarUrl} alt={displayName} className="size-full object-cover" />
                 ) : (
                   <span>{displayName?.[0]?.toUpperCase() ?? user?.role?.[0]?.toUpperCase()}</span>
                 )}
