@@ -17,14 +17,30 @@ import {
   BarChart3,
 } from 'lucide-react'
 import { NavLink, useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
 
 import { useAuth } from '@/lib/auth'
 import { cn } from '@/lib/utils'
+import { apiFetch } from '@/lib/api'
 import { NotificationBell } from '@/components/layout/NotificationBell'
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!user?.clinic_id) return
+    let cancelled = false
+    apiFetch<{ photo_url?: string | null }>('/auth/me')
+      .then((me) => {
+        if (!cancelled && me.photo_url) setAvatarUrl(me.photo_url)
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [user?.clinic_id, user?.sub])
 
   const role = user?.role
 
@@ -123,8 +139,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
         <div className="border-t border-border p-3">
           <div className="mb-2 flex items-center gap-2 px-1">
-            <div className="flex size-8 items-center justify-center rounded-full bg-secondary text-xs font-semibold text-secondary-foreground">
-              {user?.role?.[0]?.toUpperCase()}
+            <div className="relative flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-secondary text-xs font-semibold text-secondary-foreground">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt={user?.role ?? ''} className="size-full object-cover" />
+              ) : (
+                user?.role?.[0]?.toUpperCase()
+              )}
             </div>
             <div className="leading-tight">
               <p className="text-xs font-medium text-foreground">{user?.role}</p>

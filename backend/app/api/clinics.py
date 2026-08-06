@@ -3,13 +3,31 @@
 El Panel Super-Admin (Subfase 1.8) opera sobre esta colección. El alta de una
 clínica nueva crea el tenant; el cambio de suscripción registra eventos en la
 bitácora `clinic_subscription_events`.
+
+Incluye también `/clinics/me` (la propia clínica del staff), que permite leer
+y editar el perfil de la clínica (logo, datos fiscales, moneda, timezone)
+desde la Configuración.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import CurrentUser, require_roles
+from app.api.deps import (
+    CurrentClinic,
+    CurrentUser,
+    get_current_clinic,
+    require_clinic_roles,
+    require_roles,
+)
+from app.core.events import record_audit
+from app.core.images import process_cartilla_photo
+from app.core.storage import (
+    ALLOWED_IMAGE_EXTENSIONS,
+    public_url,
+    save_media,
+    validate_extension,
+)
 from app.db.session import get_db
 from app.models import (
     Appointment,
@@ -31,6 +49,8 @@ from app.schemas.clinic import (
 
 router = APIRouter(prefix="/clinics", tags=["clinics"])
 
+MAX_IMAGE_BYTES = 5 * 1024 * 1024  # 5 MB
+
 
 @router.get("", response_model=list[ClinicRead])
 def list_clinics(
@@ -42,6 +62,68 @@ def list_clinics(
     return list(
         db.scalars(select(Clinic).order_by(Clinic.created_at.desc()).limit(limit).offset(offset))
     )
+
+
+@router.get("/me", response_model=ClinicRead, summary="Perfil de mi propia clínica (staff)")
+def my_clinic(
+    ctx: CurrentClinic = Depends(get_current_clinic),
+    db: Session = Depends(get_db),
+) -> Clinic:
+    return _get_clinic_or_404(db, ctx.clinic["id"])
+
+
+@router.patch("/me", response_model=ClinicRead, summary="Actualiza el perfil de mi clínica (admin)")
+def update_my_clinic(
+    body: ClinicUpdate,
+    ctx: CurrentClinic = Depends(require_clinic_roles("admin")),
+    db: Session = Depends(get_db),
+) -> Clinic:
+    clinic = _get_clinic_or_404(db, ctx.clinic["id"])
+    for field, value in body.model_dump(exclude_unset=True).items():
+        if value is not None:
+            setattr(clinic, field, value)
+    db.commit()
+    db.refresh(clinic)
+    return clinic
+
+
+@router.post(
+    "/me/logo",
+    response_model=ClinicRead,
+    summary="Sube el logo de la clínica (compresión, sin EXIF)",
+)
+def upload_clinic_logo(
+    file: UploadFile = File(...),
+    ctx: CurrentClinic = Depends(require_clinic_roles("admin")),
+    db: Session = Depends(get_db),
+) -> Clinic:
+    clinic = _get_clinic_or_404(db, ctx.clinic["id"])
+    validate_extension(file.filename or "", ALLOWED_IMAGE_EXTENSIONS)
+    content = file.file.read()
+    if len(content) > MAX_IMAGE_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="La imagen supera el límite de 5 MB",
+        )
+    try:
+        processed = process_cartilla_photo(content)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    rel = save_media(f"clinics/{clinic.id}", "logo.jpg", processed)
+    clinic.logo_url = public_url(rel)
+    record_audit(
+        db,
+        clinic_id=clinic.id,
+        actor_type="user",
+        actor_id=ctx.user.sub,
+        action="clinic_logo_updated",
+        entity_type="clinic",
+        entity_id=clinic.id,
+    )
+    db.commit()
+    db.refresh(clinic)
+    return clinic
 
 
 def _get_clinic_or_404(db: Session, clinic_id: str) -> Clinic:

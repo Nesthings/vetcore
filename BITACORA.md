@@ -793,4 +793,41 @@ Se conserva en el backend: `POST /auth/login/owner`, el flujo de activación por
 
 ---
 
+## Subfase 2.8 — Campos base de perfiles de staff y clínica ✅
+
+**Fecha:** 2026-08-06
+
+### Qué se hizo
+Prepara el esquema para las ideas diferidas de `IDEAS.txt` (login con foto de usuario, setup wizard tipo Ubuntu con organigrama). El "super usuario" de la clínica es el rol `admin` actual (sin cambios en el modelo de roles).
+
+**Migraciones:**
+- `0007_base_profiles`: `users` + `photo_url`, `professional_title`, `cedula`, `job_title`, `description`, `specialty`, `reports_to` (self-FK → organigrama), `last_login_at`, `is_visible_on_login`. `clinics` + `logo_url`, `timezone` (UTC), `address`, `rfc`, `fiscal_name`, `currency` (MXN), `setup_completed` (default true). `super_admins` + `photo_url`.
+- `0008_super_admin_last_login`: `super_admins.last_login_at` (separada porque 0007 ya había corrido).
+
+**Backend:**
+- `/auth/me` ahora devuelve `full_name` + `photo_url` (staff y super-admin).
+- Login de staff y super-admin actualiza `last_login_at`.
+- `POST /users/{id}/photo` — foto de perfil del staff (admin o el propio usuario), procesada igual que la Cartilla: JPEG cuadrado, sin EXIF, máx. 5 MB. Auditoría `staff_photo_updated`.
+- `GET|PATCH /clinics/me` — perfil de mi clínica (staff lee, admin edita). `POST /clinics/me/logo` — logo, auditoría `clinic_logo_updated`.
+- `reports_to` validado a la misma clínica en create/update.
+
+**Frontend:**
+- `Profile`: foto de perfil (subir/cambiar), título, cédula, cargo, especialidad, descripción.
+- `Settings`: tab "Clínica" con logo, nombre, contacto, dirección, RFC, razón social, timezone y moneda. `UserFormDialog` con los campos profesionales nuevos.
+- `AppLayout`: avatar con foto real en el sidebar (vía `/auth/me`).
+- `Audit`: etiquetas para `staff_photo_updated` y `clinic_logo_updated`.
+
+### Verificado
+- Migraciones 0007+0008 aplicadas; retrofit seguro (columnas nullable/defaults) ✓
+- Upload de foto de staff → sirve por `/media` 200 ✓
+- `PATCH /clinics/me` (rfc/timezone) y `PATCH /users/{id}` con campos nuevos ✓
+- `last_login_at` se actualiza al iniciar sesión (staff y super-admin) ✓
+- Ruff + lint 0 errores + build OK ✓
+
+### Notas / pendientes
+- Queda en `TODO.md` la idea del login con foto (usar `is_visible_on_login`, `photo_url` y el `reports_to`).
+- `setup_completed` queda listo para el wizard de la idea 2; hoy default true para no bloquear tenants existentes.
+
+---
+
 **Siguiente subfase:** 3.1 — Transcripción/resumen de consulta por voz con IA.

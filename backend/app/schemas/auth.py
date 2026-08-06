@@ -20,6 +20,8 @@ class MeResponse(BaseModel):
     role: str
     clinic_id: str | None = None
     branch_id: str | None = None
+    full_name: str | None = None
+    photo_url: str | None = None
 
 
 class ActivateRequest(BaseModel):

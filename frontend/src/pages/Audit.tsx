@@ -68,6 +68,8 @@ export function Audit() {
     invoice_cancelled: 'Factura cancelada',
     user_deactivated: 'Usuario desactivado',
     consultation_deleted: 'Consulta eliminada',
+    staff_photo_updated: 'Foto de staff actualizada',
+    clinic_logo_updated: 'Logo de la clínica actualizado',
   }
 
   return (

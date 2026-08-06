@@ -4,7 +4,7 @@ Incluye los endpoints de perfil propio (`/users/me`), accesibles para todo
 el staff de la clínica.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -17,12 +17,30 @@ from app.api.deps import (
     require_staff,
 )
 from app.core.events import record_audit
+from app.core.images import process_cartilla_photo
 from app.core.security import hash_password, verify_password
+from app.core.storage import (
+    ALLOWED_IMAGE_EXTENSIONS,
+    public_url,
+    save_media,
+    validate_extension,
+)
 from app.db.session import get_db
 from app.models import ClinicBranch, User
 from app.schemas.staff import ProfileUpdate, UserCreate, UserRead, UserUpdate
 
 router = APIRouter(prefix="/users", tags=["users"])
+
+MAX_IMAGE_BYTES = 5 * 1024 * 1024  # 5 MB
+
+
+def _validate_reports_to(db: Session, clinic_id: str, reports_to: str) -> None:
+    manager = db.scalar(select(User).where(User.id == reports_to, User.clinic_id == clinic_id))
+    if manager is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El responsable (reports_to) debe pertenecer a la misma clínica",
+        )
 
 
 def _with_branch_names(db: Session, users: list[User]) -> list[dict]:
@@ -98,6 +116,10 @@ def update_my_profile(
         user.full_name = body.full_name
     if body.phone is not None:
         user.phone = body.phone
+    for field in ("professional_title", "cedula", "job_title", "description", "specialty"):
+        value = getattr(body, field)
+        if value is not None:
+            setattr(user, field, value)
 
     db.commit()
     db.refresh(user)
@@ -136,6 +158,8 @@ def create_user(
         )
     data = body.model_dump(exclude={"password"})
     data["password_hash"] = hash_password(body.password)
+    if data.get("reports_to"):
+        _validate_reports_to(db, ctx.clinic["id"], str(data["reports_to"]))
     user = User(clinic_id=ctx.clinic["id"], **data)
     db.add(user)
     try:
@@ -156,6 +180,8 @@ def update_user(
 ) -> dict:
     user = _get_user_or_404(db, ctx.clinic["id"], user_id)
     data = body.model_dump(exclude_unset=True, exclude={"password"})
+    if data.get("reports_to"):
+        _validate_reports_to(db, ctx.clinic["id"], str(data["reports_to"]))
     for field, value in data.items():
         setattr(user, field, value)
     if body.password is not None:
@@ -188,3 +214,54 @@ def deactivate_user(
         entity_id=user.id,
     )
     db.commit()
+
+
+@router.post(
+    "/{user_id}/photo",
+    response_model=UserRead,
+    summary="Sube la foto de perfil del staff (compresión, sin EXIF)",
+)
+def upload_user_photo(
+    user_id: str,
+    file: UploadFile = File(...),
+    ctx: CurrentClinic = Depends(get_current_clinic),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Foto de perfil del staff, visible en el login con foto (idea diferida).
+
+    La puede subir el propio usuario o el admin (que también la asigna a
+    cualquier otro). Se procesa igual que la Cartilla: JPEG, cuadrado, sin
+    EXIF.
+    """
+    user = _get_user_or_404(db, ctx.clinic["id"], user_id)
+    if ctx.user.role != "admin" and str(user.id) != ctx.user.sub:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos para esta acción",
+        )
+    validate_extension(file.filename or "", ALLOWED_IMAGE_EXTENSIONS)
+    content = file.file.read()
+    if len(content) > MAX_IMAGE_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="La imagen supera el límite de 5 MB",
+        )
+    try:
+        processed = process_cartilla_photo(content)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    rel = save_media(f"users/{user.id}", "avatar.jpg", processed)
+    user.photo_url = public_url(rel)
+    record_audit(
+        db,
+        clinic_id=ctx.clinic["id"],
+        actor_type="user",
+        actor_id=ctx.user.sub,
+        action="staff_photo_updated",
+        entity_type="user",
+        entity_id=user.id,
+    )
+    db.commit()
+    db.refresh(user)
+    return _with_branch_names(db, [user])[0]

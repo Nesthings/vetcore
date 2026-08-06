@@ -50,6 +50,10 @@ def _staff_login(db: Session, identifier: str, password: str) -> LoginResponse:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Credenciales inválidas",
         )
+    db.execute(
+        text("UPDATE users SET last_login_at = now() WHERE id = :uid"), {"uid": row["id"]}
+    )
+    db.commit()
     token = create_access_token(
         subject=str(row["id"]),
         role=row["role"],
@@ -110,6 +114,10 @@ def _super_admin_login(db: Session, identifier: str, password: str) -> LoginResp
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Credenciales inválidas",
         )
+    db.execute(
+        text("UPDATE super_admins SET last_login_at = now() WHERE id = :uid"), {"uid": row["id"]}
+    )
+    db.commit()
     token = create_access_token(subject=str(row["id"]), role="super-admin")
     return LoginResponse(access_token=token, role="super-admin", sub=str(row["id"]))
 
@@ -134,12 +142,30 @@ def login_super_admin(body: LoginRequest, db: Session = Depends(get_db)) -> Logi
 
 
 @router.get("/me", response_model=MeResponse, summary="Identidad del token actual")
-def me(user: CurrentUser = Depends(get_current_user)) -> MeResponse:
+def me(user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)) -> MeResponse:
+    full_name = None
+    photo_url = None
+    if user.role == "super-admin":
+        row = db.execute(
+            text("SELECT full_name, photo_url FROM super_admins WHERE id = :uid"),
+            {"uid": user.sub},
+        ).mappings().first()
+        if row:
+            full_name, photo_url = row["full_name"], row["photo_url"]
+    elif user.role in ("admin", "veterinario", "recepcion"):
+        row = db.execute(
+            text("SELECT full_name, photo_url FROM users WHERE id = :uid"),
+            {"uid": user.sub},
+        ).mappings().first()
+        if row:
+            full_name, photo_url = row["full_name"], row["photo_url"]
     return MeResponse(
         sub=user.sub,
         role=user.role,
         clinic_id=user.clinic_id,
         branch_id=user.branch_id,
+        full_name=full_name,
+        photo_url=photo_url,
     )
 
 

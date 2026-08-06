@@ -22,6 +22,12 @@ export interface StaffUser {
   branch_id: string | null
   branch_name?: string | null
   is_active: boolean
+  photo_url?: string | null
+  professional_title?: string | null
+  cedula?: string | null
+  job_title?: string | null
+  description?: string | null
+  specialty?: string | null
 }
 
 const ROLES = [
@@ -47,6 +53,10 @@ export function UserFormDialog({
   const [password, setPassword] = useState('')
   const [role, setRole] = useState('veterinario')
   const [branchId, setBranchId] = useState('')
+  const [professionalTitle, setProfessionalTitle] = useState('')
+  const [cedula, setCedula] = useState('')
+  const [jobTitle, setJobTitle] = useState('')
+  const [specialty, setSpecialty] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -57,6 +67,10 @@ export function UserFormDialog({
     setPassword('')
     setRole(user?.role ?? 'veterinario')
     setBranchId(user?.branch_id ?? '')
+    setProfessionalTitle(user?.professional_title ?? '')
+    setCedula(user?.cedula ?? '')
+    setJobTitle(user?.job_title ?? '')
+    setSpecialty(user?.specialty ?? '')
     setError(null)
     apiFetch<{ id: string; name: string }[]>('/branches')
       .then(setBranches)
@@ -73,6 +87,10 @@ export function UserFormDialog({
           full_name: fullName,
           role,
           branch_id: branchId || null,
+          professional_title: professionalTitle || null,
+          cedula: cedula || null,
+          job_title: jobTitle || null,
+          specialty: specialty || null,
         }
         if (password) body.password = password
         await apiFetch(`/users/${user.id}`, { method: 'PATCH', body: JSON.stringify(body) })
@@ -85,6 +103,10 @@ export function UserFormDialog({
             password,
             role,
             branch_id: branchId || null,
+            professional_title: professionalTitle || null,
+            cedula: cedula || null,
+            job_title: jobTitle || null,
+            specialty: specialty || null,
           }),
         })
       }
@@ -152,6 +174,42 @@ export function UserFormDialog({
                   </option>
                 ))}
               </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Título profesional</Label>
+              <Input
+                value={professionalTitle}
+                onChange={(e) => setProfessionalTitle(e.target.value)}
+                placeholder="ej. MVZ"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Cédula profesional</Label>
+              <Input
+                value={cedula}
+                onChange={(e) => setCedula(e.target.value)}
+                placeholder="ej. 1234567"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Cargo</Label>
+              <Input
+                value={jobTitle}
+                onChange={(e) => setJobTitle(e.target.value)}
+                placeholder="ej. Cirujano"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Especialidad</Label>
+              <Input
+                value={specialty}
+                onChange={(e) => setSpecialty(e.target.value)}
+                placeholder="ej. Dermatología"
+              />
             </div>
           </div>
           <div className="space-y-2">

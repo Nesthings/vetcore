@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Loader2, Save, UserRound } from 'lucide-react'
+import { Camera, Loader2, Save, UserRound } from 'lucide-react'
 
 import { AppLayout } from '@/components/layout/AppLayout'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { apiFetch } from '@/lib/api'
 
 interface Me {
@@ -15,15 +16,27 @@ interface Me {
   role: string
   phone?: string | null
   branch_name?: string | null
+  photo_url?: string | null
+  professional_title?: string | null
+  cedula?: string | null
+  job_title?: string | null
+  description?: string | null
+  specialty?: string | null
 }
 
 export function Profile() {
   const [me, setMe] = useState<Me | null>(null)
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState('')
+  const [professionalTitle, setProfessionalTitle] = useState('')
+  const [cedula, setCedula] = useState('')
+  const [jobTitle, setJobTitle] = useState('')
+  const [description, setDescription] = useState('')
+  const [specialty, setSpecialty] = useState('')
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
 
@@ -33,6 +46,11 @@ export function Profile() {
       setMe(res)
       setFullName(res.full_name)
       setPhone(res.phone ?? '')
+      setProfessionalTitle(res.professional_title ?? '')
+      setCedula(res.cedula ?? '')
+      setJobTitle(res.job_title ?? '')
+      setDescription(res.description ?? '')
+      setSpecialty(res.specialty ?? '')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo cargar tu perfil')
     }
@@ -42,13 +60,36 @@ export function Profile() {
     load()
   }, [load])
 
+  const uploadPhoto = async (file: File) => {
+    setError(null)
+    setUploading(true)
+    try {
+      const form = new FormData()
+      form.append('file', file)
+      await apiFetch(`/users/${me?.id}/photo`, { method: 'POST', body: form })
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo subir la foto')
+    } finally {
+      setUploading(false)
+    }
+  }
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
     setSuccess(false)
     setSubmitting(true)
     try {
-      const body: Record<string, unknown> = { full_name: fullName, phone: phone || null }
+      const body: Record<string, unknown> = {
+        full_name: fullName,
+        phone: phone || null,
+        professional_title: professionalTitle || null,
+        cedula: cedula || null,
+        job_title: jobTitle || null,
+        description: description || null,
+        specialty: specialty || null,
+      }
       if (newPassword) {
         body.current_password = currentPassword
         body.new_password = newPassword
@@ -82,6 +123,45 @@ export function Profile() {
           </CardHeader>
           <CardContent>
             <form onSubmit={submit} className="space-y-4">
+              <div className="flex items-center gap-4">
+                <div className="relative size-16 shrink-0 overflow-hidden rounded-full bg-secondary">
+                  {me?.photo_url ? (
+                    <img
+                      src={me.photo_url}
+                      alt="Foto de perfil"
+                      className="size-full object-cover"
+                    />
+                  ) : (
+                    <UserRound className="size-full p-3.5 text-muted-foreground" />
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <input
+                    id="profile-photo"
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0]
+                      if (f) uploadPhoto(f)
+                      e.currentTarget.value = ''
+                    }}
+                  />
+                  <Button type="button" variant="outline" size="sm" disabled={uploading}>
+                    <label
+                      htmlFor="profile-photo"
+                      className="flex cursor-pointer items-center gap-2"
+                    >
+                      {uploading ? <Loader2 className="animate-spin" /> : <Camera />}
+                      {me?.photo_url ? 'Cambiar foto' : 'Subir foto'}
+                    </label>
+                  </Button>
+                  <p className="text-xs text-muted-foreground">
+                    JPEG/PNG · máx. 5 MB · se limpian metadatos
+                  </p>
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <Label>Nombre completo</Label>
                 <div className="relative">
@@ -94,9 +174,54 @@ export function Profile() {
                   />
                 </div>
               </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Título profesional</Label>
+                  <Input
+                    value={professionalTitle}
+                    onChange={(e) => setProfessionalTitle(e.target.value)}
+                    placeholder="ej. MVZ"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Cédula profesional</Label>
+                  <Input
+                    value={cedula}
+                    onChange={(e) => setCedula(e.target.value)}
+                    placeholder="ej. 1234567"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Cargo</Label>
+                  <Input
+                    value={jobTitle}
+                    onChange={(e) => setJobTitle(e.target.value)}
+                    placeholder="ej. Cirujano"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Especialidad</Label>
+                  <Input
+                    value={specialty}
+                    onChange={(e) => setSpecialty(e.target.value)}
+                    placeholder="ej. Dermatología"
+                  />
+                </div>
+              </div>
               <div className="space-y-2">
                 <Label>Teléfono</Label>
                 <Input value={phone} onChange={(e) => setPhone(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Descripción</Label>
+                <Textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Breve presentación profesional…"
+                  rows={3}
+                />
               </div>
 
               <div className="rounded-md border border-border p-4">

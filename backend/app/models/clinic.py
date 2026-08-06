@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Numeric, String, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Numeric, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -22,6 +22,19 @@ class Clinic(UUIDPkMixin, Base):
     contact_email: Mapped[str | None] = mapped_column(String(200))
     subscription_status: Mapped[str] = mapped_column(
         String(20), nullable=False, default="trial", server_default="trial"
+    )
+    logo_url: Mapped[str | None] = mapped_column(String(255))
+    timezone: Mapped[str] = mapped_column(
+        String(50), nullable=False, default="UTC", server_default="UTC"
+    )
+    address: Mapped[str | None] = mapped_column(Text)
+    rfc: Mapped[str | None] = mapped_column(String(50))
+    fiscal_name: Mapped[str | None] = mapped_column(String(200))
+    currency: Mapped[str] = mapped_column(
+        String(10), nullable=False, default="MXN", server_default="MXN"
+    )
+    setup_completed: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

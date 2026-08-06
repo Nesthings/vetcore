@@ -3,9 +3,9 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
 from app.models.base import UUIDPkMixin
@@ -30,6 +30,26 @@ class User(UUIDPkMixin, Base):
     is_active: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default="true"
     )
+    photo_url: Mapped[str | None] = mapped_column(String(255))
+    professional_title: Mapped[str | None] = mapped_column(String(150))
+    cedula: Mapped[str | None] = mapped_column(String(50))
+    job_title: Mapped[str | None] = mapped_column(String(150))
+    description: Mapped[str | None] = mapped_column(Text)
+    specialty: Mapped[str | None] = mapped_column(String(150))
+    reports_to: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id")
+    )
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    is_visible_on_login: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    manager: Mapped["User | None"] = relationship(
+        remote_side="User.id", back_populates="reports"
+    )
+    reports: Mapped[list["User"]] = relationship(
+        back_populates="manager", foreign_keys=[reports_to]
     )

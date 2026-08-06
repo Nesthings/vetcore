@@ -9,6 +9,11 @@ class ClinicBase(BaseModel):
     contact_name: str | None = Field(default=None, max_length=200)
     contact_phone: str | None = Field(default=None, max_length=30)
     contact_email: str | None = Field(default=None, max_length=200)
+    address: str | None = Field(default=None, max_length=2000)
+    rfc: str | None = Field(default=None, max_length=50)
+    fiscal_name: str | None = Field(default=None, max_length=200)
+    timezone: str = "UTC"
+    currency: str = "MXN"
 
 
 class ClinicCreate(ClinicBase):
@@ -25,6 +30,12 @@ class ClinicUpdate(BaseModel):
     subscription_status: str | None = Field(
         default=None, pattern="^(trial|active|suspended|cancelled)$"
     )
+    address: str | None = Field(default=None, max_length=2000)
+    rfc: str | None = Field(default=None, max_length=50)
+    fiscal_name: str | None = Field(default=None, max_length=200)
+    timezone: str | None = Field(default=None, max_length=50)
+    currency: str | None = Field(default=None, max_length=10)
+    setup_completed: bool | None = None
 
 
 class ClinicRead(ClinicBase):
@@ -32,6 +43,8 @@ class ClinicRead(ClinicBase):
 
     id: uuid.UUID
     subscription_status: str
+    logo_url: str | None = None
+    setup_completed: bool
     created_at: datetime
     updated_at: datetime
 
