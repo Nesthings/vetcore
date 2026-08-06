@@ -1,5 +1,5 @@
 import { Navigate, useLocation } from 'react-router-dom'
-import { ShieldX } from 'lucide-react'
+import { Loader2, ShieldX } from 'lucide-react'
 
 import { useAuth } from '@/lib/auth'
 import { usePermissions } from '@/lib/permissions'
@@ -26,6 +26,14 @@ function AccessDenied() {
   )
 }
 
+function RouteLoading() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background text-muted-foreground">
+      <Loader2 className="size-6 animate-spin" aria-hidden="true" />
+    </div>
+  )
+}
+
 export function ProtectedRoute({
   children,
   roles,
@@ -36,7 +44,7 @@ export function ProtectedRoute({
   component?: string
 }) {
   const { isAuthenticated, user } = useAuth()
-  const { hasComponent } = usePermissions()
+  const { hasComponent, loading: permsLoading } = usePermissions()
   const { me, loading: setupLoading } = useSetup()
   const location = useLocation()
 
@@ -48,16 +56,9 @@ export function ProtectedRoute({
     return <AccessDenied />
   }
 
-  // El check de componente solo aplica al staff de clínica. Super-admin y
-  // owner tienen su propio panel/portal sin componentes.
-  const isStaff =
-    user?.role === 'admin' || user?.role === 'veterinario' || user?.role === 'recepcion'
-  if (isStaff && component && !hasComponent(component)) {
-    return <AccessDenied />
-  }
-
-  // Wizard de configuración: solo la primera vez que el admin entra a una
-  // clínica nueva (setup_completed=false). Fuerza la ruta /setup.
+  // Wizard de configuración: SOLO la primera vez que el admin entra a una
+  // clínica nueva (setup_completed=false). Se evalúa ANTES del check de
+  // componente para que el admin nuevo no se tope con "sin permisos".
   if (
     user?.role === 'admin' &&
     !setupLoading &&
@@ -65,6 +66,19 @@ export function ProtectedRoute({
     location.pathname !== '/setup'
   ) {
     return <Navigate to="/setup" replace />
+  }
+
+  // El check de componente solo aplica al staff de clínica. Mientras los
+  // permisos cargan, mostramos un estado de carga en vez de denegar.
+  const isStaff =
+    user?.role === 'admin' || user?.role === 'veterinario' || user?.role === 'recepcion'
+  if (isStaff && component) {
+    if (permsLoading) {
+      return <RouteLoading />
+    }
+    if (!hasComponent(component)) {
+      return <AccessDenied />
+    }
   }
 
   // Si ya está autenticado y visita una página sin rol específico, lo manda a su home
