@@ -21,6 +21,7 @@ from app.api import (
     notifications,
     owner,
     pets,
+    products,
     purchase_orders,
     reports,
     schedule_blocks,
@@ -59,6 +60,7 @@ app.include_router(schedule_blocks.router, prefix="/api/v1")
 app.include_router(dashboard.router, prefix="/api/v1")
 app.include_router(inventory.router, prefix="/api/v1")
 app.include_router(invoices.router, prefix="/api/v1")
+app.include_router(products.router, prefix="/api/v1")
 app.include_router(purchase_orders.router, prefix="/api/v1")
 app.include_router(services.router, prefix="/api/v1")
 app.include_router(templates.router, prefix="/api/v1")

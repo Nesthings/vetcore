@@ -43,3 +43,30 @@ def process_cartilla_photo(content: bytes) -> bytes:
     out = io.BytesIO()
     img.save(out, format="JPEG", quality=JPEG_QUALITY, optimize=True, exif=b"")
     return out.getvalue()
+
+
+def process_product_photo(content: bytes) -> bytes:
+    """Convierte a JPEG comprimido y sin EXIF conservando el aspecto original.
+
+    A diferencia de la foto de la Cartilla (cuadrada), la foto de producto
+    respeta su proporción (ej. una bolsa de croquetas) y solo se limita la
+    dimensión máxima y el peso.
+    """
+    try:
+        img = Image.open(io.BytesIO(content))
+    except UnidentifiedImageError as exc:
+        raise ValueError("El archivo no es una imagen válida") from exc
+
+    img = ImageOps.exif_transpose(img)
+
+    # Redimensionar proporcionalmente al máximo permitido
+    w, h = img.size
+    if max(w, h) > MAX_DIMENSION:
+        ratio = MAX_DIMENSION / max(w, h)
+        img = img.resize((round(w * ratio), round(h * ratio)), Image.Resampling.LANCZOS)
+
+    if img.mode != "RGB":
+        img = img.convert("RGB")
+    out = io.BytesIO()
+    img.save(out, format="JPEG", quality=JPEG_QUALITY, optimize=True, exif=b"")
+    return out.getvalue()

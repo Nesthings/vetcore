@@ -23,6 +23,7 @@ import { OwnerPortal } from '@/pages/owner/OwnerPortal'
 import { PetDetail } from '@/pages/PetDetail'
 import { Pets } from '@/pages/Pets'
 import { Profile } from '@/pages/Profile'
+import { Products } from '@/pages/Products'
 import { PurchaseOrders } from '@/pages/PurchaseOrders'
 import { Reports } from '@/pages/Reports'
 import { Services } from '@/pages/Services'
@@ -130,6 +131,14 @@ function App() {
                 element={
                   <ProtectedRoute component="inventory">
                     <Inventory />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/products"
+                element={
+                  <ProtectedRoute roles={['admin']} component="products">
+                    <Products />
                   </ProtectedRoute>
                 }
               />

@@ -57,6 +57,7 @@ from app.schemas.pet import (
     PetWeightCreate,
     PetWeightRead,
 )
+from app.schemas.product import ProductCreate, ProductRead, ProductUpdate
 from app.schemas.purchase import (
     PurchaseOrderCreate,
     PurchaseOrderItemCreate,
@@ -126,6 +127,9 @@ __all__ = [
     "PhotoEvolutionItem",
     "PlanStepCreate",
     "PlanStepRead",
+    "ProductCreate",
+    "ProductRead",
+    "ProductUpdate",
     "ProfileUpdate",
     "PurchaseOrderCreate",
     "PurchaseOrderItemCreate",

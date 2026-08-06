@@ -1150,4 +1150,34 @@ El admin define planes de vacunación (nombre, compuesto activo, notas y una lis
 
 ---
 
+## Módulo — Productos (catálogo de venta de la veterinaria) ✅
+
+**Fecha:** 2026-08-06
+
+### Qué se hizo
+Nuevo módulo **"Productos"** para la venta retail de la veterinaria (croquetas, premios, ropas, camas, platos, etc.). El admin registra cada producto con **nombre, categoría, precio (opcional) y foto (opcional)**, y el catálogo queda consultable en cualquier momento. Es independiente del inventario de insumos (`inventory_products`).
+
+**Backend:**
+- Migración `0016_sale_products`: tabla `sale_products` (clinic_id, name, category, price, photo_url, active, created_at) — multi-tenant.
+- `models/product.py::SaleProduct`, schemas `ProductCreate/Update/Read`.
+- `api/products.py`: CRUD (mutaciones solo admin) + `POST /products/{id}/photo` + `GET /products/categories` (distintas categorías usadas) + listado con filtro por categoría y `active_only`.
+- `core/images.py::process_product_photo`: convierte a JPEG comprimido y sin EXIF **conservando el aspect ratio** (a diferencia de la foto de la Cartilla, que es cuadrada) — ideal para fotos de producto.
+- Permisos: componente `products` (admin por defecto). Auditoría: `product_created/updated/deleted`, `product_photo_updated`.
+
+**Frontend:**
+- Página `Products` (`/products`, sidebar con bolsa de compras, admin) en **grid de tarjetas** con foto (o placeholder), nombre, badge de categoría, precio, estado e iconos editar/eliminar.
+- `ProductFormDialog`: nombre, **categoría con sugerencias** (Alimento, Premios, Juguetes, Ropa, Camas, Platos y accesorios, Higiene, Farmacia, Otro — se puede escribir una propia vía datalist), precio opcional, activo/inactivo y **foto opcional** con vista previa (se sube tras crear/editar).
+
+### Verificado
+- Alta de producto → listado + `GET /products/categories` ✓
+- Subida de foto PNG 200×150 → se procesa a **JPEG** (200×150, aspect ratio conservado) y sirve por `/media` 200 ✓
+- DELETE del producto ✓
+- Componente `products` en permisos del admin; Ruff + lint 0 errores + build OK ✓
+- Datos de prueba eliminados.
+
+### Notas / pendientes
+- Es un catálogo independiente; si después se quiere vender desde Facturación, se puede integrar como fuente de conceptos (igual que servicios/insumos).
+
+---
+
 **Siguiente subfase:** por decidir (Fase 3 en hold).

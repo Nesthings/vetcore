@@ -20,6 +20,7 @@ from app.models.inventory import (
 )
 from app.models.notification import InternalNotification, OutboundNotification
 from app.models.pet import ClinicalAlert, CustomBreed, Pet, PetWeightRecord
+from app.models.product import SaleProduct
 from app.models.staff import User, UserComponentPermission
 from app.models.vaccination import (
     PetVaccinationDose,
@@ -56,6 +57,7 @@ __all__ = [
     "PetWeightRecord",
     "PurchaseOrder",
     "PurchaseOrderItem",
+    "SaleProduct",
     "ScheduleBlock",
     "ServiceCatalog",
     "User",
