@@ -16,7 +16,6 @@ interface LoginResponse {
 
 const ROLE_TARGETS: Record<string, string> = {
   staff: '/auth/login',
-  owner: '/auth/login/owner',
   'super-admin': '/auth/login/super-admin',
 }
 
@@ -63,23 +62,22 @@ export function Login() {
       }
     >
       <Tabs defaultValue="staff" onValueChange={(v) => setTab(v)} className="mb-6">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="staff">Clínica</TabsTrigger>
-          <TabsTrigger value="owner">Dueño</TabsTrigger>
           <TabsTrigger value="super-admin">Super Admin</TabsTrigger>
         </TabsList>
       </Tabs>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="identifier">{tab === 'owner' ? 'Correo o teléfono' : 'Correo'}</Label>
+          <Label htmlFor="identifier">Correo</Label>
           <Input
             id="identifier"
             type="text"
             autoComplete="username"
             value={identifier}
             onChange={(e) => setIdentifier(e.target.value)}
-            placeholder={tab === 'owner' ? 'correo@ejemplo.com o +52...' : 'correo@ejemplo.com'}
+            placeholder="correo@ejemplo.com"
             required
           />
         </div>

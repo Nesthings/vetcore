@@ -719,4 +719,14 @@ Resuelta la confusión, el usuario decidió **quitar la pantalla de preferencias
 
 ---
 
+## Ajuste — Quitar la opción "Dueño" de la pantalla de login
+
+**Fecha:** 2026-08-05
+
+Se eliminó la pestaña **"Dueño"** de `Login.tsx` (quedan solo Clínica y Super Admin) y la lógica asociada (`ROLE_TARGETS.owner`, labels "Correo o teléfono"). Consistente con la decisión del producto de diferir el acceso del dueño al token directo (ver TODO.md).
+
+Se conserva en el backend: `POST /auth/login/owner`, el flujo de activación por token y el portal del dueño (el dueño se autentica al activar el token; sin él no hay pantalla de login para ese rol).
+
+---
+
 **Siguiente subfase:** 2.6 — Reportes operativos + Dashboard financiero (con la regla de permisos por contenido, sección 3.9).
