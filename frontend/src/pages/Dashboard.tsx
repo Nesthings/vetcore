@@ -174,10 +174,6 @@ export function Dashboard() {
             </Link>
           </Button>
         </div>
-        <h1 className="text-2xl font-semibold tracking-tight">Dashboard del día</h1>
-        <p className="text-sm text-muted-foreground">
-          {data ? `Resumen operativo del ${data.date}` : 'Resumen operativo de hoy'}
-        </p>
       </div>
 
       <div className="mb-6">
@@ -206,6 +202,13 @@ export function Dashboard() {
             </Link>
           ))}
         </div>
+      </div>
+
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold tracking-tight">Dashboards</h1>
+        <p className="text-sm text-muted-foreground">
+          {data ? `Resumen operativo del ${data.date}` : 'Resumen operativo de hoy'}
+        </p>
       </div>
 
       {error && <ErrorState description={error} onRetry={load} className="mb-6" />}

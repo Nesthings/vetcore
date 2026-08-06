@@ -9,7 +9,7 @@ export interface NavRoute {
 // Se usa en la sidebar (AppLayout) y en el guard de rutas (ProtectedRoute)
 // para que un rol sin acceso no vea ni entre a una pantalla.
 export const NAV_ROUTES: NavRoute[] = [
-  { to: '/', label: 'Dashboard del día', component: 'dashboard', end: true },
+  { to: '/', label: 'Dashboards', component: 'dashboard', end: true },
   { to: '/vaccination-plans', label: 'Planes de vacunación', component: 'vaccination_plans' },
   { to: '/purchase-orders', label: 'Compras', component: 'purchase_orders' },
   { to: '/automation', label: 'Automatización', component: 'automation' },
