@@ -7,13 +7,17 @@ import {
   ClipboardPlus,
   LayoutDashboard,
   PackageMinus,
+  PanelTop,
   PawPrint,
   ShoppingBag,
   TriangleAlert,
+  X,
 } from 'lucide-react'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 
 import { AppLayout } from '@/components/layout/AppLayout'
+import { DashboardChart } from '@/components/dashboards/DashboardChart'
+import { DashboardTray } from '@/components/dashboards/DashboardTray'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -24,6 +28,8 @@ import { Separator } from '@/components/ui/separator'
 import { apiFetch } from '@/lib/api'
 import { usePermissions } from '@/lib/permissions'
 import { useNavConfig } from '@/lib/nav-config'
+import { useDashboardConfig } from '@/lib/dashboard-config'
+import { DASHBOARD_CATALOG, getDashboard } from '@/lib/dashboards'
 import { MODULE_META, NAV_ROUTES } from '@/lib/nav'
 import { cn } from '@/lib/utils'
 
@@ -87,7 +93,11 @@ export function Dashboard() {
   const [error, setError] = useState<string | null>(null)
   const { hasComponent } = usePermissions()
   const { pinned, unpin } = useNavConfig()
+  const { active, add, remove } = useDashboardConfig()
   const [modulesDragOver, setModulesDragOver] = useState(false)
+  const [trayOpen, setTrayOpen] = useState(false)
+  const [gridDragOver, setGridDragOver] = useState(false)
+  const [dashData, setDashData] = useState<Record<string, unknown>>({})
 
   const load = useCallback(async () => {
     setError(null)
@@ -103,6 +113,22 @@ export function Dashboard() {
     load()
   }, [load])
 
+  useEffect(() => {
+    if (active.length === 0) {
+      setDashData({})
+      return
+    }
+    let cancelled = false
+    apiFetch<Record<string, unknown>>(`/dashboards/data?slugs=${active.join(',')}`)
+      .then((res) => {
+        if (!cancelled) setDashData(res)
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [active])
+
   const moduleItems = NAV_ROUTES.filter(
     (r) =>
       r.component !== 'dashboard' && !pinned.includes(r.component) && hasComponent(r.component),
@@ -113,6 +139,15 @@ export function Dashboard() {
     setModulesDragOver(false)
     const component = e.dataTransfer.getData('text/plain')
     if (component) unpin(component)
+  }
+
+  const availableDashboards = DASHBOARD_CATALOG.filter((d) => !active.includes(d.slug))
+
+  const handleGridDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setGridDragOver(false)
+    const slug = e.dataTransfer.getData('text/plain')
+    if (slug && getDashboard(slug)) add(slug)
   }
 
   return (
@@ -196,13 +231,77 @@ export function Dashboard() {
         </p>
       </div>
 
-      <div className="mb-6 flex items-center gap-2">
-        <LayoutDashboard className="size-6 text-primary" aria-hidden="true" />
-        <h1 className="text-2xl font-semibold tracking-tight">Dashboards</h1>
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <LayoutDashboard className="size-6 text-primary" aria-hidden="true" />
+          <h1 className="text-2xl font-semibold tracking-tight">Dashboards</h1>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => setTrayOpen((o) => !o)}>
+          <PanelTop className="size-4" aria-hidden="true" />
+          Bandeja de dashboards
+        </Button>
       </div>
-      <p className="mb-6 text-sm text-muted-foreground">
+      <p className="mb-4 text-sm text-muted-foreground">
         {data ? `Resumen operativo del ${data.date}` : 'Resumen operativo de hoy'}
       </p>
+
+      <DashboardTray
+        open={trayOpen}
+        available={availableDashboards}
+        onClose={() => setTrayOpen(false)}
+      />
+
+      {active.length > 0 && (
+        <div
+          onDragOver={(e) => {
+            e.preventDefault()
+            e.dataTransfer.dropEffect = 'move'
+            setGridDragOver(true)
+          }}
+          onDragLeave={() => setGridDragOver(false)}
+          onDrop={handleGridDrop}
+          className={cn(
+            'mb-6 grid gap-4 rounded-xl sm:grid-cols-2 xl:grid-cols-3',
+            gridDragOver && 'outline-2 outline-dashed outline-primary/40',
+          )}
+        >
+          {active.map((slug) => {
+            const def = getDashboard(slug)
+            if (!def) return null
+            return (
+              <Card
+                key={slug}
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData('text/plain', slug)
+                  e.dataTransfer.effectAllowed = 'move'
+                }}
+                title="Arrastra a la bandeja para quitarlo"
+                className="group relative cursor-grab gap-3 active:cursor-grabbing"
+              >
+                <CardHeader className="flex-row items-start justify-between gap-2 space-y-0 pb-0">
+                  <CardTitle className="text-base">{def.title}</CardTitle>
+                  <button
+                    type="button"
+                    onClick={() => remove(slug)}
+                    aria-label={`Quitar ${def.title}`}
+                    className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                  >
+                    <X className="size-4" />
+                  </button>
+                </CardHeader>
+                <CardContent className="h-60">
+                  {dashData[slug] ? (
+                    <DashboardChart slug={slug} data={dashData[slug]} />
+                  ) : (
+                    <LoadingState label="Cargando…" />
+                  )}
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
+      )}
 
       {error && <ErrorState description={error} onRetry={load} className="mb-6" />}
 

@@ -14,6 +14,7 @@ from app.api import (
     consents,
     consultations,
     dashboard,
+    dashboards,
     dose,
     health,
     inventory,
@@ -59,6 +60,7 @@ app.include_router(consultations.router, prefix="/api/v1")
 app.include_router(appointments.router, prefix="/api/v1")
 app.include_router(schedule_blocks.router, prefix="/api/v1")
 app.include_router(dashboard.router, prefix="/api/v1")
+app.include_router(dashboards.router, prefix="/api/v1")
 app.include_router(inventory.router, prefix="/api/v1")
 app.include_router(invoices.router, prefix="/api/v1")
 app.include_router(products.router, prefix="/api/v1")
