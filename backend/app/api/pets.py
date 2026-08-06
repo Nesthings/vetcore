@@ -23,7 +23,13 @@ from app.core.storage import (
     save_media,
     validate_extension,
 )
-from app.data.breeds import BREEDS_BY_SPECIES, breeds_for, species_options
+from app.data.breeds import (
+    BREEDS_BY_SPECIES,
+    breeds_for,
+    colors_for,
+    markings_for,
+    species_options,
+)
 from app.db.session import get_db
 from app.models import (
     Appointment,
@@ -96,7 +102,12 @@ def breeds_catalog(
     }
     for species, extra in custom.items():
         breeds.setdefault(species, list(dict.fromkeys(extra)))
-    return {"species": species_options(), "breeds": breeds}
+    return {
+        "species": species_options(),
+        "breeds": breeds,
+        "colors": {key: colors_for(key) for key in BREEDS_BY_SPECIES},
+        "markings": {key: markings_for(key) for key in BREEDS_BY_SPECIES},
+    }
 
 
 class BreedCreate(BaseModel):

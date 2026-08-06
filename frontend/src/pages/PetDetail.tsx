@@ -215,6 +215,23 @@ export function PetDetail() {
                   </p>
                 </div>
                 <div>
+                  <p className="text-xs text-muted-foreground">Color</p>
+                  <p className="text-sm font-medium">
+                    {pet.color_primary ? (
+                      <>
+                        {pet.color_primary}
+                        {pet.color_secondary ? ` / ${pet.color_secondary}` : ''}
+                      </>
+                    ) : (
+                      '—'
+                    )}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Características</p>
+                  <p className="text-sm font-medium">{pet.markings || '—'}</p>
+                </div>
+                <div>
                   <p className="text-xs text-muted-foreground">Último peso</p>
                   <p className="text-sm font-medium">
                     {pet.latest_weight_kg ? `${pet.latest_weight_kg} kg` : '—'}

@@ -18,6 +18,8 @@ import { apiFetch } from '@/lib/api'
 interface BreedsCatalog {
   species: { key: string; label: string }[]
   breeds: Record<string, string[]>
+  colors: Record<string, string[]>
+  markings: Record<string, string[]>
 }
 
 export function PetFormDialog({
@@ -37,6 +39,9 @@ export function PetFormDialog({
   const [breedOpen, setBreedOpen] = useState(false)
   const breedRef = useRef<HTMLDivElement>(null)
   const [addingBreed, setAddingBreed] = useState(false)
+  const [colorPrimary, setColorPrimary] = useState('')
+  const [colorSecondary, setColorSecondary] = useState('')
+  const [markings, setMarkings] = useState('')
   const [sex, setSex] = useState('')
   const [birthDate, setBirthDate] = useState('')
   const [allergies, setAllergies] = useState('')
@@ -65,6 +70,8 @@ export function PetFormDialog({
   }, [open, loadCatalog])
 
   const allBreeds = catalog?.breeds[species] ?? ['Mestizo']
+  const allColors = catalog?.colors[species] ?? []
+  const allMarkings = catalog?.markings[species] ?? []
 
   const filteredBreeds = useMemo(() => {
     const q = breedQuery.trim().toLowerCase()
@@ -131,6 +138,9 @@ export function PetFormDialog({
           name,
           species,
           breed: breed || breedQuery.trim() || null,
+          color_primary: colorPrimary || null,
+          color_secondary: colorSecondary || null,
+          markings: markings || null,
           sex: sex || null,
           birth_date: birthDate || null,
           allergies: allergies || null,
@@ -172,6 +182,9 @@ export function PetFormDialog({
                   setBreed('')
                   setBreedQuery('')
                   setBreedOpen(false)
+                  setColorPrimary('')
+                  setColorSecondary('')
+                  setMarkings('')
                 }}
                 className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
               >
@@ -266,6 +279,63 @@ export function PetFormDialog({
                 onChange={(e) => setBirthDate(e.target.value)}
               />
             </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="color-primary">Color 1</Label>
+              <select
+                id="color-primary"
+                value={colorPrimary}
+                onChange={(e) => setColorPrimary(e.target.value)}
+                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+              >
+                <option value="">—</option>
+                {allColors.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="color-secondary">Color 2 (opcional)</Label>
+              <select
+                id="color-secondary"
+                value={colorSecondary}
+                onChange={(e) => setColorSecondary(e.target.value)}
+                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+              >
+                <option value="">— Sin segundo color —</option>
+                {allColors
+                  .filter((c) => c !== colorPrimary)
+                  .map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="markings">Características especiales</Label>
+            <select
+              id="markings"
+              value={markings}
+              onChange={(e) => setMarkings(e.target.value)}
+              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+            >
+              <option value="">—</option>
+              {allMarkings.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-muted-foreground">
+              Ej. manchado, atigrado, pío, con guantes…
+            </p>
           </div>
 
           <div className="space-y-2">

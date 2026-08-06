@@ -37,6 +37,9 @@ export interface Pet {
   name: string
   species: string
   breed?: string | null
+  color_primary?: string | null
+  color_secondary?: string | null
+  markings?: string | null
   sex?: string | null
   birth_date?: string | null
   allergies?: string | null
@@ -128,6 +131,8 @@ export function Pets() {
                 <TableHead>Paciente</TableHead>
                 <TableHead>Especie</TableHead>
                 <TableHead>Raza</TableHead>
+                <TableHead>Color</TableHead>
+                <TableHead>Características</TableHead>
                 <TableHead>Sexo</TableHead>
                 <TableHead>Último peso</TableHead>
                 <TableHead>Alertas</TableHead>
@@ -147,6 +152,21 @@ export function Pets() {
                   </TableCell>
                   <TableCell className="capitalize">{p.species}</TableCell>
                   <TableCell>{p.breed ?? '—'}</TableCell>
+                  <TableCell>
+                    {p.color_primary ? (
+                      <span className="inline-flex items-center gap-1.5">
+                        <span
+                          className="inline-block size-2.5 rounded-full border border-border"
+                          aria-hidden="true"
+                        />
+                        {p.color_primary}
+                        {p.color_secondary ? ` / ${p.color_secondary}` : ''}
+                      </span>
+                    ) : (
+                      '—'
+                    )}
+                  </TableCell>
+                  <TableCell>{p.markings ?? '—'}</TableCell>
                   <TableCell>{p.sex ?? '—'}</TableCell>
                   <TableCell>{p.latest_weight_kg ? `${p.latest_weight_kg} kg` : '—'}</TableCell>
                   <TableCell>

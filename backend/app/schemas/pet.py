@@ -18,6 +18,9 @@ class PetBase(BaseModel):
     name: str = Field(min_length=1, max_length=150)
     species: str = Field(min_length=1, max_length=50)
     breed: str | None = Field(default=None, max_length=100)
+    color_primary: str | None = Field(default=None, max_length=50)
+    color_secondary: str | None = Field(default=None, max_length=50)
+    markings: str | None = Field(default=None, max_length=100)
     sex: str | None = Field(default=None, max_length=10)
     birth_date: date | None = None
     allergies: str | None = None
@@ -33,6 +36,9 @@ class PetUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=150)
     species: str | None = Field(default=None, min_length=1, max_length=50)
     breed: str | None = Field(default=None, max_length=100)
+    color_primary: str | None = Field(default=None, max_length=50)
+    color_secondary: str | None = Field(default=None, max_length=50)
+    markings: str | None = Field(default=None, max_length=100)
     sex: str | None = Field(default=None, max_length=10)
     birth_date: date | None = None
     allergies: str | None = None

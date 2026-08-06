@@ -1021,4 +1021,36 @@ Corrección del modelo conceptual: el usuario aclaró que **el admin de la clín
 
 ---
 
+## Subfase 2.14 — Color y características especiales de la mascota ✅
+
+**Fecha:** 2026-08-06
+
+### Qué se hizo
+Identificación visual del paciente: color (con segundo color opcional) y características especiales (manchado, atigrado, pío, etc.).
+
+**Backend:**
+- Migración `0012_pet_color_markings`: `pets` + `color_primary`, `color_secondary`, `markings`.
+- Modelo y schemas actualizados (create/update/read).
+- `app/data/breeds.py`: `COLORS_BY_SPECIES` (colores comunes por especie: perro, gato, ave, conejo, reptil, roedor, pez, anfibio, hurón, equino, otro) y `MARKINGS_BY_SPECIES` (características/patrones por especie).
+- `GET /pets/breeds-catalog` ahora devuelve también `colors` y `markings` por especie.
+
+**Frontend:**
+- `PetFormDialog`: campos "Color 1", "Color 2 (opcional)" y "Características especiales" con dropdowns que dependen de la especie (el color 2 excluye el color 1).
+- `Pets` (lista): columnas Color (con punto de color) y Características.
+- `PetDetail`: ficha con Color y Características.
+
+### Decisiones técnicas y por qué
+- **Dos colores**: la mayoría de mascotas tienen uno o dos colores; `color_secondary` es opcional y se excluye de la lista si ya se eligió el primario.
+- **Catálogos por especie**: misma fuente (`data/breeds.py`) y mismo patrón que las razas; se pueden ampliar igual que ellas.
+
+### Verificado
+- `breeds-catalog` devuelve `colors` y `markings` por especie ✓
+- Alta de mascota con color 1 + color 2 + marcas → se guardan y se leen ✓
+- Ruff + lint 0 errores + build OK ✓
+
+### Notas / pendientes
+- Queda en `TODO.md` el acceso del dueño por token.
+
+---
+
 **Siguiente subfase:** 3.1 — Transcripción/resumen de consulta por voz con IA.
