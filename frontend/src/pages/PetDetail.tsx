@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   Camera,
   ClipboardPlus,
+  FileSignature,
   Loader2,
   MailPlus,
   PawPrint,
@@ -24,6 +25,7 @@ import {
 } from 'recharts'
 
 import { AppLayout } from '@/components/layout/AppLayout'
+import { ConsentDialog } from '@/components/pets/ConsentDialog'
 import { InviteOwnerDialog } from '@/components/pets/InviteOwnerDialog'
 import { PhotoComparison } from '@/components/pets/PhotoComparison'
 import { TransferOwnerDialog } from '@/components/pets/TransferOwnerDialog'
@@ -68,6 +70,16 @@ interface PhotoEvolutionItem {
   reason?: string | null
 }
 
+interface Consent {
+  id: string
+  pet_id: string
+  title: string
+  body: string
+  signature_url: string
+  pdf_url: string
+  signed_at: string
+}
+
 const ALERT_TYPES = [
   'Alergia',
   'Enfermedad crónica',
@@ -83,11 +95,13 @@ export function PetDetail() {
   const [weights, setWeights] = useState<WeightRecord[]>([])
   const [alerts, setAlerts] = useState<ClinicalAlert[]>([])
   const [photos, setPhotos] = useState<PhotoEvolutionItem[]>([])
+  const [consents, setConsents] = useState<Consent[]>([])
   const [compareIdx, setCompareIdx] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [inviteOpen, setInviteOpen] = useState(false)
   const [transferOpen, setTransferOpen] = useState(false)
+  const [consentOpen, setConsentOpen] = useState(false)
   const [alertType, setAlertType] = useState(ALERT_TYPES[0])
   const [alertDesc, setAlertDesc] = useState('')
   const [alertBusy, setAlertBusy] = useState(false)
@@ -97,18 +111,20 @@ export function PetDetail() {
     setLoading(true)
     setError(null)
     try {
-      const [p, tl, w, al, ph] = await Promise.all([
+      const [p, tl, w, al, ph, cs] = await Promise.all([
         apiFetch<Pet>(`/pets/${id}`),
         apiFetch<TimelineEvent[]>(`/pets/${id}/timeline`),
         apiFetch<WeightRecord[]>(`/pets/${id}/weights`),
         apiFetch<ClinicalAlert[]>(`/pets/${id}/alerts`),
         apiFetch<PhotoEvolutionItem[]>(`/pets/${id}/photo-evolution`),
+        apiFetch<Consent[]>(`/consents/pets/${id}`),
       ])
       setPet(p)
       setTimeline(tl)
       setWeights(w)
       setAlerts(al)
       setPhotos(ph)
+      setConsents(cs)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo cargar el paciente')
     } finally {
@@ -174,6 +190,9 @@ export function PetDetail() {
         </div>
         {pet && (
           <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => setConsentOpen(true)}>
+              <FileSignature /> Consentimiento
+            </Button>
             <Button variant="outline" size="sm" onClick={() => setInviteOpen(true)}>
               <MailPlus /> Invitar dueño
             </Button>
@@ -371,6 +390,7 @@ export function PetDetail() {
               <TabsTrigger value="timeline">Línea de tiempo</TabsTrigger>
               <TabsTrigger value="peso">Peso histórico</TabsTrigger>
               <TabsTrigger value="fotos">Fotos de evolución</TabsTrigger>
+              <TabsTrigger value="consents">Consentimientos</TabsTrigger>
             </TabsList>
 
             <TabsContent value="timeline" className="space-y-4">
@@ -516,6 +536,55 @@ export function PetDetail() {
                 </div>
               )}
             </TabsContent>
+
+            <TabsContent value="consents" className="space-y-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">
+                  Consentimientos informados firmados por el dueño.
+                </p>
+                <Button size="sm" onClick={() => setConsentOpen(true)}>
+                  <FileSignature /> Nuevo consentimiento
+                </Button>
+              </div>
+              {consents.length === 0 ? (
+                <EmptyState
+                  title="Sin consentimientos"
+                  description="Genera el primero para procedimientos como anestesia o cirugía."
+                  icon={FileSignature}
+                />
+              ) : (
+                <div className="space-y-2">
+                  {consents.map((c) => (
+                    <div
+                      key={c.id}
+                      className="flex items-center justify-between gap-3 rounded-md border border-border/60 px-3 py-2"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium">{c.title}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Firmado{' '}
+                          {new Date(c.signed_at).toLocaleString('es-MX', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </p>
+                      </div>
+                      <a
+                        href={c.pdf_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="shrink-0 text-sm font-medium text-primary hover:text-primary-hover"
+                      >
+                        Ver PDF
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
           </Tabs>
         </div>
       )}
@@ -535,6 +604,19 @@ export function PetDetail() {
           petName={pet.name}
           open={transferOpen}
           onOpenChange={setTransferOpen}
+        />
+      )}
+
+      {pet && (
+        <ConsentDialog
+          petId={pet.id}
+          petName={pet.name}
+          open={consentOpen}
+          onOpenChange={setConsentOpen}
+          onSaved={() => {
+            setConsentOpen(false)
+            load()
+          }}
         />
       )}
     </AppLayout>

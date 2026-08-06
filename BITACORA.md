@@ -1053,4 +1053,42 @@ Identificación visual del paciente: color (con segundo color opcional) y caract
 
 ---
 
-**Siguiente subfase:** 3.1 — Transcripción/resumen de consulta por voz con IA.
+## Subfase 3.2 — Consentimientos digitales firmados en tablet ✅
+
+**Fecha:** 2026-08-06
+
+### Qué se hizo
+El staff genera un consentimiento informado (título + texto), el dueño lo **firma dibujando en la tablet**, y el sistema guarda la firma (PNG) y genera un **PDF firmado** que queda archivado en el expediente.
+
+**Backend:**
+- Migración `0013_consents`: amplía `digital_consents` (existente desde 0001) con `clinic_id`, `pet_id`, `title`, `body`. (`signature_url`/`pdf_url` ya existían con `NOT NULL`.)
+- Modelo `DigitalConsent` + schemas `ConsentCreate`/`ConsentRead`.
+- `services/pdf.py::build_consent_pdf`: PDF con logo/estilo VetCore, info del paciente/dueño, texto del consentimiento e **imagen de la firma**.
+- `api/consents.py`:
+  - `POST /consents` — recibe la firma en base64 (data URI o crudo), la guarda como PNG en `/media/consents/...` y genera el PDF. Auditoría `consent_created`.
+  - `GET /consents/pets/{pet_id}` — historial de consentimientos de la mascota (por clínica).
+
+**Frontend:**
+- `SignaturePad`: canvas de firma a mano (mouse/touch, retina-ready, botón Limpiar) que expone el data URL.
+- `ConsentDialog`: título + texto del consentimiento + nombre del dueño + **pad de firma** → "Firmar y generar PDF". Valida que exista firma.
+- `PetDetail`: botón "Consentimiento" en el header, tab "Consentimientos" con la lista (fecha + Ver PDF) y botón "Nuevo consentimiento".
+
+### Decisiones técnicas y por qué
+- **Firma como PNG + PDF con la imagen**: queda tanto la firma original como el documento final; ambos se sirven por `/media`.
+- **Base64 flexible**: acepta data URI (lo que produce el canvas) o base64 crudo.
+- **`clinic_id`/`pet_id` obligatorios**: aislamiento multi-tenant y archivo en el expediente del paciente (la tabla base no los tenía).
+- `owner_id`/`consultation_id` quedan opcionales (se pueden vincular después al flujo de consulta).
+
+### Verificado
+- `POST /consents` con firma PNG → firma + PDF en `/media`, ambos 200 ✓
+- `GET /consents/pets/{id}` devuelve historial por clínica ✓
+- PDF incluye la firma (reportlab ImageReader) ✓
+- Ruff + lint 0 errores + build OK ✓
+
+### Notas / pendientes
+- Siguientes subfases: 3.3 Hospitalización, 3.4 Laboratorio (3.1/3.5/3.6 en `TODO.md`).
+- El consentimiento aún no se vincula automáticamente a una consulta; se puede conectar cuando se integre al flujo de Nueva consulta.
+
+---
+
+**Siguiente subfase:** 3.3 — Hospitalización (hoja de signos vitales por hora).

@@ -3,6 +3,7 @@ from app.models.appointment import Appointment, AppointmentWaitlist, ScheduleBlo
 from app.models.audit import AuditLog
 from app.models.billing import Invoice, InvoiceItem, ServiceCatalog
 from app.models.clinic import Clinic, ClinicBranch, ClinicSubscriptionEvent
+from app.models.consent import DigitalConsent
 from app.models.consultation import (
     Consultation,
     ConsultationAttachment,
@@ -36,6 +37,7 @@ __all__ = [
     "ConsultationItem",
     "ConsultationSummaryPdf",
     "ConsultationTemplate",
+    "DigitalConsent",
     "CustomBreed",
     "InventoryKit",
     "InventoryKitItem",

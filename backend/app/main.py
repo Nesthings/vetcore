@@ -11,6 +11,7 @@ from app.api import (
     automation,
     branches,
     clinics,
+    consents,
     consultations,
     dashboard,
     dose,
@@ -64,6 +65,7 @@ app.include_router(services.router, prefix="/api/v1")
 app.include_router(templates.router, prefix="/api/v1")
 app.include_router(dose.router, prefix="/api/v1")
 app.include_router(owner.router, prefix="/api/v1")
+app.include_router(consents.router, prefix="/api/v1")
 app.include_router(waitlist.router, prefix="/api/v1")
 app.include_router(automation.router, prefix="/api/v1")
 app.include_router(reports.router, prefix="/api/v1")
