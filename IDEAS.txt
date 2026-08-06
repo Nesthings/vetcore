@@ -1,0 +1,4 @@
+VETCORE TODO'S
+
+1. Anadir una pantalla al inicio donde se seleccione el usuario que va a acceder a sistema, con contrasena y con foto, dependiendo de quien entre se le daran los privilegios correspondientes.El super usuario podra agregar nuevos usuarios con foto, nombre, cargo, y darle su contrasena.
+

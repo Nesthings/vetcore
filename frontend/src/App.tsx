@@ -10,6 +10,7 @@ import { Agenda } from '@/pages/Agenda'
 import { Automation } from '@/pages/Automation'
 import { Dashboard } from '@/pages/Dashboard'
 import { DesignSystem } from '@/pages/DesignSystem'
+import { FinancialDashboard } from '@/pages/FinancialDashboard'
 import { Inventory } from '@/pages/Inventory'
 import { Invoices } from '@/pages/Invoices'
 import { Kits } from '@/pages/Kits'
@@ -21,6 +22,7 @@ import { PetDetail } from '@/pages/PetDetail'
 import { Pets } from '@/pages/Pets'
 import { Profile } from '@/pages/Profile'
 import { PurchaseOrders } from '@/pages/PurchaseOrders'
+import { Reports } from '@/pages/Reports'
 import { Services } from '@/pages/Services'
 import { Settings } from '@/pages/Settings'
 import { SuperAdminPanel } from '@/pages/superadmin/SuperAdminPanel'
@@ -67,6 +69,22 @@ function App() {
             element={
               <ProtectedRoute roles={['admin']}>
                 <Automation />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/reports"
+            element={
+              <ProtectedRoute>
+                <Reports />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/reports/financial"
+            element={
+              <ProtectedRoute roles={['admin']}>
+                <FinancialDashboard />
               </ProtectedRoute>
             }
           />

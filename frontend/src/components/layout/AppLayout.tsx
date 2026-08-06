@@ -13,6 +13,7 @@ import {
   Timer,
   UserRound,
   Users,
+  BarChart3,
 } from 'lucide-react'
 import { NavLink, useNavigate } from 'react-router-dom'
 
@@ -55,6 +56,14 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       to: '/automation',
       label: 'Automatización',
       icon: BellRing,
+      end: false,
+      roles: ['admin'],
+    },
+    { to: '/reports', label: 'Reportes', icon: BarChart3, end: false },
+    {
+      to: '/reports/financial',
+      label: 'Financiero',
+      icon: Receipt,
       end: false,
       roles: ['admin'],
     },

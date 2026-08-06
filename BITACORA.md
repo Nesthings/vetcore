@@ -729,4 +729,35 @@ Se conserva en el backend: `POST /auth/login/owner`, el flujo de activación por
 
 ---
 
-**Siguiente subfase:** 2.6 — Reportes operativos + Dashboard financiero (con la regla de permisos por contenido, sección 3.9).
+## Subfase 2.6 — Reportes operativos + Dashboard financiero ✅
+
+**Fecha:** 2026-08-05
+
+### Qué se hizo
+**Backend (`reports.py`):**
+- `GET /reports/operational?from=&to=&branch_id=` — **todo el staff** (sin dinero): citas total y por estado, consultas total y por veterinario, pacientes atendidos, top productos usados en consultas, cancelaciones/no-show.
+- `GET /reports/financial?from=&to=&branch_id=` — **solo admin**: ingresos totales (facturas `paid`), ingresos por día (serie), facturas por estado, pendientes por cobrar, ticket promedio, top servicios por ingreso.
+- Rango de fechas default = últimos 30 días.
+
+**Frontend:**
+- `Reports` (`/reports`, todo staff): KPIs + gráficas (citas por estado, consultas por vet) + top productos, con selector de fechas y enlace al financiero (si admin).
+- `FinancialDashboard` (`/reports/financial`, solo admin): KPIs de ingresos, gráfica de línea (ingresos por día), barras (top servicios), facturas por estado.
+- Nav: **Reportes** (staff) y **Financiero** (admin).
+
+### Decisiones técnicas y por qué
+- **Permisos por contenido (regla 3.9):** el reporte operativo NO expone montos (vet/recepción pueden verlo); el financiero con montos es exclusivo del admin. Backend lo impone (`get_current_clinic` vs `require_clinic_roles("admin")`) y la UI además oculta el enlace.
+- **Cálculo de ingresos en servidor** sobre facturas `paid` (nunca se confía en el cliente).
+- **Gráficas con recharts** y colores `chart-*` del design system.
+
+### Verificado
+- Operativo: 7 citas (scheduled), 4 consultas (1 vet), 1 paciente ✓
+- Financiero: ingresos 2356.00, ticket 785.33, 3 paid, top servicios ✓
+- Recepción: operativo 200, financiero **403** ✓
+- Ruff + lint 0 errores + build OK ✓
+
+### Notas / pendientes
+- `top_productos` queda vacío si las consultas no referencian productos con `product_id` (los items libres no se agregan); se puede ampliar a contar descripciones.
+
+---
+
+**Siguiente subfase:** 2.7 — Centro de notificaciones internas + Bitácora/auditoría (log de cambios: fotos, cancelaciones, ediciones).
