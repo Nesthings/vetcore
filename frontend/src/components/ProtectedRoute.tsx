@@ -1,4 +1,5 @@
 import { Navigate, useLocation } from 'react-router-dom'
+import { ShieldX } from 'lucide-react'
 
 import { useAuth } from '@/lib/auth'
 
@@ -10,12 +11,36 @@ const ROLE_HOME: Record<string, string> = {
   recepcion: '/',
 }
 
-export function ProtectedRoute({ children }: { children: React.ReactNode }) {
+function AccessDenied() {
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-background px-4 text-center">
+      <div className="flex size-12 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+        <ShieldX className="size-6" aria-hidden="true" />
+      </div>
+      <h1 className="text-lg font-semibold">Acceso restringido</h1>
+      <p className="max-w-sm text-sm text-muted-foreground">
+        Tu rol no tiene permisos para ver esta sección. Contacta al admin de la clínica.
+      </p>
+    </div>
+  )
+}
+
+export function ProtectedRoute({
+  children,
+  roles,
+}: {
+  children: React.ReactNode
+  roles?: string[]
+}) {
   const { isAuthenticated, user } = useAuth()
   const location = useLocation()
 
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />
+  }
+
+  if (roles && user && !roles.includes(user.role)) {
+    return <AccessDenied />
   }
 
   // Si ya está autenticado y visita una página sin rol específico, lo manda a su home

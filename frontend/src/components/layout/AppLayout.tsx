@@ -6,6 +6,7 @@ import {
   Package,
   PawPrint,
   Receipt,
+  Settings2,
   Users,
 } from 'lucide-react'
 import { NavLink, useNavigate } from 'react-router-dom'
@@ -26,6 +27,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     { to: '/inventory', label: 'Inventario', icon: Package, end: false, adminOnly: false },
     { to: '/services', label: 'Servicios', icon: FileText, end: false, adminOnly: true },
     { to: '/invoices', label: 'Facturación', icon: Receipt, end: false, adminOnly: true },
+    { to: '/settings', label: 'Configuración', icon: Settings2, end: false, adminOnly: true },
   ].filter((i) => !i.adminOnly || isAdmin)
 
   const handleLogout = () => {

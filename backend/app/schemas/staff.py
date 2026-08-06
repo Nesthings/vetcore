@@ -37,3 +37,4 @@ class UserRead(BaseModel):
     phone: str | None
     is_active: bool
     created_at: datetime
+    branch_name: str | None = None

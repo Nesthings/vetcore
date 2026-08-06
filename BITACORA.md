@@ -375,4 +375,38 @@ Las verificaciones de frontend deben ejercitar el código JS real (no solo el ba
 
 ---
 
-**Siguiente subfase:** 1.6 — Configuración de clínica + Multi-sucursal (gestión de usuarios/staff, sucursales con inventario y agenda independientes, catálogo de servicios).
+## Subfase 1.6 — Configuración de clínica + Multi-sucursal ✅
+
+**Fecha:** 2026-08-05
+
+### Qué se hizo
+**Backend (menor):**
+- `users` enriquecido con `branch_name` (listado y detalle).
+
+**Frontend:**
+- `Settings` (`/settings`, solo admin): tabs **Usuarios** (tabla del staff, alta/edición, activar/desactivar) y **Sucursales** (tabla, alta/edición, eliminar con 409 si tiene registros) + enlace al catálogo de servicios.
+- `UserFormDialog` (alta/edición de staff: rol, sucursal, contraseña) y `BranchFormDialog`.
+- Nav **Configuración** (solo admin).
+- **Selector de sucursal en Inventario** → el inventario se filtra por sucursal (independencia visible; la agenda ya lo tenía desde 1.3).
+- `ProtectedRoute` ahora acepta `roles` → las rutas admin-only (`/services`, `/invoices`, `/settings`) muestran una pantalla de "Acceso restringido" si un rol no permitido navega directo a la URL.
+
+### Decisiones técnicas y por qué
+- **Configuración centralizada con tabs** (aprobado): una sola página para staff y sucursales, como agrupa el checklist 20-22.
+- **Servicios se queda en `/services`** (aprobado): desde Configuración solo se enlaza.
+- **Multi-sucursal visible:** agenda (1.3) e inventario filtran por `branch_id`; el modelo ya lo hacía desde 1.1.
+- **Backend: lectura de staff abierta a todo el staff** (matriz 1.1 aprobada: "staff lee"); las mutaciones de users/branches siguen siendo solo admin (403). El control fino de la UI se hace con el guard de roles del frontend.
+- **`confirm()` nativo** para eliminar sucursal (simple, sin librería de dialogs extra).
+
+### Verificado
+- `users` devuelve `branch_name` ("Dr. Test | admin | Sucursal Centro") ✓
+- Alta de sucursal nueva ✓; inventario filtrado por sucursal (3 productos en la 1ª) ✓
+- Recepción: backend devuelve 403 al intentar mutar users; la UI bloquea `/services`, `/invoices`, `/settings` ✓
+- Ruff + lint 0 errores + build OK ✓
+
+### Notas / pendientes
+- Datos de prueba: sucursal "Sucursal Norte" creada.
+- El Panel Super-Admin (1.8) gestionará clínicas; la configuración aquí es a nivel clínica.
+
+---
+
+**Siguiente subfase:** 1.7 — Cartilla digital del dueño (vista solo-lectura de vacunas/historial/último peso, foto compartida editable por el dueño con límites/compresión/EXIF/historial, flujo completo de invitación por token con reutilización de cuenta `owner` global).

@@ -16,6 +16,7 @@ import { PetDetail } from '@/pages/PetDetail'
 import { Pets } from '@/pages/Pets'
 import { Services } from '@/pages/Services'
 import { SessionHome } from '@/pages/SessionHome'
+import { Settings } from '@/pages/Settings'
 
 function App() {
   return (
@@ -79,7 +80,7 @@ function App() {
           <Route
             path="/services"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute roles={['admin']}>
                 <Services />
               </ProtectedRoute>
             }
@@ -87,8 +88,16 @@ function App() {
           <Route
             path="/invoices"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute roles={['admin']}>
                 <Invoices />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute roles={['admin']}>
+                <Settings />
               </ProtectedRoute>
             }
           />

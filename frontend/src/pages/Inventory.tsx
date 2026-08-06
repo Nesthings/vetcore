@@ -12,6 +12,13 @@ import { ErrorState } from '@/components/ui/error-state'
 import { Input } from '@/components/ui/input'
 import { LoadingState } from '@/components/ui/loading-state'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   Table,
   TableBody,
   TableCell,
@@ -46,6 +53,8 @@ function stockBadge(stock: number) {
 
 export function Inventory() {
   const [products, setProducts] = useState<InventoryProduct[]>([])
+  const [branches, setBranches] = useState<{ id: string; name: string }[]>([])
+  const [branchId, setBranchId] = useState('')
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -54,28 +63,30 @@ export function Inventory() {
   const [lotFor, setLotFor] = useState<InventoryProduct | null>(null)
   const [stockFor, setStockFor] = useState<InventoryProduct | null>(null)
 
-  const load = useCallback(
-    async (q = search) => {
-      setLoading(true)
-      setError(null)
-      try {
-        const params = new URLSearchParams()
-        if (q) params.set('search', q)
-        const res = await apiFetch<InventoryProduct[]>(`/inventory?${params}`)
-        setProducts(res)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'No se pudo cargar el inventario')
-      } finally {
-        setLoading(false)
-      }
-    },
-    [search],
-  )
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const params = new URLSearchParams()
+      if (search) params.set('search', search)
+      if (branchId) params.set('branch_id', branchId)
+      const [res, branchList] = await Promise.all([
+        apiFetch<InventoryProduct[]>(`/inventory?${params}`),
+        apiFetch<{ id: string; name: string }[]>('/branches'),
+      ])
+      setProducts(res)
+      setBranches(branchList)
+      if (!branchId && branchList.length > 0) setBranchId(branchList[0].id)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo cargar el inventario')
+    } finally {
+      setLoading(false)
+    }
+  }, [search, branchId])
 
   useEffect(() => {
     load()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [load])
 
   return (
     <AppLayout>
@@ -89,17 +100,29 @@ export function Inventory() {
         </Button>
       </div>
 
-      <div className="mb-4 max-w-md">
-        <div className="relative">
+      <div className="mb-4 flex max-w-lg gap-3">
+        <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && load(search)}
+            onKeyDown={(e) => e.key === 'Enter' && load()}
             placeholder="Buscar producto…"
             className="pl-9"
           />
         </div>
+        <Select value={branchId} onValueChange={setBranchId}>
+          <SelectTrigger className="w-48">
+            <SelectValue placeholder="Sucursal" />
+          </SelectTrigger>
+          <SelectContent>
+            {branches.map((b) => (
+              <SelectItem key={b.id} value={b.id}>
+                {b.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {error && <ErrorState description={error} onRetry={() => load()} className="mb-6" />}
