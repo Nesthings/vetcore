@@ -6,6 +6,7 @@ import {
   CalendarDays,
   CalendarX2,
   ClipboardPlus,
+  LayoutDashboard,
   Package,
   PackageMinus,
   PawPrint,
@@ -204,12 +205,13 @@ export function Dashboard() {
         </div>
       </div>
 
-      <div className="mb-6">
+      <div className="mb-6 flex items-center gap-2">
+        <LayoutDashboard className="size-6 text-primary" aria-hidden="true" />
         <h1 className="text-2xl font-semibold tracking-tight">Dashboards</h1>
-        <p className="text-sm text-muted-foreground">
-          {data ? `Resumen operativo del ${data.date}` : 'Resumen operativo de hoy'}
-        </p>
       </div>
+      <p className="mb-6 text-sm text-muted-foreground">
+        {data ? `Resumen operativo del ${data.date}` : 'Resumen operativo de hoy'}
+      </p>
 
       {error && <ErrorState description={error} onRetry={load} className="mb-6" />}
 

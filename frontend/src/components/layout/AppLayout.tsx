@@ -2,6 +2,7 @@ import {
   BellRing,
   CalendarDays,
   FileText,
+  Home,
   LayoutDashboard,
   LogOut,
   Package,
@@ -28,7 +29,7 @@ import { NotificationBell } from '@/components/layout/NotificationBell'
 import { ThemeToggle } from '@/components/layout/ThemeToggle'
 
 const NAV_ICONS: Record<string, React.ElementType> = {
-  dashboard: LayoutDashboard,
+  dashboard: Home,
   agenda: CalendarDays,
   waitlist: Timer,
   pets: Users,
