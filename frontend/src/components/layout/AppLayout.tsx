@@ -1,4 +1,4 @@
-import { CalendarDays, LayoutDashboard, LogOut, PawPrint } from 'lucide-react'
+import { CalendarDays, LayoutDashboard, LogOut, PawPrint, Users } from 'lucide-react'
 import { NavLink, useNavigate } from 'react-router-dom'
 
 import { useAuth } from '@/lib/auth'
@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 const NAV_ITEMS = [
   { to: '/', label: 'Dashboard del día', icon: LayoutDashboard, end: true },
   { to: '/agenda', label: 'Agenda', icon: CalendarDays, end: false },
+  { to: '/pets', label: 'Pacientes', icon: Users, end: false },
 ]
 
 export function AppLayout({ children }: { children: React.ReactNode }) {

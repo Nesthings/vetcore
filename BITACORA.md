@@ -289,4 +289,50 @@ Las verificaciones de frontend deben ejercitar el código JS real (no solo el ba
 
 ---
 
-**Siguiente subfase:** 1.4 — Ficha de paciente + Nueva consulta (línea de tiempo, alta/edición de mascota, cálculo de dosis, captura de foto/nota, PDF de resumen de consulta).
+## Subfase 1.4 — Ficha de paciente + Nueva consulta ✅
+
+**Fecha:** 2026-08-05
+
+### Qué se hizo
+**Backend:**
+- `reportlab` agregado (generación de PDF).
+- `app/core/storage.py`: servicio de media **local** (`MEDIA_ROOT`, URL pública `/media/...`) con interfaz preparada para migrar a R2.
+- `POST /dose/calc`: cálculo de dosis (volumen = peso × dosis ÷ concentración), única fuente de verdad.
+- `GET /pets/{id}/timeline`: fusiona consultas y citas del paciente en orden cronológico.
+- `POST /pets/{id}/photo`: sube la foto CLÍNICA del expediente (campo distinto del de la Cartilla, principio 5).
+- `POST /consultations/{id}/summary-pdf`: genera/regenera el PDF de resumen (informativo, NO receta — principio 6) con `reportlab` y lo registra en `consultation_summary_pdfs`.
+- `POST /consultations/{id}/attachments`: subida multipart de foto/nota → `consultation_attachments`.
+- Modelos `ConsultationAttachment` y `ConsultationSummaryPdf`.
+- `/media` montado con StaticFiles.
+- Validación de extensiones (imágenes: jpg/jpeg/png/webp) y límite de 5 MB.
+
+**Frontend:**
+- `Pets` (listado con búsqueda + alta) y `PetFormDialog`.
+- `PetDetail`: ficha con foto, alertas, alergias, **línea de tiempo** y **gráfica de peso histórico** (recharts).
+- `NewConsultation`: motivo/diagnóstico/tratamiento/indicaciones, próxima cita, sucursal, **peso nuevo**, **calculadora de dosis con confirmación obligatoria**, items, subida de foto → al guardar genera el PDF automáticamente y lo ofrece para descargar.
+- Nav "Pacientes" + rutas `/pets`, `/pets/:id`, `/pets/:id/consultas/nueva`.
+
+### Decisiones técnicas y por qué
+- **Storage local ahora, R2 después (aprobado):** fotos y PDFs en `backend/media/`. El servicio `storage.py` abstrae guardar/URL pública para que la migración a R2 no toque endpoints. `MEDIA_ROOT` en `.env`.
+- **PDF informativo (reportlab):** contiene qué se hizo, qué se aplicó e indicaciones; el footer dice explícitamente "no constituye una receta médica" (regla 6).
+- **Dosis en backend:** la fórmula vive en un solo lugar (testeable). La UI muestra la fórmula y **bloquea el guardado** si no hay confirmación explícita cuando hay un cálculo (regla sección 8).
+- **Peso como serie de tiempo:** el pesaje se vincula a la consulta (`consultation_id`) y se guarda en `pet_weight_records`; el default visual es el último valor (principio 4).
+- **Límites y validación de uploads:** 5 MB y extensiones permitidas; el endpoint devuelve 413 si se excede.
+
+### Verificado
+- `POST /dose/calc`: 12.5kg × 5mg/kg ÷ 50mg/ml → 62.5 mg / 1.25 ml ✓
+- Timeline fusiona 1 consulta + 3 citas en orden ✓
+- Upload de foto clínica → `/media/pets/...` sirve HTTP 200 ✓
+- PDF: generado, descargable como `application/pdf` (encabezado `%PDF`) ✓
+- Consulta completa por API (items + peso vinculado + PDF + adjunto): peso último actualizado a 12.8 ✓
+- Lint 0 errores (solo warnings conocidos) + build OK ✓
+
+### Notas / pendientes
+- La foto de la Cartilla digital del dueño (regla 5) es un campo distinto y llega en la Subfase 1.7.
+- Los PDFs y fotos viven en disco local; R2 se integra cuando el usuario provea credenciales.
+- El adjunto de video/audio de la consulta queda pendiente (tipo en el esquema, pero la UI solo sube fotos por ahora).
+- `annotation_json` de adjuntos es FASE 2 (anotaciones sobre la foto).
+
+---
+
+**Siguiente subfase:** 1.5 — Inventario básico + Facturación básica (alta de producto, lista con alertas de caducidad, descuento automático al facturar, detalle de factura/recibo, catálogo de servicios y precios).

@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     r2_bucket_name: str = ""
     r2_public_base_url: str = ""
 
+    # Media (MVP: storage local; R2 cuando existan credenciales)
+    media_root: str = "media"
+
     @property
     def resolved_database_url(self) -> str:
         if self.database_url:

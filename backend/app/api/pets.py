@@ -2,22 +2,32 @@
 
 El peso es histórico (una fila por consulta, principio 4 del documento):
 la lectura de mascotas expone el último peso como default visual.
+Incluye la foto clínica del expediente (distinta de la foto de la Cartilla,
+principio 5) y la línea de tiempo que fusiona consultas y citas.
 """
 
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import CurrentClinic, get_current_clinic, require_clinic_roles
+from app.core.storage import (
+    ALLOWED_IMAGE_EXTENSIONS,
+    public_url,
+    save_media,
+    validate_extension,
+)
 from app.db.session import get_db
-from app.models import Pet, PetWeightRecord
+from app.models import Appointment, Consultation, Pet, PetWeightRecord, User
 from app.schemas.pet import PetCreate, PetRead, PetUpdate, PetWeightCreate, PetWeightRead
 
 router = APIRouter(prefix="/pets", tags=["pets"])
 
 PET_MUTATORS = ("admin", "veterinario")
+
+MAX_IMAGE_BYTES = 5 * 1024 * 1024  # 5 MB
 
 
 @router.get("", response_model=list[PetRead])
@@ -146,3 +156,93 @@ def create_weight(
     db.commit()
     db.refresh(record)
     return record
+
+
+@router.post(
+    "/{pet_id}/photo",
+    response_model=PetRead,
+    summary="Sube la foto clínica del expediente del paciente",
+)
+def upload_pet_photo(
+    pet_id: str,
+    file: UploadFile = File(...),
+    ctx: CurrentClinic = Depends(require_clinic_roles(*PET_MUTATORS)),
+    db: Session = Depends(get_db),
+) -> Pet:
+    """Foto CLÍNICA del expediente. Es un campo distinto de la foto de la
+    Cartilla digital (principio 5): nunca se sobrescriben entre sí."""
+    pet = _get_pet_or_404(db, ctx.clinic["id"], pet_id)
+
+    validate_extension(file.filename or "", ALLOWED_IMAGE_EXTENSIONS)
+    content = file.file.read()
+    if len(content) > MAX_IMAGE_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="La imagen supera el límite de 5 MB",
+        )
+
+    rel = save_media(f"pets/{pet_id}", file.filename or "photo.jpg", content)
+    pet.clinical_photo_url = public_url(rel)
+    db.commit()
+    db.refresh(pet)
+    return _pet_with_latest_weight(db, pet)
+
+
+@router.get(
+    "/{pet_id}/timeline",
+    summary="Línea de tiempo del paciente (consultas + citas)",
+)
+def pet_timeline(
+    pet_id: str,
+    ctx: CurrentClinic = Depends(get_current_clinic),
+    db: Session = Depends(get_db),
+) -> list[dict]:
+    pet = _get_pet_or_404(db, ctx.clinic["id"], pet_id)
+
+    consultations = db.scalars(
+        select(Consultation)
+        .where(Consultation.pet_id == pet.id, Consultation.clinic_id == ctx.clinic["id"])
+        .order_by(Consultation.created_at.desc())
+    ).all()
+
+    appointments = db.scalars(
+        select(Appointment)
+        .where(Appointment.pet_id == pet.id, Appointment.clinic_id == ctx.clinic["id"])
+        .order_by(Appointment.start_time.desc())
+    ).all()
+
+    vet_ids = {c.vet_user_id for c in consultations}
+    vets = (
+        dict(db.execute(select(User.id, User.full_name).where(User.id.in_(vet_ids))).all())
+        if vet_ids
+        else {}
+    )
+
+    events: list[dict] = []
+    for c in consultations:
+        events.append(
+            {
+                "type": "consulta",
+                "id": str(c.id),
+                "title": c.reason or "Consulta",
+                "subtitle": f"Diagnóstico: {c.diagnosis}" if c.diagnosis else "",
+                "author": vets.get(c.vet_user_id),
+                "date": c.created_at.isoformat(),
+                "status": None,
+            }
+        )
+    for a in appointments:
+        events.append(
+            {
+                "type": "cita",
+                "id": str(a.id),
+                "title": a.procedure_type,
+                "subtitle": "",
+                "author": None,
+                "date": a.start_time.isoformat(),
+                "status": a.status,
+            }
+        )
+
+    events.sort(key=lambda e: e["date"], reverse=True)
+    return events

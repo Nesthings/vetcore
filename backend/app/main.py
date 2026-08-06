@@ -1,5 +1,8 @@
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.api import (
     appointments,
@@ -8,6 +11,7 @@ from app.api import (
     clinics,
     consultations,
     dashboard,
+    dose,
     health,
     inventory,
     invoices,
@@ -44,3 +48,9 @@ app.include_router(schedule_blocks.router, prefix="/api/v1")
 app.include_router(dashboard.router, prefix="/api/v1")
 app.include_router(inventory.router, prefix="/api/v1")
 app.include_router(invoices.router, prefix="/api/v1")
+app.include_router(dose.router, prefix="/api/v1")
+
+# Media (MVP local). La URL pública /media/... es la que devuelven los endpoints.
+media_dir = Path(settings.media_root)
+media_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/media", StaticFiles(directory=media_dir), name="media")

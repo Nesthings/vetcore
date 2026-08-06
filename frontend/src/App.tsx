@@ -9,6 +9,9 @@ import { ResetPassword } from '@/pages/auth/ResetPassword'
 import { Agenda } from '@/pages/Agenda'
 import { Dashboard } from '@/pages/Dashboard'
 import { DesignSystem } from '@/pages/DesignSystem'
+import { NewConsultation } from '@/pages/NewConsultation'
+import { PetDetail } from '@/pages/PetDetail'
+import { Pets } from '@/pages/Pets'
 import { SessionHome } from '@/pages/SessionHome'
 
 function App() {
@@ -35,6 +38,30 @@ function App() {
             element={
               <ProtectedRoute>
                 <Agenda />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/pets"
+            element={
+              <ProtectedRoute>
+                <Pets />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/pets/:id"
+            element={
+              <ProtectedRoute>
+                <PetDetail />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/pets/:id/consultas/nueva"
+            element={
+              <ProtectedRoute>
+                <NewConsultation />
               </ProtectedRoute>
             }
           />

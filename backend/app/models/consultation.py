@@ -1,10 +1,10 @@
-"""Modelos de consultas y sus items."""
+"""Modelos de consultas, sus items, adjuntos y resúmenes PDF."""
 
 import uuid
 from datetime import date, datetime
 
 from sqlalchemy import Date, DateTime, ForeignKey, Numeric, String, Text, func
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -60,3 +60,33 @@ class ConsultationItem(UUIDPkMixin, Base):
     )
 
     consultation: Mapped[Consultation] = relationship(back_populates="items")
+
+
+class ConsultationAttachment(UUIDPkMixin, Base):
+    """Adjuntos de la consulta (foto, video, audio)."""
+
+    __tablename__ = "consultation_attachments"
+
+    consultation_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("consultations.id"), nullable=False, index=True
+    )
+    type: Mapped[str] = mapped_column(String(20), nullable=False)
+    url: Mapped[str] = mapped_column(Text, nullable=False)
+    annotation_json: Mapped[dict | None] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class ConsultationSummaryPdf(UUIDPkMixin, Base):
+    """PDF de resumen de consulta (informativo, no es receta médica)."""
+
+    __tablename__ = "consultation_summary_pdfs"
+
+    consultation_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("consultations.id"), nullable=False, unique=True
+    )
+    pdf_url: Mapped[str] = mapped_column(Text, nullable=False)
+    generated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )

@@ -1,21 +1,43 @@
-"""CRUD de consultas — por-tenant, vet/admin para mutar."""
+"""CRUD de consultas — por-tenant, vet/admin para mutar.
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+Incluye la generación del PDF de resumen (informativo, no receta) y la
+subida de adjuntos (foto/nota).
+"""
+
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import CurrentClinic, get_current_clinic, require_clinic_roles
+from app.core.storage import (
+    ALLOWED_IMAGE_EXTENSIONS,
+    public_url,
+    save_media,
+    validate_extension,
+)
 from app.db.session import get_db
-from app.models import Consultation, ConsultationItem, Pet
+from app.models import (
+    Clinic,
+    ClinicBranch,
+    Consultation,
+    ConsultationAttachment,
+    ConsultationItem,
+    ConsultationSummaryPdf,
+    Pet,
+    User,
+)
 from app.schemas.consultation import (
     ConsultationCreate,
     ConsultationRead,
     ConsultationUpdate,
 )
+from app.services.pdf import build_consultation_summary_pdf
 
 router = APIRouter(prefix="/consultations", tags=["consultations"])
 
 CONSULTATION_MUTATORS = ("admin", "veterinario")
+
+MAX_IMAGE_BYTES = 5 * 1024 * 1024  # 5 MB
 
 
 @router.get("", response_model=list[ConsultationRead])
@@ -119,3 +141,92 @@ def delete_consultation(
     consultation = _get_consultation_or_404(db, ctx.clinic["id"], consultation_id)
     db.delete(consultation)
     db.commit()
+
+
+@router.post(
+    "/{consultation_id}/summary-pdf",
+    summary="Genera el PDF de resumen de la consulta (informativo)",
+)
+def generate_summary_pdf(
+    consultation_id: str,
+    ctx: CurrentClinic = Depends(require_clinic_roles(*CONSULTATION_MUTATORS)),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Genera (o regenera) el PDF de resumen. Es un documento INFORMATIVO:
+    qué se hizo, qué se aplicó e indicaciones. No es una receta médica."""
+    consultation = _get_consultation_or_404(db, ctx.clinic["id"], consultation_id)
+
+    clinic = db.get(Clinic, ctx.clinic["id"])
+    pet = db.get(Pet, consultation.pet_id)
+    vet = db.get(User, consultation.vet_user_id)
+    branch = db.get(ClinicBranch, consultation.branch_id) if consultation.branch_id else None
+
+    data = {
+        "clinic_name": f"{clinic.name}" + (f" — {branch.name}" if branch else ""),
+        "pet_name": pet.name,
+        "species": pet.species,
+        "breed": pet.breed,
+        "vet_name": vet.full_name,
+        "date_str": consultation.created_at.astimezone().strftime("%d/%m/%Y %H:%M"),
+        "reason": consultation.reason,
+        "diagnosis": consultation.diagnosis,
+        "treatment": consultation.treatment,
+        "care_instructions": consultation.care_instructions,
+        "items": [
+            {"description": i.description, "quantity": i.quantity} for i in consultation.items
+        ],
+        "next_appointment_suggestion": (
+            consultation.next_appointment_suggestion.isoformat()
+            if consultation.next_appointment_suggestion
+            else None
+        ),
+    }
+
+    pdf_bytes = build_consultation_summary_pdf(data)
+    rel = save_media("summaries", f"consulta_{consultation_id}.pdf", pdf_bytes)
+    pdf_url = public_url(rel)
+
+    existing = db.scalar(
+        select(ConsultationSummaryPdf).where(
+            ConsultationSummaryPdf.consultation_id == consultation_id
+        )
+    )
+    if existing:
+        existing.pdf_url = pdf_url
+    else:
+        db.add(ConsultationSummaryPdf(consultation_id=consultation_id, pdf_url=pdf_url))
+    db.commit()
+
+    return {"consultation_id": consultation_id, "pdf_url": pdf_url}
+
+
+@router.post(
+    "/{consultation_id}/attachments",
+    status_code=status.HTTP_201_CREATED,
+    summary="Adjunta una foto/nota a la consulta",
+)
+def upload_attachment(
+    consultation_id: str,
+    file: UploadFile = File(...),
+    ctx: CurrentClinic = Depends(require_clinic_roles(*CONSULTATION_MUTATORS)),
+    db: Session = Depends(get_db),
+) -> dict:
+    _get_consultation_or_404(db, ctx.clinic["id"], consultation_id)
+
+    validate_extension(file.filename or "", ALLOWED_IMAGE_EXTENSIONS)
+    content = file.file.read()
+    if len(content) > MAX_IMAGE_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="La imagen supera el límite de 5 MB",
+        )
+
+    rel = save_media(f"consultations/{consultation_id}", file.filename or "attach.jpg", content)
+    attachment = ConsultationAttachment(
+        consultation_id=consultation_id,
+        type="photo",
+        url=public_url(rel),
+    )
+    db.add(attachment)
+    db.commit()
+    return {"id": str(attachment.id), "url": attachment.url, "type": "photo"}
