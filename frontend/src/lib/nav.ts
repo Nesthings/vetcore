@@ -13,7 +13,7 @@ export const NAV_ROUTES: NavRoute[] = [
   { to: '/agenda', label: 'Agenda', component: 'agenda' },
   { to: '/waitlist', label: 'Lista de espera', component: 'waitlist' },
   { to: '/pets', label: 'Pacientes', component: 'pets' },
-  { to: '/inventory', label: 'Inventario de insumos', component: 'inventory' },
+  { to: '/inventory', label: 'Insumos', component: 'inventory' },
   { to: '/purchase-orders', label: 'Compras', component: 'purchase_orders' },
   { to: '/automation', label: 'Automatización', component: 'automation' },
   { to: '/reports', label: 'Reportes', component: 'reports' },

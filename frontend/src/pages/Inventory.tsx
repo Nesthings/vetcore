@@ -93,7 +93,7 @@ export function Inventory() {
     <AppLayout>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Inventario de insumos</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Insumos</h1>
           <p className="text-sm text-muted-foreground">Productos, stock y alertas de caducidad</p>
         </div>
         <Button size="sm" onClick={() => setCreateOpen(true)}>
