@@ -6,6 +6,7 @@ si la clínica está suspendida, el dueño conserva lectura (badge read_only).
 Incluye preferencias (opt-in WhatsApp, principio 10) y encuestas (2.4).
 """
 
+from datetime import UTC, datetime
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile, status
@@ -33,6 +34,8 @@ from app.models import (
     User,
 )
 from app.schemas.crm import (
+    OwnerPreferencesRead,
+    OwnerPreferencesUpdate,
     SurveyCreate,
     SurveyRead,
 )
@@ -463,3 +466,63 @@ def owner_invoice_receipt(
             detail="La factura no pertenece a una mascota tuya",
         )
     return receipt_response(db, invoice)
+
+
+def _preferences_read(db: Session, owner_id: str) -> OwnerPreferencesRead:
+    row = (
+        db.execute(
+            text(
+                "SELECT preferred_channel, accepts_reminders, accepts_reminders_at "
+                "FROM owner_preferences WHERE owner_id = :o"
+            ),
+            {"o": owner_id},
+        )
+        .mappings()
+        .first()
+    )
+    if row is None:
+        return OwnerPreferencesRead(
+            preferred_channel="whatsapp", accepts_reminders=False, accepts_reminders_at=None
+        )
+    return OwnerPreferencesRead(**dict(row))
+
+
+@router.get("/preferences", response_model=OwnerPreferencesRead)
+def get_preferences(
+    user: CurrentUser = Depends(get_current_owner),
+    db: Session = Depends(get_db),
+) -> OwnerPreferencesRead:
+    """Preferencias de contacto del dueño (opt-in para recordatorios, principio 10)."""
+    return _preferences_read(db, user.sub)
+
+
+@router.put("/preferences", response_model=OwnerPreferencesRead)
+def update_preferences(
+    body: OwnerPreferencesUpdate,
+    user: CurrentUser = Depends(get_current_owner),
+    db: Session = Depends(get_db),
+) -> OwnerPreferencesRead:
+    """Actualiza preferencias. Al aceptar recordatorios se guarda el timestamp."""
+    data = body.model_dump(exclude_unset=True)
+    if not data:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="No hay campos para actualizar",
+        )
+    if data.get("accepts_reminders"):
+        data["accepts_reminders_at"] = datetime.now(UTC)
+    columns = ", ".join(data.keys())
+    placeholders = ", ".join(f":{c}" for c in data)
+    updates = ", ".join(f"{c} = EXCLUDED.{c}" for c in data)
+    params = {c: v for c, v in data.items()}
+    params["owner_id"] = user.sub
+    db.execute(
+        text(
+            f"INSERT INTO owner_preferences (owner_id, {columns}) "
+            f"VALUES (:owner_id, {placeholders}) "
+            f"ON CONFLICT (owner_id) DO UPDATE SET {updates}"
+        ),
+        params,
+    )
+    db.commit()
+    return _preferences_read(db, user.sub)

@@ -1237,4 +1237,25 @@ El usuario indicó que el módulo de Reportes operativos no le sirve y pidió bo
 
 ---
 
+## Ajuste — Opt-in de recordatorios del dueño (preferencias de contacto)
+
+**Fecha:** 2026-08-06
+
+### Contexto
+Tras explicar el módulo Automatización, se notó que el dueño **no tenía ningún lugar** para aceptar los recordatorios: la pantalla de preferencias (2.4) se había revertido y los endpoints `/owner/preferences` se eliminaron. Sin opt-in, el motor de recordatorios omite todo (`skipped_no_consent`).
+
+### Qué se hizo
+- **Backend:** se restauraron `GET /owner/preferences` y `PUT /owner/preferences` (admin de owner vía `get_current_owner`), usando la tabla `owner_preferences` que ya existía. Al aceptar se guarda `accepts_reminders_at = now()`. Schemas `OwnerPreferencesRead/Update` en `schemas/crm.py`.
+- **Frontend:** tarjeta **"Preferencias de contacto"** en el Portal del dueño con un **toggle** para aceptar recordatorios por WhatsApp (optimista, revierte si falla; muestra la fecha de activación).
+
+### Verificado
+- GET default (whatsapp/false), PUT activar → `accepts_reminders_at` seteado, GET persiste, PUT desactivar ✓
+- Owner de prueba creado y eliminado ✓
+- Ruff + lint 0 errores + build OK ✓
+
+### Notas
+- El envío real de WhatsApp sigue pendiente (proveedor); el opt-in ya queda gestionable por el dueño.
+
+---
+
 **Siguiente subfase:** por decidir (Fase 3 en hold).

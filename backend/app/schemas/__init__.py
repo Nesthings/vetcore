@@ -37,6 +37,8 @@ from app.schemas.consultation import (
     ConsultationUpdate,
 )
 from app.schemas.crm import (
+    OwnerPreferencesRead,
+    OwnerPreferencesUpdate,
     PhotoEvolutionItem,
     SurveyCreate,
     SurveyRead,
@@ -128,6 +130,8 @@ __all__ = [
     "InvoiceUpdate",
     "OwnerLinkRead",
     "OwnerContactUpdate",
+    "OwnerPreferencesRead",
+    "OwnerPreferencesUpdate",
     "OwnerTransferRequest",
     "OwnerTransferResponse",
     "NotificationRead",

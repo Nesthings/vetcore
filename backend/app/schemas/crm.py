@@ -24,3 +24,16 @@ class PhotoEvolutionItem(BaseModel):
     consultation_id: uuid.UUID
     consultation_date: datetime
     reason: str | None = None
+
+
+class OwnerPreferencesRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    preferred_channel: str
+    accepts_reminders: bool
+    accepts_reminders_at: datetime | None = None
+
+
+class OwnerPreferencesUpdate(BaseModel):
+    preferred_channel: str | None = Field(default=None, pattern="^(whatsapp|email|sms)$")
+    accepts_reminders: bool | None = None
