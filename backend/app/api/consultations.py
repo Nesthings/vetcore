@@ -9,6 +9,7 @@ from sqlalchemy import select, text
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import CurrentClinic, get_current_clinic, require_clinic_roles
+from app.core.events import record_audit
 from app.core.storage import (
     ALLOWED_IMAGE_EXTENSIONS,
     public_url,
@@ -141,6 +142,16 @@ def delete_consultation(
     db: Session = Depends(get_db),
 ) -> None:
     consultation = _get_consultation_or_404(db, ctx.clinic["id"], consultation_id)
+    record_audit(
+        db,
+        clinic_id=ctx.clinic["id"],
+        actor_type="user",
+        actor_id=ctx.user.sub,
+        action="consultation_deleted",
+        entity_type="consultation",
+        entity_id=consultation.id,
+        metadata={"pet_id": str(consultation.pet_id)},
+    )
     db.delete(consultation)
     db.commit()
 

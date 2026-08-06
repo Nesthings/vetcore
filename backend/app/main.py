@@ -6,6 +6,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api import (
     appointments,
+    audit,
     auth,
     automation,
     branches,
@@ -17,6 +18,7 @@ from app.api import (
     inventory,
     invoices,
     kits,
+    notifications,
     owner,
     pets,
     purchase_orders,
@@ -65,6 +67,8 @@ app.include_router(owner.router, prefix="/api/v1")
 app.include_router(waitlist.router, prefix="/api/v1")
 app.include_router(automation.router, prefix="/api/v1")
 app.include_router(reports.router, prefix="/api/v1")
+app.include_router(notifications.router, prefix="/api/v1")
+app.include_router(audit.router, prefix="/api/v1")
 
 # Media (MVP local). La URL pública /media/... es la que devuelven los endpoints.
 media_dir = Path(settings.media_root)

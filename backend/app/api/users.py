@@ -16,6 +16,7 @@ from app.api.deps import (
     require_clinic_roles,
     require_staff,
 )
+from app.core.events import record_audit
 from app.core.security import hash_password, verify_password
 from app.db.session import get_db
 from app.models import ClinicBranch, User
@@ -177,4 +178,13 @@ def deactivate_user(
     """Desactiva el usuario (soft-delete via is_active)."""
     user = _get_user_or_404(db, ctx.clinic["id"], user_id)
     user.is_active = False
+    record_audit(
+        db,
+        clinic_id=ctx.clinic["id"],
+        actor_type="user",
+        actor_id=ctx.user.sub,
+        action="user_deactivated",
+        entity_type="user",
+        entity_id=user.id,
+    )
     db.commit()

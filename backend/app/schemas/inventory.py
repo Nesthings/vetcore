@@ -34,7 +34,8 @@ class InventoryLotRead(BaseModel):
 
 
 class StockEntryCreate(BaseModel):
-    quantity: float = Field(gt=0)
+    # Positivo = entrada, negativo = salida (el frontend ya convierte).
+    quantity: float = Field(ne=0)
     reason: str = Field(min_length=1, max_length=50)
 
 

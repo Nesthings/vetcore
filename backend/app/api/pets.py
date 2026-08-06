@@ -16,6 +16,7 @@ from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from app.api.deps import CurrentClinic, get_current_clinic, require_clinic_roles
+from app.core.events import notify_roles, record_audit
 from app.core.storage import (
     ALLOWED_IMAGE_EXTENSIONS,
     public_url,
@@ -131,6 +132,15 @@ def create_pet(
 ) -> Pet:
     pet = Pet(clinic_id=ctx.clinic["id"], **body.model_dump())
     db.add(pet)
+    record_audit(
+        db,
+        clinic_id=ctx.clinic["id"],
+        actor_type="user",
+        actor_id=ctx.user.sub,
+        action="pet_created",
+        entity_type="pet",
+        entity_id=pet.id,
+    )
     db.commit()
     db.refresh(pet)
     return pet
@@ -144,8 +154,19 @@ def update_pet(
     db: Session = Depends(get_db),
 ) -> Pet:
     pet = _get_pet_or_404(db, ctx.clinic["id"], pet_id)
-    for field, value in body.model_dump(exclude_unset=True).items():
+    fields = body.model_dump(exclude_unset=True)
+    for field, value in fields.items():
         setattr(pet, field, value)
+    record_audit(
+        db,
+        clinic_id=ctx.clinic["id"],
+        actor_type="user",
+        actor_id=ctx.user.sub,
+        action="pet_updated",
+        entity_type="pet",
+        entity_id=pet.id,
+        metadata={"fields": list(fields.keys())},
+    )
     db.commit()
     db.refresh(pet)
     return _pet_with_latest_weight(db, pet)
@@ -230,6 +251,16 @@ def upload_pet_photo(
 
     rel = save_media(f"pets/{pet_id}", file.filename or "photo.jpg", content)
     pet.clinical_photo_url = public_url(rel)
+    record_audit(
+        db,
+        clinic_id=ctx.clinic["id"],
+        actor_type="user",
+        actor_id=ctx.user.sub,
+        action="photo_uploaded",
+        entity_type="pet",
+        entity_id=pet.id,
+        metadata={"kind": "clinical"},
+    )
     db.commit()
     db.refresh(pet)
     return _pet_with_latest_weight(db, pet)
@@ -445,6 +476,16 @@ def transfer_owner(
             "by": ctx.user.sub,
         },
     )
+    record_audit(
+        db,
+        clinic_id=ctx.clinic["id"],
+        actor_type="user",
+        actor_id=ctx.user.sub,
+        action="owner_transferred",
+        entity_type="pet",
+        entity_id=pet_id,
+        metadata={"new_owner": str(owner), "reused": reused},
+    )
     db.commit()
 
     return OwnerTransferResponse(
@@ -494,6 +535,23 @@ def create_alert(
     _get_pet_or_404(db, ctx.clinic["id"], pet_id)
     alert = ClinicalAlert(pet_id=pet_id, type=body.type, description=body.description)
     db.add(alert)
+    record_audit(
+        db,
+        clinic_id=ctx.clinic["id"],
+        actor_type="user",
+        actor_id=ctx.user.sub,
+        action="alert_created",
+        entity_type="alert",
+        entity_id=alert.id,
+        metadata={"pet_id": pet_id, "type": body.type},
+    )
+    notify_roles(
+        db,
+        clinic_id=ctx.clinic["id"],
+        roles=["veterinario", "admin"],
+        type_="clinical_alert",
+        message=f"Nueva alerta clínica: {body.type} — {body.description}",
+    )
     db.commit()
     db.refresh(alert)
     return alert
@@ -535,6 +593,16 @@ def delete_alert(
 ) -> None:
     _get_pet_or_404(db, ctx.clinic["id"], pet_id)
     alert = _get_alert_or_404(db, pet_id, alert_id)
+    record_audit(
+        db,
+        clinic_id=ctx.clinic["id"],
+        actor_type="user",
+        actor_id=ctx.user.sub,
+        action="alert_deleted",
+        entity_type="alert",
+        entity_id=alert.id,
+        metadata={"pet_id": pet_id, "type": alert.type},
+    )
     db.delete(alert)
     db.commit()
 

@@ -760,4 +760,37 @@ Se conserva en el backend: `POST /auth/login/owner`, el flujo de activación por
 
 ---
 
-**Siguiente subfase:** 2.7 — Centro de notificaciones internas + Bitácora/auditoría (log de cambios: fotos, cancelaciones, ediciones).
+## Subfase 2.7 — Centro de notificaciones internas + Bitácora/auditoría ✅
+
+**Fecha:** 2026-08-05
+
+### Qué se hizo
+**Backend:**
+- Modelos `InternalNotification` y `AuditLog` (tablas existentes).
+- Helpers transversales en `app/core/events.py`: `notify_user`, `notify_roles` y `record_audit`.
+- `notifications.py`: `GET /notifications`, `GET /notifications/unread-count`, `POST /notifications/{id}/read`, `POST /notifications/read-all`.
+- `audit.py`: `GET /audit-log` con filtros (entidad, acción, rango) — por clínica.
+- **Hooks de notificación:** cancelación/no-show de cita → vet asignado; alerta clínica creada → vets+admins; stock < 5 tras movimiento → admins.
+- **Auditoría registrada en:** alta/edición de mascota, foto clínica, foto de la Cartilla (actor `owner`) + revert, alertas crear/resolver, cambio de estado de cita, transferencia de dueño, cancelación de factura, desactivación de usuario, eliminación de consulta.
+
+**Frontend:**
+- `NotificationBell` en el header del panel clínico: campana con contador de no leídas, dropdown con notificaciones, marcar leída/todas, polling 30s.
+- `Audit` (`/audit`, staff): tabla de bitácora con filtros por acción/entidad y badges con etiquetas legibles.
+
+### Decisiones técnicas y por qué
+- **Notificaciones en eventos clave** (cancelaciones, alertas, stock bajo) — las de mayor valor; ampliables después.
+- **Bitácora central con `record_audit`** — actores `user`/`owner`/`system`; aislada por `clinic_id`.
+- **Bug latente corregido (de 2.2):** `StockEntryCreate` rechazaba cantidades negativas (`gt=0`), pero el frontend envía negativos para salidas. Se cambió a `ne=0`; el aviso de stock bajo requería ver el movimiento antes de evaluar (`db.flush()` antes de `_maybe_notify_low_stock`).
+
+### Verificado
+- Cancelar cita → notificación `appointment_cancelled` al vet; contador 1; marcar leída → 0 ✓
+- Salida de stock 6→4 → notificación `low_stock` a admins ✓
+- Bitácora registra los eventos (acción, entidad, actor, metadata) ✓
+- Ruff + lint 0 errores + build OK ✓
+
+### Notas / pendientes
+- La bitácora y las notificaciones quedan listas para alimentarse de más eventos conforme crezca el sistema.
+
+---
+
+**Siguiente subfase:** 3.1 — Transcripción/resumen de consulta por voz con IA.

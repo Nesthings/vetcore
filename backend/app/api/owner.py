@@ -13,6 +13,7 @@ from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import CurrentUser, get_current_owner
+from app.core.events import record_audit
 from app.core.images import process_cartilla_photo
 from app.core.storage import (
     ALLOWED_IMAGE_EXTENSIONS,
@@ -218,7 +219,7 @@ def upload_cartilla_photo(
     owner: CurrentUser = Depends(get_current_owner),
     db: Session = Depends(get_db),
 ) -> dict:
-    pet, _ = _linked_pet(db, owner.sub, pet_id)
+    pet, clinic = _linked_pet(db, owner.sub, pet_id)
 
     validate_extension(file.filename or "", ALLOWED_IMAGE_EXTENSIONS)
     content = file.file.read()
@@ -235,6 +236,15 @@ def upload_cartilla_photo(
     rel = save_media(f"cartilla/{pet.id}", "cartilla.jpg", processed)
     pet.cartilla_photo_prev_url = pet.cartilla_photo_url
     pet.cartilla_photo_url = public_url(rel)
+    record_audit(
+        db,
+        clinic_id=clinic["id"],
+        actor_type="owner",
+        actor_id=owner.sub,
+        action="cartilla_photo_updated",
+        entity_type="pet",
+        entity_id=pet.id,
+    )
     db.commit()
     db.refresh(pet)
     return {
@@ -252,7 +262,7 @@ def revert_cartilla_photo(
     owner: CurrentUser = Depends(get_current_owner),
     db: Session = Depends(get_db),
 ) -> dict:
-    pet, _ = _linked_pet(db, owner.sub, pet_id)
+    pet, clinic = _linked_pet(db, owner.sub, pet_id)
     if not pet.cartilla_photo_prev_url:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -260,6 +270,15 @@ def revert_cartilla_photo(
         )
     pet.cartilla_photo_url = pet.cartilla_photo_prev_url
     pet.cartilla_photo_prev_url = None
+    record_audit(
+        db,
+        clinic_id=clinic["id"],
+        actor_type="owner",
+        actor_id=owner.sub,
+        action="cartilla_photo_reverted",
+        entity_type="pet",
+        entity_id=pet.id,
+    )
     db.commit()
     db.refresh(pet)
     return {"cartilla_photo_url": pet.cartilla_photo_url, "revertible": False}

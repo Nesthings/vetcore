@@ -35,6 +35,7 @@ from app.schemas.crm import (
     SurveyCreate,
     SurveyRead,
 )
+from app.schemas.events import AuditLogRead, NotificationRead
 from app.schemas.inventory import (
     InventoryLotCreate,
     InventoryLotRead,
@@ -73,6 +74,7 @@ __all__ = [
     "AppointmentCreate",
     "AppointmentRead",
     "AppointmentUpdate",
+    "AuditLogRead",
     "ClinicBranchCreate",
     "ClinicBranchRead",
     "ClinicBranchUpdate",
@@ -108,6 +110,7 @@ __all__ = [
     "OwnerLinkRead",
     "OwnerTransferRequest",
     "OwnerTransferResponse",
+    "NotificationRead",
     "PendingReminder",
     "PetCreate",
     "PetRead",

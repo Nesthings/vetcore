@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import CurrentClinic, get_current_clinic, require_clinic_roles
+from app.core.events import notify_user, record_audit
 from app.db.session import get_db
 from app.models import Appointment, ClinicBranch, Pet, User
 from app.schemas.appointment import AppointmentCreate, AppointmentRead, AppointmentUpdate
@@ -137,8 +138,34 @@ def update_appointment(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="end_time debe ser posterior a start_time",
             )
+    old_status = appointment.status
     for field, value in data.items():
         setattr(appointment, field, value)
+
+    # Auditoría + notificación al cambiar estado (cancelación/no-show)
+    if "status" in data and data["status"] != old_status:
+        record_audit(
+            db,
+            clinic_id=ctx.clinic["id"],
+            actor_type="user",
+            actor_id=ctx.user.sub,
+            action=f"appointment_{data['status']}",
+            entity_type="appointment",
+            entity_id=appointment.id,
+            metadata={"from": old_status, "to": data["status"]},
+        )
+        if data["status"] in ("cancelled", "no_show") and appointment.vet_user_id:
+            notify_user(
+                db,
+                clinic_id=ctx.clinic["id"],
+                user_id=appointment.vet_user_id,
+                type_="appointment_cancelled",
+                message=(
+                    f"Cita {data['status']} ({appointment.procedure_type}) para el "
+                    f"{appointment.start_time.astimezone().strftime('%d/%m %H:%M')}"
+                ),
+            )
+
     db.commit()
     db.refresh(appointment)
     return appointment

@@ -10,6 +10,7 @@ import {
   Receipt,
   Settings2,
   ShoppingCart,
+  History,
   Timer,
   UserRound,
   Users,
@@ -19,6 +20,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 
 import { useAuth } from '@/lib/auth'
 import { cn } from '@/lib/utils'
+import { NotificationBell } from '@/components/layout/NotificationBell'
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth()
@@ -60,6 +62,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       roles: ['admin'],
     },
     { to: '/reports', label: 'Reportes', icon: BarChart3, end: false },
+    { to: '/audit', label: 'Bitácora', icon: History, end: false },
     {
       to: '/reports/financial',
       label: 'Financiero',
@@ -149,10 +152,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       </aside>
 
       <main className="min-w-0 flex-1">
-        <header className="sticky top-0 z-10 flex h-14 items-center border-b border-border bg-background/80 px-6 backdrop-blur">
+        <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b border-border bg-background/80 px-6 backdrop-blur">
           <p className="text-sm text-muted-foreground">
             Bienvenido, <span className="font-medium text-foreground">{user?.role}</span>
           </p>
+          <NotificationBell />
         </header>
         <div className="p-6">{children}</div>
       </main>

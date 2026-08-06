@@ -7,6 +7,7 @@ import { ForgotPassword } from '@/pages/auth/ForgotPassword'
 import { Login } from '@/pages/auth/Login'
 import { ResetPassword } from '@/pages/auth/ResetPassword'
 import { Agenda } from '@/pages/Agenda'
+import { Audit } from '@/pages/Audit'
 import { Automation } from '@/pages/Automation'
 import { Dashboard } from '@/pages/Dashboard'
 import { DesignSystem } from '@/pages/DesignSystem'
@@ -77,6 +78,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <Reports />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/audit"
+            element={
+              <ProtectedRoute>
+                <Audit />
               </ProtectedRoute>
             }
           />

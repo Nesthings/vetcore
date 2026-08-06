@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import CurrentClinic, require_clinic_roles
 from app.api.inventory import allocate_fifo
+from app.core.events import record_audit
 from app.db.session import get_db
 from app.models import (
     Clinic,
@@ -258,4 +259,14 @@ def cancel_invoice(
 ) -> None:
     invoice = _get_invoice_or_404(db, ctx.clinic["id"], invoice_id)
     invoice.status = "cancelled"
+    record_audit(
+        db,
+        clinic_id=ctx.clinic["id"],
+        actor_type="user",
+        actor_id=ctx.user.sub,
+        action="invoice_cancelled",
+        entity_type="invoice",
+        entity_id=invoice.id,
+        metadata={"total": float(invoice.total)},
+    )
     db.commit()

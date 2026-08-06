@@ -14,6 +14,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps import CurrentClinic, get_current_clinic, require_clinic_roles
+from app.core.events import notify_roles
 from app.db.session import get_db
 from app.models import InventoryLot, InventoryMovement, InventoryProduct
 from app.schemas.inventory import (
@@ -31,6 +32,24 @@ INVENTORY_MUTATORS = ("admin", "veterinario")
 
 EXPIRATION_ALERT_DAYS = 30
 FORECAST_WINDOW_DAYS = 30
+LOW_STOCK_THRESHOLD = 5
+
+
+def _maybe_notify_low_stock(db: Session, ctx: CurrentClinic, product: InventoryProduct) -> None:
+    """Notifica a los admins si el stock del producto quedó bajo el umbral."""
+    stock = db.scalar(
+        select(func.coalesce(func.sum(InventoryMovement.quantity_delta), 0)).where(
+            InventoryMovement.product_id == product.id
+        )
+    )
+    if (stock or 0) < LOW_STOCK_THRESHOLD:
+        notify_roles(
+            db,
+            clinic_id=ctx.clinic["id"],
+            roles=["admin"],
+            type_="low_stock",
+            message=f"Stock bajo: {product.name} ({float(stock or 0)} en inventario)",
+        )
 
 
 def allocate_fifo(db: Session, product_id: str, quantity: float) -> list[tuple[str, float]]:
@@ -200,6 +219,8 @@ def create_lot(
             reason="purchase",
         )
     )
+    db.flush()
+    _maybe_notify_low_stock(db, ctx, product)
     db.commit()
     return _enrich(db, [product])[0]
 
@@ -223,6 +244,8 @@ def stock_entry(
             reason=body.reason,
         )
     )
+    db.flush()
+    _maybe_notify_low_stock(db, ctx, product)
     db.commit()
     return _enrich(db, [product])[0]
 
