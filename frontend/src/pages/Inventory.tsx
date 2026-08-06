@@ -43,6 +43,7 @@ export interface InventoryProduct {
   }[]
   expiring_soon: boolean
   expired: boolean
+  days_remaining?: number | null
 }
 
 function stockBadge(stock: number) {
@@ -151,6 +152,7 @@ export function Inventory() {
                 <TableHead>Unidad</TableHead>
                 <TableHead>Stock</TableHead>
                 <TableHead>Caducidad</TableHead>
+                <TableHead>Predicción</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
@@ -168,6 +170,19 @@ export function Inventory() {
                       <span className="inline-flex items-center gap-1">
                         <TriangleAlert className="size-3.5 text-warning" aria-hidden="true" />
                         <Badge variant="warning">Vence pronto</Badge>
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {p.days_remaining !== null && p.days_remaining !== undefined ? (
+                      <span className="text-sm text-muted-foreground">
+                        {p.days_remaining < 7 ? (
+                          <Badge variant="warning">~{p.days_remaining} días</Badge>
+                        ) : (
+                          `~${p.days_remaining} días`
+                        )}
                       </span>
                     ) : (
                       <span className="text-muted-foreground">—</span>

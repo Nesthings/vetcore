@@ -1,10 +1,12 @@
 """CRUD de productos, lotes y stock de inventario — por-tenant.
 
 El stock se deriva de la suma de `inventory_movements`; los lotes aportan
-la fecha de caducidad para las alertas (Subfase 1.5).
+la fecha de caducidad para las alertas (1.5) y el consumo FIFO (2.2).
+Incluye la predicción de agotamiento (days_remaining).
 """
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
@@ -28,6 +30,32 @@ router = APIRouter(prefix="/inventory", tags=["inventory"])
 INVENTORY_MUTATORS = ("admin", "veterinario")
 
 EXPIRATION_ALERT_DAYS = 30
+FORECAST_WINDOW_DAYS = 30
+
+
+def allocate_fifo(db: Session, product_id: str, quantity: float) -> list[tuple[str, float]]:
+    """Asigna el consumo de stock a lotes por FIFO (vence primero, primero en salir).
+
+    Devuelve [(lot_id, cantidad)] que cubren hasta `quantity`. Si los lotes no
+    alcanzan, la diferencia se consume sin lote (stock genérico).
+    """
+    lots = list(
+        db.scalars(
+            select(InventoryLot)
+            .where(InventoryLot.product_id == product_id, InventoryLot.quantity > 0)
+            .order_by(InventoryLot.expiration_date.asc().nulls_last(), InventoryLot.created_at)
+        )
+    )
+    remaining = Decimal(str(quantity))
+    allocation: list[tuple[str, float]] = []
+    for lot in lots:
+        if remaining <= 0:
+            break
+        take = min(Decimal(str(lot.quantity)), remaining)
+        lot.quantity = float(Decimal(str(lot.quantity)) - take)
+        allocation.append((str(lot.id), float(take)))
+        remaining -= take
+    return allocation
 
 
 def _enrich(db: Session, products: list[InventoryProduct]) -> list[dict]:
@@ -40,6 +68,20 @@ def _enrich(db: Session, products: list[InventoryProduct]) -> list[dict]:
         db.execute(
             select(InventoryMovement.product_id, func.sum(InventoryMovement.quantity_delta))
             .where(InventoryMovement.product_id.in_(product_ids))
+            .group_by(InventoryMovement.product_id)
+        ).all()
+    )
+
+    # Predicción de agotamiento: consumo por ventas de los últimos N días
+    since = datetime.now() - timedelta(days=FORECAST_WINDOW_DAYS)
+    sales_rows = dict(
+        db.execute(
+            select(InventoryMovement.product_id, func.sum(InventoryMovement.quantity_delta))
+            .where(
+                InventoryMovement.product_id.in_(product_ids),
+                InventoryMovement.reason == "sale",
+                InventoryMovement.created_at >= since,
+            )
             .group_by(InventoryMovement.product_id)
         ).all()
     )
@@ -62,12 +104,16 @@ def _enrich(db: Session, products: list[InventoryProduct]) -> list[dict]:
     for p in products:
         data = InventoryProductRead.model_validate(p).model_dump()
         lots = lots_by_product.get(p.id, [])
-        data["stock"] = float(stock_rows.get(p.id, 0))
+        stock = float(stock_rows.get(p.id, 0))
+        data["stock"] = stock
         data["lots"] = [InventoryLotRead.model_validate(lot).model_dump() for lot in lots]
         data["expiring_soon"] = any(
             lot.expiration_date and today <= lot.expiration_date <= soon for lot in lots
         )
         data["expired"] = any(lot.expiration_date and lot.expiration_date < today for lot in lots)
+        sold = float(sales_rows.get(p.id, 0) or 0)
+        daily_rate = max(0, -sold) / FORECAST_WINDOW_DAYS
+        data["days_remaining"] = round(stock / daily_rate, 1) if daily_rate > 0 else None
         out.append(data)
     return out
 

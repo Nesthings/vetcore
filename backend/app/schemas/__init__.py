@@ -38,6 +38,7 @@ from app.schemas.inventory import (
     InventoryProductUpdate,
     StockEntryCreate,
 )
+from app.schemas.kit import KitCreate, KitItemCreate, KitItemRead, KitRead, KitUpdate
 from app.schemas.pet import (
     ClinicalAlertCreate,
     ClinicalAlertRead,
@@ -50,6 +51,13 @@ from app.schemas.pet import (
     PetUpdate,
     PetWeightCreate,
     PetWeightRead,
+)
+from app.schemas.purchase import (
+    PurchaseOrderCreate,
+    PurchaseOrderItemCreate,
+    PurchaseOrderItemRead,
+    PurchaseOrderRead,
+    PurchaseOrderUpdate,
 )
 from app.schemas.services import ServiceCreate, ServiceRead, ServiceUpdate
 from app.schemas.staff import ProfileUpdate, UserCreate, UserRead, UserUpdate
@@ -85,6 +93,11 @@ __all__ = [
     "InvoiceItemRead",
     "InvoiceRead",
     "InvoiceUpdate",
+    "KitCreate",
+    "KitItemCreate",
+    "KitItemRead",
+    "KitRead",
+    "KitUpdate",
     "OwnerLinkRead",
     "OwnerTransferRequest",
     "OwnerTransferResponse",
@@ -94,6 +107,11 @@ __all__ = [
     "PetWeightCreate",
     "PetWeightRead",
     "ProfileUpdate",
+    "PurchaseOrderCreate",
+    "PurchaseOrderItemCreate",
+    "PurchaseOrderItemRead",
+    "PurchaseOrderRead",
+    "PurchaseOrderUpdate",
     "ScheduleBlockCreate",
     "ScheduleBlockRead",
     "ServiceCreate",

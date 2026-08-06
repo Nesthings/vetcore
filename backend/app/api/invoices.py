@@ -14,6 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import CurrentClinic, require_clinic_roles
+from app.api.inventory import allocate_fifo
 from app.db.session import get_db
 from app.models import (
     Clinic,
@@ -155,16 +156,30 @@ def create_invoice(
                 discount_percent=discount,
             )
         )
-        # Al facturar un producto, se descuenta stock (movimiento de venta)
+        # Al facturar un producto, se descuenta stock por FIFO (Subfase 2.2):
+        # consume primero los lotes que vencen antes.
         if item.product_id is not None:
-            db.add(
-                InventoryMovement(
-                    product_id=item.product_id,
-                    quantity_delta=-Decimal(str(item.quantity)),
-                    reason="sale",
-                    reference_id=invoice.id,
+            consumed = Decimal(str(item.quantity))
+            for lot_id, qty in allocate_fifo(db, str(item.product_id), float(item.quantity)):
+                db.add(
+                    InventoryMovement(
+                        product_id=item.product_id,
+                        lot_id=lot_id,
+                        quantity_delta=-Decimal(str(qty)),
+                        reason="sale",
+                        reference_id=invoice.id,
+                    )
                 )
-            )
+                consumed -= Decimal(str(qty))
+            if consumed > 0:
+                db.add(
+                    InventoryMovement(
+                        product_id=item.product_id,
+                        quantity_delta=-consumed,
+                        reason="sale",
+                        reference_id=invoice.id,
+                    )
+                )
 
     invoice.total = total.quantize(Decimal("0.01"))
     db.add(invoice)

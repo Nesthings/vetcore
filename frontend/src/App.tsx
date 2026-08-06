@@ -11,12 +11,14 @@ import { Dashboard } from '@/pages/Dashboard'
 import { DesignSystem } from '@/pages/DesignSystem'
 import { Inventory } from '@/pages/Inventory'
 import { Invoices } from '@/pages/Invoices'
+import { Kits } from '@/pages/Kits'
 import { NewConsultation } from '@/pages/NewConsultation'
 import { OwnerPetDetail } from '@/pages/owner/OwnerPetDetail'
 import { OwnerPortal } from '@/pages/owner/OwnerPortal'
 import { PetDetail } from '@/pages/PetDetail'
 import { Pets } from '@/pages/Pets'
 import { Profile } from '@/pages/Profile'
+import { PurchaseOrders } from '@/pages/PurchaseOrders'
 import { Services } from '@/pages/Services'
 import { Settings } from '@/pages/Settings'
 import { SuperAdminPanel } from '@/pages/superadmin/SuperAdminPanel'
@@ -78,6 +80,22 @@ function App() {
             element={
               <ProtectedRoute>
                 <Inventory />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/kits"
+            element={
+              <ProtectedRoute roles={['admin', 'veterinario']}>
+                <Kits />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/purchase-orders"
+            element={
+              <ProtectedRoute roles={['admin']}>
+                <PurchaseOrders />
               </ProtectedRoute>
             }
           />

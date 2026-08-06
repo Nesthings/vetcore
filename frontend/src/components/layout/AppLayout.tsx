@@ -5,8 +5,10 @@ import {
   LogOut,
   Package,
   PawPrint,
+  PackageOpen,
   Receipt,
   Settings2,
+  ShoppingCart,
   UserRound,
   Users,
 } from 'lucide-react'
@@ -32,6 +34,20 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     { to: '/agenda', label: 'Agenda', icon: CalendarDays, end: false },
     { to: '/pets', label: 'Pacientes', icon: Users, end: false },
     { to: '/inventory', label: 'Inventario', icon: Package, end: false },
+    {
+      to: '/kits',
+      label: 'Kits',
+      icon: PackageOpen,
+      end: false,
+      roles: ['admin', 'veterinario'],
+    },
+    {
+      to: '/purchase-orders',
+      label: 'Compras',
+      icon: ShoppingCart,
+      end: false,
+      roles: ['admin'],
+    },
     {
       to: '/templates',
       label: 'Plantillas',

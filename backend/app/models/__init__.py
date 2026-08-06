@@ -9,7 +9,15 @@ from app.models.consultation import (
     ConsultationSummaryPdf,
     ConsultationTemplate,
 )
-from app.models.inventory import InventoryLot, InventoryMovement, InventoryProduct
+from app.models.inventory import (
+    InventoryKit,
+    InventoryKitItem,
+    InventoryLot,
+    InventoryMovement,
+    InventoryProduct,
+    PurchaseOrder,
+    PurchaseOrderItem,
+)
 from app.models.pet import ClinicalAlert, Pet, PetWeightRecord
 from app.models.staff import User
 
@@ -27,10 +35,14 @@ __all__ = [
     "InventoryLot",
     "InventoryMovement",
     "InventoryProduct",
+    "InventoryKit",
+    "InventoryKitItem",
     "Invoice",
     "InvoiceItem",
     "Pet",
     "PetWeightRecord",
+    "PurchaseOrder",
+    "PurchaseOrderItem",
     "ScheduleBlock",
     "ServiceCatalog",
     "User",

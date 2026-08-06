@@ -15,8 +15,10 @@ from app.api import (
     health,
     inventory,
     invoices,
+    kits,
     owner,
     pets,
+    purchase_orders,
     schedule_blocks,
     services,
     templates,
@@ -51,6 +53,8 @@ app.include_router(schedule_blocks.router, prefix="/api/v1")
 app.include_router(dashboard.router, prefix="/api/v1")
 app.include_router(inventory.router, prefix="/api/v1")
 app.include_router(invoices.router, prefix="/api/v1")
+app.include_router(kits.router, prefix="/api/v1")
+app.include_router(purchase_orders.router, prefix="/api/v1")
 app.include_router(services.router, prefix="/api/v1")
 app.include_router(templates.router, prefix="/api/v1")
 app.include_router(dose.router, prefix="/api/v1")

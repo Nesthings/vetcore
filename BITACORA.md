@@ -554,4 +554,43 @@ Las verificaciones de frontend deben ejercitar el código JS real (no solo el ba
 
 ---
 
-**Siguiente subfase:** 2.2 — Inventario avanzado (lotes FIFO por caducidad, kits con descuento, predicción de agotamiento, órdenes de compra).
+## Subfase 2.2 — Inventario avanzado (FIFO, kits, predicción, órdenes de compra) ✅
+
+**Fecha:** 2026-08-05
+
+### Qué se hizo
+**Backend:**
+- Migración `0006`: `price` en `inventory_kits` (decisión: kit con precio propio).
+- Modelos `InventoryKit`, `InventoryKitItem`, `PurchaseOrder`, `PurchaseOrderItem`.
+- **FIFO por caducidad:** `allocate_fifo()` en `inventory.py` consume primero los lotes que vencen antes; se aplica al facturar productos (movimientos de venta por lote y descuento de `lot.quantity`).
+- **Predicción de agotamiento:** `days_remaining` en el inventario = stock ÷ consumo diario (ventas de los últimos 30 días).
+- CRUD `/kits` (admin/veterinario) con nombres de productos.
+- CRUD `/purchase-orders` (admin): borrador → enviada → recibida; al **recibir**, crea los movimientos de entrada de stock automáticamente. Una orden recibida no se modifica; solo se eliminan borradores.
+
+**Frontend:**
+- Inventario: columna **Predicción** (badge si quedan <7 días).
+- `Kits` (`/kits`, admin/vet): CRUD con componentes y precio.
+- `PurchaseOrders` (`/purchase-orders`, admin): crear orden, cambiar estado (Enviar/Recibir/Cancelar).
+- Facturación: optgroup **Kits** en el selector de conceptos (el kit se factura como línea con su precio).
+
+### Decisiones técnicas y por qué
+- **Kit con precio propio (aprobado):** el esquema no tiene precios de productos ni de kits; se agregó `price` al kit y se factura como una línea de bundle. El "descuento múltiple" queda implícito en el precio del conjunto.
+- **FIFO real al facturar:** no solo visual; el movimiento de venta referencia el lote vencido primero. `lot.quantity` y el libro de movimientos se mantienen consistentes.
+- **Recibir PO → movimientos `purchase`** (sin lote): el esquema de PO no trae lotes/caducidades; el FIFO aplica a los lotes que existan.
+- **Predicción simple** (media de 30 días) sin modelos de serie temporal; suficiente para el MVP.
+
+### Verificado
+- FIFO: producto con L-2026 (vence antes, 5) y L-2027 (10); venta de 7 → consume los 5 del L-2026 y 2 del L-2027 (quedan 0 y 8) ✓
+- `days_remaining`: 34.3 días (8 ÷ 7/30) ✓; tras recibir PO (28) → 120 ✓
+- Kit creado con precio y componentes ✓
+- PO: crear (draft) → recibir → stock +20 ✓
+- Inventario/kits/PO vía proxy: 200 ✓
+- Ruff + lint 0 errores + build OK ✓
+
+### Notas / pendientes
+- Datos de prueba: kit "Kit vacunación" (899), producto "Analgésico" con 2 lotes, 2 órdenes de compra.
+- Quedan 2 "Amoxicilina 250mg" en distintas sucursales (ruido de pruebas anterior).
+
+---
+
+**Siguiente subfase:** 2.3 — Agenda avanzada (lista de espera + confirmación automática escalonada 48h/24h/2h).

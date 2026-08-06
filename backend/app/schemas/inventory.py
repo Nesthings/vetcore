@@ -54,3 +54,4 @@ class InventoryProductRead(BaseModel):
     lots: list[InventoryLotRead] = Field(default_factory=list)
     expiring_soon: bool = False
     expired: bool = False
+    days_remaining: float | None = None
