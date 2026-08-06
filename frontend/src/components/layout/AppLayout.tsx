@@ -17,7 +17,7 @@ import {
   Syringe,
 } from 'lucide-react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { useAuth } from '@/lib/auth'
 import { cn } from '@/lib/utils'
@@ -49,19 +49,34 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const { hasComponent } = usePermissions()
   const navigate = useNavigate()
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [fullName, setFullName] = useState<string | null>(null)
+  const [profileOpen, setProfileOpen] = useState(false)
+  const profileRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!user?.clinic_id) return
     let cancelled = false
-    apiFetch<{ photo_url?: string | null }>('/auth/me')
+    apiFetch<{ photo_url?: string | null; full_name?: string | null }>('/auth/me')
       .then((me) => {
-        if (!cancelled && me.photo_url) setAvatarUrl(me.photo_url)
+        if (cancelled) return
+        if (me.photo_url) setAvatarUrl(me.photo_url)
+        if (me.full_name) setFullName(me.full_name)
       })
       .catch(() => undefined)
     return () => {
       cancelled = true
     }
   }, [user?.clinic_id, user?.sub])
+
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setProfileOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onClick)
+    return () => document.removeEventListener('mousedown', onClick)
+  }, [])
 
   const NAV_ITEMS = NAV_ROUTES.filter((i) => hasComponent(i.component)).map((i) => ({
     ...i,
@@ -72,6 +87,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     logout()
     navigate('/login', { replace: true })
   }
+
+  const displayName = fullName ?? user?.role ?? ''
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -106,47 +123,60 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             </NavLink>
           ))}
         </nav>
-
-        <div className="border-t border-border p-3">
-          <div className="mb-2 flex items-center gap-2 px-1">
-            <div className="relative flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-secondary text-xs font-semibold text-secondary-foreground">
-              {avatarUrl ? (
-                <img src={avatarUrl} alt={user?.role ?? ''} className="size-full object-cover" />
-              ) : (
-                user?.role?.[0]?.toUpperCase()
-              )}
-            </div>
-            <div className="leading-tight">
-              <p className="text-xs font-medium text-foreground">{user?.role}</p>
-              <p className="text-[11px] text-muted-foreground">
-                Clínica {user?.clinic_id?.slice(0, 8)}
-              </p>
-            </div>
-          </div>
-          <NavLink
-            to="/profile"
-            className="mb-1 flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-          >
-            <UserRound className="size-4" aria-hidden="true" />
-            Mi perfil
-          </NavLink>
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-          >
-            <LogOut className="size-4" aria-hidden="true" />
-            Cerrar sesión
-          </button>
-        </div>
       </aside>
 
       <main className="min-w-0 flex-1">
         <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b border-border bg-background/80 px-6 backdrop-blur">
           <p className="text-sm text-muted-foreground">
-            Bienvenido, <span className="font-medium text-foreground">{user?.role}</span>
+            Hola, <span className="font-medium text-foreground">{displayName}</span>
           </p>
-          <NotificationBell />
+          <div className="flex items-center gap-2">
+            <NotificationBell />
+            <div ref={profileRef} className="relative">
+              <button
+                type="button"
+                onClick={() => setProfileOpen((o) => !o)}
+                className="flex size-9 items-center justify-center overflow-hidden rounded-full border border-border bg-secondary text-xs font-semibold text-secondary-foreground transition-colors hover:bg-accent"
+                aria-label="Menú de perfil"
+              >
+                {avatarUrl ? (
+                  <img
+                    src={avatarUrl}
+                    alt={displayName}
+                    className="size-full object-cover"
+                    onClick={() => setProfileOpen((o) => !o)}
+                  />
+                ) : (
+                  <span>{displayName?.[0]?.toUpperCase() ?? user?.role?.[0]?.toUpperCase()}</span>
+                )}
+              </button>
+
+              {profileOpen && (
+                <div className="absolute right-0 top-12 z-50 w-56 overflow-hidden rounded-xl border border-border bg-card shadow-dialog">
+                  <div className="border-b border-border px-3 py-2.5">
+                    <p className="truncate text-sm font-semibold text-foreground">{displayName}</p>
+                    <p className="text-xs capitalize text-muted-foreground">{user?.role}</p>
+                  </div>
+                  <NavLink
+                    to="/profile"
+                    onClick={() => setProfileOpen(false)}
+                    className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                  >
+                    <UserRound className="size-4" aria-hidden="true" />
+                    Ver perfil
+                  </NavLink>
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="flex w-full items-center gap-3 border-t border-border px-3 py-2.5 text-sm font-medium text-destructive transition-colors hover:bg-accent"
+                  >
+                    <LogOut className="size-4" aria-hidden="true" />
+                    Cerrar sesión
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
         </header>
         <div className="p-6">{children}</div>
       </main>
