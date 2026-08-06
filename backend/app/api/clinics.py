@@ -22,7 +22,7 @@ from app.api.deps import (
 )
 from app.core.events import record_audit
 from app.core.images import process_cartilla_photo
-from app.core.security import hash_password
+from app.core.security import create_access_token, hash_password
 from app.core.storage import (
     ALLOWED_IMAGE_EXTENSIONS,
     public_url,
@@ -39,6 +39,7 @@ from app.models import (
     Pet,
     User,
 )
+from app.schemas.auth import LoginResponse
 from app.schemas.clinic import (
     ClinicCreate,
     ClinicRead,
@@ -132,6 +133,61 @@ def _get_clinic_or_404(db: Session, clinic_id: str) -> Clinic:
     if clinic is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Clínica no encontrada")
     return clinic
+
+
+@router.post(
+    "/register",
+    response_model=LoginResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Alta autogestionada de una clínica (modelo de un solo admin)",
+)
+def register_clinic(
+    body: ClinicCreate,
+    db: Session = Depends(get_db),
+) -> LoginResponse:
+    """Crea el tenant + su primer super-usuario (admin) y devuelve un token
+    de sesión, de modo que el admin arranca directo el wizard de configuración.
+
+    Sin nivel de plataforma: cada clínica se registra sola (idea del usuario).
+    """
+    if body.first_admin is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El registro requiere el primer super-usuario (first_admin)",
+        )
+
+    data = body.model_dump(exclude={"first_admin"})
+    clinic = Clinic(**data, setup_completed=False)
+    db.add(clinic)
+    db.flush()
+
+    admin_data = body.first_admin.model_dump()
+    admin = User(
+        clinic_id=clinic.id,
+        role="admin",
+        full_name=admin_data["full_name"],
+        email=admin_data["email"],
+        password_hash=hash_password(admin_data["password"]),
+        professional_title=admin_data.get("professional_title"),
+        cedula=admin_data.get("cedula"),
+    )
+    db.add(admin)
+    db.commit()
+    db.refresh(admin)
+
+    token = create_access_token(
+        subject=str(admin.id),
+        role="admin",
+        clinic_id=str(clinic.id),
+        branch_id=None,
+    )
+    return LoginResponse(
+        access_token=token,
+        role="admin",
+        sub=str(admin.id),
+        clinic_id=str(clinic.id),
+        branch_id=None,
+    )
 
 
 @router.get("/{clinic_id}", response_model=ClinicRead)

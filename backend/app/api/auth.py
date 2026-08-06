@@ -373,9 +373,10 @@ def reset_password(
     summary="Perfiles visibles para el login con foto (idea 1)",
 )
 def login_candidates(db: Session = Depends(get_db)) -> dict:
-    """Lista los staff con `is_visible_on_login=true` agrupados por clínica
-    y los super-admins, para la rejilla de selección de usuario con foto.
+    """Lista los staff con `is_visible_on_login=true` agrupados por clínica,
+    para la rejilla de selección de usuario con foto.
 
+    Modelo de un solo admin: no hay super-admin de plataforma visible.
     Solo devuelve perfiles activos de clínicas con suscripción activa/trial.
     No incluye el email en la rejilla (se pide en el paso de contraseña).
     """
@@ -404,24 +405,7 @@ def login_candidates(db: Session = Depends(get_db)) -> dict:
                 "photo_url": row["photo_url"],
             }
         )
-
-    supers = db.execute(
-        text(
-            "SELECT id, full_name, email, photo_url FROM super_admins WHERE is_active = true"
-        )
-    ).mappings()
-    return {
-        "clinics": list(by_clinic.values()),
-        "super_admins": [
-            {
-                "id": s["id"],
-                "full_name": s["full_name"],
-                "email": s["email"],
-                "photo_url": s["photo_url"],
-            }
-            for s in supers
-        ],
-    }
+    return {"clinics": list(by_clinic.values())}
 
 
 @router.post(

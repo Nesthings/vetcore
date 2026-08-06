@@ -950,4 +950,40 @@ La pantalla de inicio ahora muestra la rejilla de perfiles con foto para selecci
 
 ---
 
+## Subfase 2.12 — Modelo de un solo admin (corrección de rol) + wizard ampliado ✅
+
+**Fecha:** 2026-08-06
+
+### Qué se hizo
+Corrección del modelo conceptual: el usuario aclaró que **el admin de la clínica es el super usuario** (no existe un "Super Admin de plataforma" en la UX). Todo se gestiona desde la clínica.
+
+**Modelo de un solo admin:**
+- `POST /clinics/register` (público): crea la clínica + su primer super-usuario (admin) y devuelve token → el admin arranca directo el wizard. Ya no depende de un super-admin de plataforma.
+- `/auth/login-candidates` ya **no** expone super-admins (solo staff por clínica).
+- Se eliminaron la ruta `/super-admin` y el `SuperAdminPanel` + diálogos de plataforma (`pages/superadmin`, `components/superadmin`).
+- El rol `super-admin` queda en el backend por compatibilidad, pero no tiene entrada por UI.
+
+**Wizard ampliado (solicitud del usuario):**
+- **Dependientes por sucursal**: el paso Equipo ahora agrupa por sucursal (agregar dependientes a cada sucursal concreta).
+- **Puestos**: lista predefinida de puestos (`PUESTOS`: Director, Encargado de sucursal, Veterinario, Cirujano, Dermatólogo, Recepción, Auxiliar, Administrativo) para super-usuario y dependientes (→ `job_title`).
+- **Privilegios**: el paso Accesos ahora es un toggle **activar/desactivar** (botón SÍ/NO) por pantalla, en lugar de checkbox.
+- Organigrama renombrado a "Organigrama y encargados" (muestra puesto + jefe).
+
+### Decisiones técnicas y por qué
+- **Registro público con token**: sin nivel de plataforma, la primera interacción es "crear mi clínica" desde el login → wizard. El alta queda atómica (clínica + admin + sesión).
+- **Se conservan `super_admins` y `/auth/login/super-admin` en backend** por compatibilidad/diagnóstico, pero sin acceso desde la UI (decisión reversible).
+- Los datos de prueba (Test/Beta/Suspendida y las clínicas creadas durante pruebas) se eliminaron; el sistema queda vacío para que el usuario cree su clínica.
+
+### Verificado
+- `POST /clinics/register` crea clínica + admin y devuelve token ✓
+- `login-candidates` solo devuelve `clinics` (sin super-admins) ✓
+- Wizard por API: sucursales, dependiente con puesto (`job_title`), permisos ✓
+- Ruff + lint 0 errores + build OK ✓
+
+### Notas / pendientes
+- El backend conserva el rol `super-admin` (login + seed) sin UI; se puede eliminar después si se confirma que no hará falta.
+- Queda en `TODO.md` el acceso del dueño por token.
+
+---
+
 **Siguiente subfase:** 3.1 — Transcripción/resumen de consulta por voz con IA.

@@ -60,6 +60,7 @@ interface StaffUser {
   branch_id?: string | null
   professional_title?: string | null
   cedula?: string | null
+  job_title?: string | null
 }
 
 interface UserComponents {
@@ -75,9 +76,21 @@ interface TeamMember {
   password: string
   role: string
   branch_id: string
+  job_title: string
   professional_title: string
   cedula: string
 }
+
+const PUESTOS = [
+  'Director(a)',
+  'Encargado(a) de sucursal',
+  'Veterinario(a)',
+  'Cirujano(a)',
+  'Dermatólogo(a)',
+  'Recepción',
+  'Auxiliar',
+  'Administrativo(a)',
+]
 
 const ROLE_LABELS: Record<string, string> = {
   admin: 'Admin',
@@ -152,7 +165,7 @@ export function SetupWizard() {
           full_name: me.full_name,
           professional_title: me.professional_title ?? '',
           cedula: me.cedula ?? '',
-          job_title: '',
+          job_title: me.job_title ?? '',
           specialty: '',
           phone: '',
         })
@@ -211,6 +224,7 @@ export function SetupWizard() {
               password: t.password,
               role: t.role,
               branch_id: t.branch_id || null,
+              job_title: t.job_title.trim() || null,
               professional_title: t.professional_title.trim() || null,
               cedula: t.cedula.trim() || null,
             }),
@@ -283,21 +297,6 @@ export function SetupWizard() {
     } catch {
       /* sin componentes aún */
     }
-  }
-
-  const addTeamRow = () => {
-    setTeam((prev) => [
-      ...prev,
-      {
-        full_name: '',
-        email: '',
-        password: '',
-        role: 'veterinario',
-        branch_id: branchOptions[0]?.id ?? '',
-        professional_title: '',
-        cedula: '',
-      },
-    ])
   }
 
   const setTeamField = (idx: number, field: keyof TeamMember, value: string) => {
@@ -491,12 +490,19 @@ export function SetupWizard() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Cargo</Label>
-                  <Input
+                  <Label>Cargo / puesto</Label>
+                  <select
                     value={superForm.job_title}
                     onChange={(e) => setSuperForm({ ...superForm, job_title: e.target.value })}
-                    placeholder="ej. Director"
-                  />
+                    className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  >
+                    <option value="">— Elegir puesto —</option>
+                    {PUESTOS.map((p) => (
+                      <option key={p} value={p}>
+                        {p}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div className="space-y-2">
                   <Label>Especialidad</Label>
@@ -589,118 +595,181 @@ export function SetupWizard() {
           {step === 3 && (
             <div className="space-y-4">
               <div>
-                <h2 className="text-lg font-semibold">Equipo</h2>
+                <h2 className="text-lg font-semibold">Dependientes por sucursal</h2>
                 <p className="text-sm text-muted-foreground">
-                  Agrega a los dependientes: veterinarios y recepción.
+                  Agrega al equipo y asígnalo a su sucursal y puesto. Cada uno verá su propio panel
+                  según su rol.
                 </p>
               </div>
-              {team.length === 0 && (
-                <p className="rounded-md border border-border/60 bg-secondary/50 px-3 py-2 text-sm text-muted-foreground">
-                  Puedes agregar el equipo ahora o después en Configuración.
+
+              {branchOptions.length === 0 && (
+                <p className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                  Primero define al menos una sucursal en el paso anterior.
                 </p>
               )}
-              {team.map((t, i) => (
-                <div key={i} className="space-y-3 rounded-md border border-border/60 p-4">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium">Dependiente {i + 1}</p>
+
+              {branchOptions.map((b) => {
+                const members = team.filter((t) => t.branch_id === b.id)
+                return (
+                  <div key={b.id} className="rounded-md border border-border/60 p-4">
+                    <div className="mb-3 flex items-center justify-between">
+                      <p className="text-sm font-semibold">{b.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {members.length} dependiente{members.length === 1 ? '' : 's'}
+                      </p>
+                    </div>
+                    {members.length === 0 && (
+                      <p className="mb-3 text-sm text-muted-foreground">
+                        Sin dependientes asignados todavía.
+                      </p>
+                    )}
+                    {members.map((t, i) => {
+                      const globalIdx = team.indexOf(t)
+                      return (
+                        <div
+                          key={i}
+                          className="mb-3 space-y-3 rounded-md border border-border/50 p-3"
+                        >
+                          <div className="flex items-center justify-between">
+                            <p className="text-sm font-medium">
+                              {t.full_name || 'Nuevo dependiente'} ·{' '}
+                              <span className="font-normal text-muted-foreground">
+                                {t.job_title || 'sin puesto'}
+                              </span>
+                            </p>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive"
+                              onClick={() =>
+                                setTeam((prev) => prev.filter((_, j) => j !== globalIdx))
+                              }
+                            >
+                              Quitar
+                            </Button>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1.5">
+                              <Label>Nombre completo *</Label>
+                              <Input
+                                value={t.full_name}
+                                onChange={(e) =>
+                                  setTeamField(globalIdx, 'full_name', e.target.value)
+                                }
+                                required
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label>Correo *</Label>
+                              <Input
+                                type="email"
+                                value={t.email}
+                                onChange={(e) => setTeamField(globalIdx, 'email', e.target.value)}
+                                required
+                              />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1.5">
+                              <Label>Contraseña *</Label>
+                              <Input
+                                type="password"
+                                value={t.password}
+                                onChange={(e) =>
+                                  setTeamField(globalIdx, 'password', e.target.value)
+                                }
+                                minLength={8}
+                                required
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label>Puesto *</Label>
+                              <select
+                                value={t.job_title}
+                                onChange={(e) =>
+                                  setTeamField(globalIdx, 'job_title', e.target.value)
+                                }
+                                required
+                                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                              >
+                                <option value="">— Elegir puesto —</option>
+                                {PUESTOS.map((p) => (
+                                  <option key={p} value={p}>
+                                    {p}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1.5">
+                              <Label>Rol de acceso *</Label>
+                              <select
+                                value={t.role}
+                                onChange={(e) => setTeamField(globalIdx, 'role', e.target.value)}
+                                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                              >
+                                <option value="veterinario">Veterinario</option>
+                                <option value="recepcion">Recepción</option>
+                                <option value="admin">Admin</option>
+                              </select>
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label>Cédula profesional</Label>
+                              <Input
+                                value={t.cedula}
+                                onChange={(e) => setTeamField(globalIdx, 'cedula', e.target.value)}
+                              />
+                            </div>
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label>Título profesional</Label>
+                            <Input
+                              value={t.professional_title}
+                              onChange={(e) =>
+                                setTeamField(globalIdx, 'professional_title', e.target.value)
+                              }
+                              placeholder="ej. MVZ"
+                            />
+                          </div>
+                        </div>
+                      )
+                    })}
                     <Button
                       type="button"
-                      variant="ghost"
+                      variant="outline"
                       size="sm"
-                      className="text-destructive"
-                      onClick={() => setTeam((prev) => prev.filter((_, j) => j !== i))}
+                      onClick={() =>
+                        setTeam((prev) => [
+                          ...prev,
+                          {
+                            full_name: '',
+                            email: '',
+                            password: '',
+                            role: 'veterinario',
+                            branch_id: b.id,
+                            job_title: '',
+                            professional_title: '',
+                            cedula: '',
+                          },
+                        ])
+                      }
                     >
-                      Quitar
+                      + Agregar dependiente a {b.name}
                     </Button>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1.5">
-                      <Label>Nombre completo *</Label>
-                      <Input
-                        value={t.full_name}
-                        onChange={(e) => setTeamField(i, 'full_name', e.target.value)}
-                        required
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label>Correo *</Label>
-                      <Input
-                        type="email"
-                        value={t.email}
-                        onChange={(e) => setTeamField(i, 'email', e.target.value)}
-                        required
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1.5">
-                      <Label>Contraseña *</Label>
-                      <Input
-                        type="password"
-                        value={t.password}
-                        onChange={(e) => setTeamField(i, 'password', e.target.value)}
-                        minLength={8}
-                        required
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label>Rol *</Label>
-                      <select
-                        value={t.role}
-                        onChange={(e) => setTeamField(i, 'role', e.target.value)}
-                        className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                      >
-                        <option value="veterinario">Veterinario</option>
-                        <option value="recepcion">Recepción</option>
-                        <option value="admin">Admin</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1.5">
-                      <Label>Sucursal</Label>
-                      <select
-                        value={t.branch_id}
-                        onChange={(e) => setTeamField(i, 'branch_id', e.target.value)}
-                        className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                      >
-                        <option value="">— Sin sucursal —</option>
-                        {branchOptions.map((b) => (
-                          <option key={b.id} value={b.id}>
-                            {b.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label>Cédula profesional</Label>
-                      <Input
-                        value={t.cedula}
-                        onChange={(e) => setTeamField(i, 'cedula', e.target.value)}
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Título profesional</Label>
-                    <Input
-                      value={t.professional_title}
-                      onChange={(e) => setTeamField(i, 'professional_title', e.target.value)}
-                    />
-                  </div>
-                </div>
-              ))}
-              <Button type="button" variant="outline" size="sm" onClick={addTeamRow}>
-                + Agregar dependiente
-              </Button>
+                )
+              })}
             </div>
           )}
 
           {step === 4 && (
             <div className="space-y-4">
               <div>
-                <h2 className="text-lg font-semibold">Organigrama</h2>
+                <h2 className="text-lg font-semibold">Organigrama y encargados</h2>
                 <p className="text-sm text-muted-foreground">
-                  Define quién reporta a quién (relación jefe–subordinado).
+                  Define quién es encargado de quién (jefe–subordinado) dentro de cada sucursal.
                 </p>
               </div>
               <div className="space-y-2">
@@ -712,7 +781,7 @@ export function SetupWizard() {
                     <div className="min-w-0">
                       <p className="text-sm font-medium">{u.full_name}</p>
                       <p className="text-xs text-muted-foreground">
-                        {ROLE_LABELS[u.role] ?? u.role}
+                        {u.job_title ?? ROLE_LABELS[u.role] ?? u.role}
                       </p>
                     </div>
                     <select
@@ -723,7 +792,7 @@ export function SetupWizard() {
                       aria-label={`Reporta a ${u.full_name}`}
                       className="h-8 w-48 shrink-0 rounded-md border border-input bg-background px-2 text-sm"
                     >
-                      <option value="">— Sin responsable —</option>
+                      <option value="">— Sin encargado —</option>
                       {users
                         .filter((x) => x.id !== u.id)
                         .map((x) => (
@@ -741,16 +810,21 @@ export function SetupWizard() {
           {step === 5 && (
             <div className="space-y-4">
               <div>
-                <h2 className="text-lg font-semibold">Accesos a componentes</h2>
+                <h2 className="text-lg font-semibold">Privilegios</h2>
                 <p className="text-sm text-muted-foreground">
-                  Activa o desactiva módulos por usuario (los valores por defecto son según el rol).
+                  Activa o desactiva el acceso a cada pantalla del panel por usuario.
                 </p>
               </div>
               <div className="space-y-4">
                 {users.map((u) => (
                   <div key={u.id} className="rounded-md border border-border/60 p-4">
                     <div className="mb-2 flex items-center justify-between">
-                      <p className="text-sm font-medium">{u.full_name}</p>
+                      <p className="text-sm font-medium">
+                        {u.full_name}
+                        <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                          {ROLE_LABELS[u.role] ?? u.role}
+                        </span>
+                      </p>
                       <Button
                         type="button"
                         variant="ghost"
@@ -761,39 +835,38 @@ export function SetupWizard() {
                       </Button>
                     </div>
                     {userComponents[u.id] ? (
-                      <div className="grid gap-1.5">
+                      <div className="space-y-1.5">
                         {userComponents[u.id].catalog.map((c) => {
-                          const isDefault = userComponents[u.id].defaults.includes(c.slug)
                           const checked = accessOverride[u.id]?.[c.slug] ?? false
                           return (
-                            <label
+                            <div
                               key={c.slug}
                               className="flex items-center justify-between rounded-md border border-border/50 px-3 py-1.5 text-sm"
                             >
-                              <span>
-                                {c.label}
-                                {isDefault ? (
-                                  <span className="ml-1 text-[11px] text-muted-foreground">
-                                    (según rol)
-                                  </span>
-                                ) : null}
-                              </span>
-                              <input
-                                type="checkbox"
-                                checked={checked}
-                                onChange={(e) =>
+                              <span>{c.label}</span>
+                              <button
+                                type="button"
+                                onClick={() =>
                                   setAccessOverride((prev) => ({
                                     ...prev,
-                                    [u.id]: { ...prev[u.id], [c.slug]: e.target.checked },
+                                    [u.id]: { ...prev[u.id], [c.slug]: !checked },
                                   }))
                                 }
-                              />
-                            </label>
+                                aria-pressed={checked}
+                                className={`flex h-7 w-14 items-center rounded-full px-1 transition-colors ${
+                                  checked ? 'justify-end bg-success' : 'justify-start bg-secondary'
+                                }`}
+                              >
+                                <span className="flex size-5 items-center justify-center rounded-full bg-background text-[10px] font-semibold text-foreground shadow-sm">
+                                  {checked ? 'SÍ' : 'NO'}
+                                </span>
+                              </button>
+                            </div>
                           )
                         })}
                         <p className="text-[11px] text-muted-foreground">
                           {Object.values(accessOverride[u.id] ?? {}).filter(Boolean).length} de{' '}
-                          {userComponents[u.id].catalog.length} activos
+                          {userComponents[u.id].catalog.length} pantallas activas
                         </p>
                       </div>
                     ) : (

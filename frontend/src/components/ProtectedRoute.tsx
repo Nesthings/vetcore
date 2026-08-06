@@ -6,7 +6,6 @@ import { usePermissions } from '@/lib/permissions'
 import { useSetup } from '@/lib/setup'
 
 const ROLE_HOME: Record<string, string> = {
-  'super-admin': '/super-admin',
   owner: '/portal',
   admin: '/',
   veterinario: '/',
@@ -49,7 +48,11 @@ export function ProtectedRoute({
     return <AccessDenied />
   }
 
-  if (component && !hasComponent(component)) {
+  // El check de componente solo aplica al staff de clínica. Super-admin y
+  // owner tienen su propio panel/portal sin componentes.
+  const isStaff =
+    user?.role === 'admin' || user?.role === 'veterinario' || user?.role === 'recepcion'
+  if (isStaff && component && !hasComponent(component)) {
     return <AccessDenied />
   }
 

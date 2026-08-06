@@ -29,7 +29,6 @@ import { Reports } from '@/pages/Reports'
 import { Services } from '@/pages/Services'
 import { Settings } from '@/pages/Settings'
 import { SetupWizard } from '@/pages/SetupWizard'
-import { SuperAdminPanel } from '@/pages/superadmin/SuperAdminPanel'
 import { Templates } from '@/pages/Templates'
 import { Waitlist } from '@/pages/Waitlist'
 
@@ -211,14 +210,6 @@ function App() {
                 element={
                   <ProtectedRoute roles={['owner']}>
                     <OwnerInvoices />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/super-admin"
-                element={
-                  <ProtectedRoute roles={['super-admin']}>
-                    <SuperAdminPanel />
                   </ProtectedRoute>
                 }
               />

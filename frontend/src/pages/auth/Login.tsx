@@ -1,6 +1,15 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { AlertCircle, Building2, ChevronLeft, Loader2, Lock, UserRound } from 'lucide-react'
+import {
+  AlertCircle,
+  Building2,
+  ChevronLeft,
+  Loader2,
+  Lock,
+  PawPrint,
+  Plus,
+  UserRound,
+} from 'lucide-react'
 
 import { AuthLayout } from '@/components/auth/AuthLayout'
 import { Button } from '@/components/ui/button'
@@ -19,7 +28,6 @@ interface LoginCandidate {
   role: string
   job_title?: string | null
   photo_url?: string | null
-  email?: string | null
 }
 
 interface ClinicGroup {
@@ -30,7 +38,6 @@ interface ClinicGroup {
 
 interface Candidates {
   clinics: ClinicGroup[]
-  super_admins: LoginCandidate[]
 }
 
 const ROLE_LABELS: Record<string, string> = {
@@ -65,12 +72,19 @@ export function Login() {
   const navigate = useNavigate()
   const location = useLocation()
 
+  const [mode, setMode] = useState<'select' | 'register'>('select')
   const [candidates, setCandidates] = useState<Candidates | null>(null)
   const [loadingCandidates, setLoadingCandidates] = useState(true)
   const [selected, setSelected] = useState<LoginCandidate | null>(null)
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+
+  const [regName, setRegName] = useState('')
+  const [regFullName, setRegFullName] = useState('')
+  const [regEmail, setRegEmail] = useState('')
+  const [regPassword, setRegPassword] = useState('')
+  const [regTitle, setRegTitle] = useState('')
 
   const loadCandidates = useCallback(async () => {
     try {
@@ -93,21 +107,41 @@ export function Login() {
     setError(null)
     setSubmitting(true)
     try {
-      const isSuper = selected.role === 'super-admin'
-      const res = await apiFetch<LoginResponse>(
-        isSuper ? '/auth/login/super-admin' : '/auth/login/user',
-        {
-          method: 'POST',
-          body: JSON.stringify(
-            isSuper ? { identifier: selected.email, password } : { user_id: selected.id, password },
-          ),
-        },
-      )
+      const res = await apiFetch<LoginResponse>('/auth/login/user', {
+        method: 'POST',
+        body: JSON.stringify({ user_id: selected.id, password }),
+      })
       login(res.access_token)
       const from = (location.state as { from?: { pathname: string } } | null)?.from
       navigate(from?.pathname ?? '/', { replace: true })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al iniciar sesión')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(null)
+    setSubmitting(true)
+    try {
+      const res = await apiFetch<LoginResponse>('/clinics/register', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: regName,
+          first_admin: {
+            full_name: regFullName,
+            email: regEmail,
+            password: regPassword,
+            professional_title: regTitle || null,
+          },
+        }),
+      })
+      login(res.access_token)
+      navigate('/', { replace: true })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo crear la clínica')
     } finally {
       setSubmitting(false)
     }
@@ -119,25 +153,111 @@ export function Login() {
     setError(null)
   }
 
-  const allUsers: LoginCandidate[] = [
-    ...(candidates?.clinics.flatMap((c) => c.users) ?? []),
-    ...(candidates?.super_admins.map((s) => ({ ...s, role: 'super-admin' })) ?? []),
-  ]
-
   return (
     <AuthLayout
-      title="Iniciar sesión"
-      subtitle="Selecciona tu perfil para continuar"
+      title={mode === 'register' ? 'Crear mi clínica' : 'Iniciar sesión'}
+      subtitle={
+        mode === 'register'
+          ? 'Registra tu clínica y configúrala paso a paso'
+          : 'Selecciona tu perfil para continuar'
+      }
       footer={
-        <>
-          <span className="text-muted-foreground">¿Perdiste tu contraseña? </span>
-          <Link to="/forgot-password" className="font-medium text-primary hover:text-primary-hover">
-            Recupérala aquí
-          </Link>
-        </>
+        <Link to="/forgot-password" className="font-medium text-primary hover:text-primary-hover">
+          ¿Perdiste tu contraseña? Recupérala aquí
+        </Link>
       }
     >
-      {selected ? (
+      {mode === 'register' ? (
+        <form onSubmit={handleRegister} className="space-y-4">
+          <button
+            type="button"
+            onClick={() => setMode('select')}
+            className="flex items-center gap-1 text-sm font-medium text-primary hover:text-primary-hover"
+          >
+            <ChevronLeft className="size-4" /> Volver al inicio de sesión
+          </button>
+
+          <div className="space-y-2">
+            <Label htmlFor="reg-name">Nombre de la clínica *</Label>
+            <div className="relative">
+              <Building2 className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                id="reg-name"
+                className="pl-9"
+                value={regName}
+                onChange={(e) => setRegName(e.target.value)}
+                placeholder="ej. Clínica VetCare"
+                required
+              />
+            </div>
+          </div>
+
+          <div className="rounded-md border border-border p-4">
+            <div className="mb-3 flex items-center gap-2">
+              <PawPrint className="size-4 text-primary" aria-hidden="true" />
+              <p className="text-sm font-medium">Primer super-usuario (tú)</p>
+            </div>
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label htmlFor="reg-fullname">Nombre completo *</Label>
+                <Input
+                  id="reg-fullname"
+                  value={regFullName}
+                  onChange={(e) => setRegFullName(e.target.value)}
+                  placeholder="Tu nombre"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="reg-email">Correo *</Label>
+                <Input
+                  id="reg-email"
+                  type="email"
+                  value={regEmail}
+                  onChange={(e) => setRegEmail(e.target.value)}
+                  placeholder="correo@ejemplo.com"
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="reg-password">Contraseña *</Label>
+                  <Input
+                    id="reg-password"
+                    type="password"
+                    value={regPassword}
+                    onChange={(e) => setRegPassword(e.target.value)}
+                    minLength={8}
+                    placeholder="Mínimo 8 caracteres"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="reg-title">Título profesional</Label>
+                  <Input
+                    id="reg-title"
+                    value={regTitle}
+                    onChange={(e) => setRegTitle(e.target.value)}
+                    placeholder="ej. MVZ"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {error && (
+            <div className="flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+              <AlertCircle className="size-4 shrink-0" aria-hidden="true" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          <Button type="submit" className="w-full" disabled={submitting}>
+            {submitting ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Plus />}
+            {submitting ? 'Creando…' : 'Crear clínica y entrar'}
+          </Button>
+        </form>
+      ) : selected ? (
         <form onSubmit={handleSubmit} className="space-y-4">
           <button
             type="button"
@@ -191,71 +311,62 @@ export function Login() {
           <Loader2 className="animate-spin" aria-hidden="true" />
           <p className="text-sm">Cargando perfiles…</p>
         </div>
-      ) : allUsers.length === 0 ? (
-        <div className="space-y-4 py-6 text-center">
-          <p className="text-sm text-muted-foreground">
-            No hay perfiles visibles todavía. Inicia sesión con tu correo si tu cuenta está
-            desactivada para la selección con foto.
-          </p>
-        </div>
       ) : (
-        <div className="max-h-[420px] space-y-5 overflow-y-auto pr-1">
-          {candidates?.clinics.map((clinic) => (
-            <div key={clinic.id}>
-              <div className="mb-2 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                <Building2 className="size-3.5" aria-hidden="true" />
-                {clinic.name}
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                {clinic.users.map((u) => (
-                  <button
-                    key={u.id}
-                    type="button"
-                    onClick={() => {
-                      setSelected(u)
-                      setPassword('')
-                      setError(null)
-                    }}
-                    className="group flex flex-col items-center gap-2 rounded-xl border border-border bg-card p-3 transition-colors hover:border-primary hover:bg-accent"
-                  >
-                    <Avatar candidate={u} />
-                    <div className="min-w-0 text-center">
-                      <p className="truncate text-xs font-medium text-foreground">{u.full_name}</p>
-                      <p className="text-[11px] text-muted-foreground">
-                        {ROLE_LABELS[u.role] ?? u.role}
-                      </p>
-                    </div>
-                  </button>
-                ))}
-              </div>
+        <div className="space-y-5">
+          {candidates && candidates.clinics.length > 0 ? (
+            <div className="max-h-[360px] space-y-5 overflow-y-auto pr-1">
+              {candidates.clinics.map((clinic) => (
+                <div key={clinic.id}>
+                  <div className="mb-2 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                    <Building2 className="size-3.5" aria-hidden="true" />
+                    {clinic.name}
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {clinic.users.map((u) => (
+                      <button
+                        key={u.id}
+                        type="button"
+                        onClick={() => {
+                          setSelected(u)
+                          setPassword('')
+                          setError(null)
+                        }}
+                        className="group flex flex-col items-center gap-2 rounded-xl border border-border bg-card p-3 transition-colors hover:border-primary hover:bg-accent"
+                      >
+                        <Avatar candidate={u} />
+                        <div className="min-w-0 text-center">
+                          <p className="truncate text-xs font-medium text-foreground">
+                            {u.full_name}
+                          </p>
+                          <p className="text-[11px] text-muted-foreground">
+                            {ROLE_LABELS[u.role] ?? u.role}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
-
-          {candidates && candidates.super_admins.length > 0 && (
-            <div>
-              <div className="mb-2 text-xs font-medium text-muted-foreground">Plataforma</div>
-              <div className="grid grid-cols-3 gap-2">
-                {candidates.super_admins.map((s) => (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => {
-                      setSelected({ ...s, role: 'super-admin' })
-                      setPassword('')
-                      setError(null)
-                    }}
-                    className="group flex flex-col items-center gap-2 rounded-xl border border-border bg-card p-3 transition-colors hover:border-primary hover:bg-accent"
-                  >
-                    <Avatar candidate={s} />
-                    <div className="min-w-0 text-center">
-                      <p className="truncate text-xs font-medium text-foreground">{s.full_name}</p>
-                      <p className="text-[11px] text-muted-foreground">Super Admin</p>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
+          ) : (
+            <p className="py-4 text-center text-sm text-muted-foreground">
+              No hay perfiles todavía. Crea tu clínica para empezar.
+            </p>
           )}
+
+          <div className="border-t border-border pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                setMode('register')
+                setError(null)
+              }}
+            >
+              <Plus /> Crear mi clínica
+            </Button>
+          </div>
         </div>
       )}
     </AuthLayout>
