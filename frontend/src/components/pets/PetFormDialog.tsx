@@ -68,6 +68,7 @@ export function PetFormDialog({
   const [ownerEmail, setOwnerEmail] = useState('')
   const [altContactName, setAltContactName] = useState('')
   const [altPhone, setAltPhone] = useState('')
+  const [ownerAcceptsReminders, setOwnerAcceptsReminders] = useState(false)
 
   const [submitting, setSubmitting] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -235,6 +236,7 @@ export function PetFormDialog({
                 email: ownerEmail || null,
                 alt_contact_name: altContactName || null,
                 alt_phone: altPhone || null,
+                accepts_reminders: ownerAcceptsReminders,
               }
             : null
         const created = await apiFetch<{ id: string }>('/pets', {
@@ -647,6 +649,18 @@ export function PetFormDialog({
                   </div>
                 </div>
               </div>
+
+              {(ownerName || ownerPhone || ownerEmail) && (
+                <label className="flex cursor-pointer items-start gap-2 rounded-md bg-secondary/40 px-3 py-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={ownerAcceptsReminders}
+                    onChange={(e) => setOwnerAcceptsReminders(e.target.checked)}
+                    className="mt-0.5 size-4 rounded border-border"
+                  />
+                  <span>El dueño acepta recibir recordatorios por WhatsApp de sus citas.</span>
+                </label>
+              )}
             </div>
           )}
 

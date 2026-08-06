@@ -297,6 +297,18 @@ def create_pet(
                 ),
                 {"oid": owner, "pid": pet.id, "cid": ctx.clinic["id"]},
             )
+        if owner is not None:
+            db.execute(
+                text(
+                    "INSERT INTO owner_preferences "
+                    "(owner_id, accepts_reminders, accepts_reminders_at) "
+                    "VALUES (:oid, :ar, CASE WHEN :ar THEN now() ELSE NULL END) "
+                    "ON CONFLICT (owner_id) DO UPDATE SET "
+                    "accepts_reminders = EXCLUDED.accepts_reminders, "
+                    "accepts_reminders_at = EXCLUDED.accepts_reminders_at"
+                ),
+                {"oid": owner, "ar": bool(body.owner.accepts_reminders)},
+            )
 
     record_audit(
         db,

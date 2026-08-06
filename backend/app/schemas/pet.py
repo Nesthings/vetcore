@@ -12,6 +12,7 @@ class PetOwnerCreate(BaseModel):
     email: str | None = Field(default=None, max_length=200)
     alt_contact_name: str | None = Field(default=None, max_length=200)
     alt_phone: str | None = Field(default=None, max_length=30)
+    accepts_reminders: bool = False
 
 
 class PetBase(BaseModel):
