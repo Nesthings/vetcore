@@ -1086,9 +1086,9 @@ El staff genera un consentimiento informado (título + texto), el dueño lo **fi
 - Ruff + lint 0 errores + build OK ✓
 
 ### Notas / pendientes
-- Siguientes subfases: 3.3 Hospitalización, 3.4 Laboratorio (3.1/3.5/3.6 en `TODO.md`).
+- Siguientes subfases de Fase 3: 3.3 Hospitalización y 3.4 Laboratorio **en hold** (decidido 2026-08-06); 3.1/3.5/3.6 en `TODO.md`.
 - El consentimiento aún no se vincula automáticamente a una consulta; se puede conectar cuando se integre al flujo de Nueva consulta.
 
 ---
 
-**Siguiente subfase:** 3.3 — Hospitalización (hoja de signos vitales por hora).
+**Siguiente subfase:** por decidir (Fase 3 en hold).

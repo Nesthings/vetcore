@@ -12,5 +12,11 @@ Lista de trabajo diferido. Cada ítem se mueve a una subfase cuando se decide im
 - [ ] **3.1 — Transcripción/resumen de consulta por voz con IA.** Diferida por decisión del usuario (2026-08-06) para continuar con el MVP. El esquema de la tabla `consultation_attachments` ya soporta tipo `audio`.
   - Implicaciones: integración con un servicio de STT (Whisper/local o API), transcripción → resumen estructurado, vinculación a la consulta y a su PDF.
 
+- [ ] **3.3 — Hospitalización (hoja de signos vitales por hora).** Puesta en hold por decisión del usuario (2026-08-06). Tablas `hospitalization_records` y `hospitalization_vitals` ya existen en el esquema (FASE 3).
+  - Implicaciones: admisión/egreso por paciente, registro horario de temperatura/signos, hoja de signos vitales.
+
+- [ ] **3.4 — Laboratorio integrado.** Puesta en hold junto con 3.3 (2026-08-06). Tabla `lab_orders` ya existe en el esquema (FASE 3).
+  - Implicaciones: órdenes de laboratorio, estado (ordered/in_progress/completed), resultados con URL.
+
 - [ ] **3.5 — Dashboard de inteligencia de negocio.** Top enfermedades, razas, predicción de horas pico.
 - [ ] **3.6 — Diario de salud del dueño.** Síntomas reportados antes de la cita.
