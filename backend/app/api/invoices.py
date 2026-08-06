@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.api.deps import CurrentClinic, require_clinic_roles
+from app.api.deps import CurrentClinic, get_current_clinic, require_component
 from app.api.inventory import allocate_fifo
 from app.core.events import record_audit
 from app.db.session import get_db
@@ -29,7 +29,11 @@ from app.models import (
 from app.schemas.billing import InvoiceCreate, InvoiceItemCreate, InvoiceRead, InvoiceUpdate
 from app.services.pdf import build_invoice_receipt_pdf
 
-router = APIRouter(prefix="/invoices", tags=["invoices"])
+router = APIRouter(
+    prefix="/invoices",
+    tags=["invoices"],
+    dependencies=[Depends(require_component("invoices"))],
+)
 
 
 def _with_names(db: Session, invoices: list[Invoice]) -> list[dict]:
@@ -66,7 +70,7 @@ def _with_names(db: Session, invoices: list[Invoice]) -> list[dict]:
 
 @router.get("", response_model=list[InvoiceRead])
 def list_invoices(
-    ctx: CurrentClinic = Depends(require_clinic_roles("admin")),
+    ctx: CurrentClinic = Depends(get_current_clinic),
     db: Session = Depends(get_db),
     pet_id: str | None = Query(default=None),
     limit: int = Query(default=20, ge=1, le=100),
@@ -99,7 +103,7 @@ def _get_invoice_or_404(db: Session, clinic_id: str, invoice_id: str) -> Invoice
 @router.get("/{invoice_id}", response_model=InvoiceRead)
 def get_invoice(
     invoice_id: str,
-    ctx: CurrentClinic = Depends(require_clinic_roles("admin")),
+    ctx: CurrentClinic = Depends(get_current_clinic),
     db: Session = Depends(get_db),
 ) -> dict:
     invoice = _get_invoice_or_404(db, ctx.clinic["id"], invoice_id)
@@ -117,7 +121,7 @@ def _line_total(item: InvoiceItemCreate) -> Decimal:
 @router.post("", response_model=InvoiceRead, status_code=status.HTTP_201_CREATED)
 def create_invoice(
     body: InvoiceCreate,
-    ctx: CurrentClinic = Depends(require_clinic_roles("admin")),
+    ctx: CurrentClinic = Depends(get_current_clinic),
     db: Session = Depends(get_db),
 ) -> dict:
     invoice = Invoice(
@@ -191,7 +195,7 @@ def create_invoice(
 @router.get("/{invoice_id}/receipt", summary="Recibo de la factura en PDF")
 def invoice_receipt(
     invoice_id: str,
-    ctx: CurrentClinic = Depends(require_clinic_roles("admin")),
+    ctx: CurrentClinic = Depends(get_current_clinic),
     db: Session = Depends(get_db),
 ) -> Response:
     invoice = _get_invoice_or_404(db, ctx.clinic["id"], invoice_id)
@@ -241,7 +245,7 @@ def receipt_response(db: Session, invoice: Invoice) -> Response:
 def update_invoice_status(
     invoice_id: str,
     body: InvoiceUpdate,
-    ctx: CurrentClinic = Depends(require_clinic_roles("admin")),
+    ctx: CurrentClinic = Depends(get_current_clinic),
     db: Session = Depends(get_db),
 ) -> dict:
     invoice = _get_invoice_or_404(db, ctx.clinic["id"], invoice_id)
@@ -254,7 +258,7 @@ def update_invoice_status(
 @router.delete("/{invoice_id}", status_code=status.HTTP_204_NO_CONTENT)
 def cancel_invoice(
     invoice_id: str,
-    ctx: CurrentClinic = Depends(require_clinic_roles("admin")),
+    ctx: CurrentClinic = Depends(get_current_clinic),
     db: Session = Depends(get_db),
 ) -> None:
     invoice = _get_invoice_or_404(db, ctx.clinic["id"], invoice_id)

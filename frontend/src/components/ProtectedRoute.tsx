@@ -2,6 +2,7 @@ import { Navigate, useLocation } from 'react-router-dom'
 import { ShieldX } from 'lucide-react'
 
 import { useAuth } from '@/lib/auth'
+import { usePermissions } from '@/lib/permissions'
 
 const ROLE_HOME: Record<string, string> = {
   'super-admin': '/super-admin',
@@ -28,11 +29,14 @@ function AccessDenied() {
 export function ProtectedRoute({
   children,
   roles,
+  component,
 }: {
   children: React.ReactNode
   roles?: string[]
+  component?: string
 }) {
   const { isAuthenticated, user } = useAuth()
+  const { hasComponent } = usePermissions()
   const location = useLocation()
 
   if (!isAuthenticated) {
@@ -40,6 +44,10 @@ export function ProtectedRoute({
   }
 
   if (roles && user && !roles.includes(user.role)) {
+    return <AccessDenied />
+  }
+
+  if (component && !hasComponent(component)) {
     return <AccessDenied />
   }
 

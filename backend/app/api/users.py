@@ -5,7 +5,8 @@ el staff de la clínica.
 """
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
-from sqlalchemy import select
+from pydantic import BaseModel, Field
+from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -13,11 +14,18 @@ from app.api.deps import (
     CurrentClinic,
     CurrentUser,
     get_current_clinic,
-    require_clinic_roles,
+    require_component,
     require_staff,
 )
 from app.core.events import record_audit
 from app.core.images import process_cartilla_photo
+from app.core.permissions import (
+    COMPONENTS,
+    component_catalog,
+    default_components,
+    effective_components,
+    get_overrides,
+)
 from app.core.security import hash_password, verify_password
 from app.core.storage import (
     ALLOWED_IMAGE_EXTENSIONS,
@@ -26,7 +34,7 @@ from app.core.storage import (
     validate_extension,
 )
 from app.db.session import get_db
-from app.models import ClinicBranch, User
+from app.models import ClinicBranch, User, UserComponentPermission
 from app.schemas.staff import ProfileUpdate, UserCreate, UserRead, UserUpdate
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -145,7 +153,7 @@ def get_user(
 @router.post("", response_model=UserRead, status_code=status.HTTP_201_CREATED)
 def create_user(
     body: UserCreate,
-    ctx: CurrentClinic = Depends(require_clinic_roles("admin")),
+    ctx: CurrentClinic = Depends(require_component("settings")),
     db: Session = Depends(get_db),
 ) -> User:
     exists = db.scalar(
@@ -175,7 +183,7 @@ def create_user(
 def update_user(
     user_id: str,
     body: UserUpdate,
-    ctx: CurrentClinic = Depends(require_clinic_roles("admin")),
+    ctx: CurrentClinic = Depends(require_component("settings")),
     db: Session = Depends(get_db),
 ) -> dict:
     user = _get_user_or_404(db, ctx.clinic["id"], user_id)
@@ -198,7 +206,7 @@ def update_user(
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 def deactivate_user(
     user_id: str,
-    ctx: CurrentClinic = Depends(require_clinic_roles("admin")),
+    ctx: CurrentClinic = Depends(require_component("settings")),
     db: Session = Depends(get_db),
 ) -> None:
     """Desactiva el usuario (soft-delete via is_active)."""
@@ -265,3 +273,74 @@ def upload_user_photo(
     db.commit()
     db.refresh(user)
     return _with_branch_names(db, [user])[0]
+
+
+@router.get("/me/components", summary="Componentes efectivos del staff autenticado")
+def my_components(
+    me: CurrentUser = Depends(require_staff),
+    db: Session = Depends(get_db),
+) -> dict:
+    return {"components": sorted(effective_components(db, me.sub, me.role))}
+
+
+def _user_components_row(db: Session, user: User) -> dict:
+    overrides = get_overrides(db, str(user.id))
+    return {
+        "user_id": user.id,
+        "role": user.role,
+        "catalog": component_catalog(),
+        "defaults": sorted(default_components(user.role)),
+        "overrides": overrides,
+        "effective": sorted(effective_components(db, str(user.id), user.role)),
+    }
+
+
+@router.get("/{user_id}/components", summary="Accesos a componentes de un usuario (admin)")
+def user_components(
+    user_id: str,
+    ctx: CurrentClinic = Depends(require_component("settings")),
+    db: Session = Depends(get_db),
+) -> dict:
+    user = _get_user_or_404(db, ctx.clinic["id"], user_id)
+    return _user_components_row(db, user)
+
+
+class ComponentOverrides(BaseModel):
+    overrides: dict[str, bool] = Field(
+        default_factory=dict,
+        description="component -> allowed. El admin establece/revoca por componente.",
+    )
+
+
+@router.put(
+    "/{user_id}/components",
+    summary="Reemplaza los overrides de componentes de un usuario (admin)",
+)
+def update_user_components(
+    user_id: str,
+    body: ComponentOverrides,
+    ctx: CurrentClinic = Depends(require_component("settings")),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Sync completo: los overrides recibidos reemplazan a los existentes.
+
+    Un componente ausente en `overrides` vuelve al default del rol (se borra
+    la fila si existía).
+    """
+    user = _get_user_or_404(db, ctx.clinic["id"], user_id)
+    for component in body.overrides:
+        if component not in COMPONENTS:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Componente desconocido: {component}",
+            )
+    db.execute(
+        delete(UserComponentPermission).where(UserComponentPermission.user_id == user.id)
+    )
+    for component, allowed in body.overrides.items():
+        db.add(
+            UserComponentPermission(user_id=user.id, component=component, allowed=allowed)
+        )
+    db.commit()
+    db.refresh(user)
+    return _user_components_row(db, user)

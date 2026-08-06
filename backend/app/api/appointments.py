@@ -6,13 +6,17 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.deps import CurrentClinic, get_current_clinic, require_clinic_roles
+from app.api.deps import CurrentClinic, get_current_clinic, require_clinic_roles, require_component
 from app.core.events import notify_user, record_audit
 from app.db.session import get_db
 from app.models import Appointment, ClinicBranch, Pet, User
 from app.schemas.appointment import AppointmentCreate, AppointmentRead, AppointmentUpdate
 
-router = APIRouter(prefix="/appointments", tags=["appointments"])
+router = APIRouter(
+    prefix="/appointments",
+    tags=["appointments"],
+    dependencies=[Depends(require_component("agenda"))],
+)
 
 
 def _with_names(db: Session, appointments: list[Appointment]) -> list[dict]:

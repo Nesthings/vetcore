@@ -21,7 +21,7 @@ from app.models.inventory import (
 )
 from app.models.notification import InternalNotification, OutboundNotification
 from app.models.pet import ClinicalAlert, Pet, PetWeightRecord
-from app.models.staff import User
+from app.models.staff import User, UserComponentPermission
 
 __all__ = [
     "Appointment",
@@ -52,4 +52,5 @@ __all__ = [
     "ScheduleBlock",
     "ServiceCatalog",
     "User",
+    "UserComponentPermission",
 ]

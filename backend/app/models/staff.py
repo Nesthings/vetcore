@@ -53,3 +53,25 @@ class User(UUIDPkMixin, Base):
     reports: Mapped[list["User"]] = relationship(
         back_populates="manager", foreign_keys=[reports_to]
     )
+
+
+class UserComponentPermission(UUIDPkMixin, Base):
+    """Override de acceso a un componente para un usuario del staff.
+
+    Solo almacena las excepciones al default del rol (`allowed` true/false).
+    Sin fila = acceso por defecto del rol.
+    """
+
+    __tablename__ = "user_component_permissions"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    component: Mapped[str] = mapped_column(String(50), nullable=False)
+    allowed: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )

@@ -6,12 +6,16 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.deps import CurrentClinic, get_current_clinic
+from app.api.deps import CurrentClinic, get_current_clinic, require_component
 from app.db.session import get_db
 from app.models import AuditLog
 from app.schemas.events import AuditLogRead
 
-router = APIRouter(prefix="/audit-log", tags=["audit-log"])
+router = APIRouter(
+    prefix="/audit-log",
+    tags=["audit-log"],
+    dependencies=[Depends(require_component("audit"))],
+)
 
 
 @router.get("", response_model=list[AuditLogRead])

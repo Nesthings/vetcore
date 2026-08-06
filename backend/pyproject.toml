@@ -14,6 +14,7 @@ extend-immutable-calls = [
     "fastapi.Query",
     "app.api.deps.require_clinic_roles",
     "app.api.deps.require_roles",
+    "app.api.deps.require_component",
 ]
 
 [tool.ruff.format]

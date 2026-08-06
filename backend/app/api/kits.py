@@ -7,12 +7,16 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.api.deps import CurrentClinic, get_current_clinic, require_clinic_roles
+from app.api.deps import CurrentClinic, get_current_clinic, require_clinic_roles, require_component
 from app.db.session import get_db
 from app.models import InventoryKit, InventoryKitItem, InventoryProduct
 from app.schemas.kit import KitCreate, KitRead, KitUpdate
 
-router = APIRouter(prefix="/kits", tags=["kits"])
+router = APIRouter(
+    prefix="/kits",
+    tags=["kits"],
+    dependencies=[Depends(require_component("kits"))],
+)
 
 KIT_MUTATORS = ("admin", "veterinario")
 

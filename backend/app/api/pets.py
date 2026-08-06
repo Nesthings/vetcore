@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
-from app.api.deps import CurrentClinic, get_current_clinic, require_clinic_roles
+from app.api.deps import CurrentClinic, get_current_clinic, require_clinic_roles, require_component
 from app.core.events import notify_roles, record_audit
 from app.core.storage import (
     ALLOWED_IMAGE_EXTENSIONS,
@@ -48,7 +48,11 @@ from app.schemas.pet import (
     PetWeightRead,
 )
 
-router = APIRouter(prefix="/pets", tags=["pets"])
+router = APIRouter(
+    prefix="/pets",
+    tags=["pets"],
+    dependencies=[Depends(require_component("pets"))],
+)
 
 PET_MUTATORS = ("admin", "veterinario")
 

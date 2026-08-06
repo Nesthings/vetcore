@@ -7,6 +7,7 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.core.permissions import effective_components
 from app.core.security import get_token_payload
 from app.db.session import get_db
 
@@ -114,6 +115,29 @@ def require_clinic_roles(*roles: str):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="No tienes permisos para esta acción",
+            )
+        return ctx
+
+    return dependency
+
+
+def require_component(*components: str):
+    """Restringe una ruta a staff con acceso a (al menos) uno de los
+    componentes dados (modelo de permisos por componente, idea 2).
+
+    El acceso efectivo = default del rol + overrides por usuario en la tabla
+    `user_component_permissions`.
+    """
+
+    def dependency(
+        ctx: CurrentClinic = Depends(get_current_clinic),
+        db: Session = Depends(get_db),
+    ) -> CurrentClinic:
+        allowed = effective_components(db, ctx.user.sub, ctx.user.role)
+        if not allowed.intersection(components):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tienes acceso a este módulo",
             )
         return ctx
 

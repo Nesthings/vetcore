@@ -10,7 +10,11 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import CurrentClinic, get_current_clinic, require_clinic_roles
+from app.api.deps import (
+    CurrentClinic,
+    require_clinic_roles,
+    require_component,
+)
 from app.db.session import get_db
 from app.models import (
     Appointment,
@@ -44,7 +48,7 @@ def _branch_scope(ctx: CurrentClinic, branch_id: str | None) -> list:
 
 @router.get("/operational", summary="Reporte operativo (sin cifras de dinero)")
 def operational_report(
-    ctx: CurrentClinic = Depends(get_current_clinic),
+    ctx: CurrentClinic = Depends(require_component("reports")),
     db: Session = Depends(get_db),
     from_: datetime | None = Query(default=None, alias="from"),
     to: datetime | None = Query(default=None),
@@ -124,6 +128,7 @@ def operational_report(
 @router.get("/financial", summary="Dashboard financiero (EXCLUSIVO del admin)")
 def financial_report(
     ctx: CurrentClinic = Depends(require_clinic_roles("admin")),
+    _component: CurrentClinic = Depends(require_component("financial")),
     db: Session = Depends(get_db),
     from_: datetime | None = Query(default=None, alias="from"),
     to: datetime | None = Query(default=None),

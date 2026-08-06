@@ -9,12 +9,16 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.deps import CurrentClinic, get_current_clinic, require_clinic_roles
+from app.api.deps import CurrentClinic, get_current_clinic, require_clinic_roles, require_component
 from app.db.session import get_db
 from app.models import ConsultationTemplate
 from app.schemas.template import TemplateCreate, TemplateRead, TemplateUpdate
 
-router = APIRouter(prefix="/templates", tags=["templates"])
+router = APIRouter(
+    prefix="/templates",
+    tags=["templates"],
+    dependencies=[Depends(require_component("templates"))],
+)
 
 TEMPLATE_MUTATORS = ("admin", "veterinario")
 

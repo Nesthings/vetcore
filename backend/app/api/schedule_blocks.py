@@ -6,12 +6,16 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.deps import CurrentClinic, get_current_clinic, require_clinic_roles
+from app.api.deps import CurrentClinic, get_current_clinic, require_clinic_roles, require_component
 from app.db.session import get_db
 from app.models import ScheduleBlock, User
 from app.schemas.appointment import ScheduleBlockCreate, ScheduleBlockRead
 
-router = APIRouter(prefix="/schedule-blocks", tags=["schedule-blocks"])
+router = APIRouter(
+    prefix="/schedule-blocks",
+    tags=["schedule-blocks"],
+    dependencies=[Depends(require_component("agenda"))],
+)
 
 
 @router.get("", response_model=list[ScheduleBlockRead])

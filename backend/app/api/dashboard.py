@@ -13,11 +13,15 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.appointments import _with_names
-from app.api.deps import CurrentClinic, get_current_clinic
+from app.api.deps import CurrentClinic, get_current_clinic, require_component
 from app.db.session import get_db
 from app.models import Appointment, InventoryMovement, InventoryProduct, Pet, ScheduleBlock
 
-router = APIRouter(prefix="/dashboard", tags=["dashboard"])
+router = APIRouter(
+    prefix="/dashboard",
+    tags=["dashboard"],
+    dependencies=[Depends(require_component("dashboard"))],
+)
 
 STOCK_ALERT_DEFAULT_THRESHOLD = 5
 

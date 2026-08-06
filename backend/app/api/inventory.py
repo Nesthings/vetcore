@@ -13,7 +13,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.deps import CurrentClinic, get_current_clinic, require_clinic_roles
+from app.api.deps import CurrentClinic, get_current_clinic, require_clinic_roles, require_component
 from app.core.events import notify_roles
 from app.db.session import get_db
 from app.models import InventoryLot, InventoryMovement, InventoryProduct
@@ -26,7 +26,11 @@ from app.schemas.inventory import (
     StockEntryCreate,
 )
 
-router = APIRouter(prefix="/inventory", tags=["inventory"])
+router = APIRouter(
+    prefix="/inventory",
+    tags=["inventory"],
+    dependencies=[Depends(require_component("inventory"))],
+)
 
 INVENTORY_MUTATORS = ("admin", "veterinario")
 

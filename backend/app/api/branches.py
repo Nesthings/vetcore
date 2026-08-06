@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.deps import CurrentClinic, get_current_clinic, require_clinic_roles
+from app.api.deps import CurrentClinic, get_current_clinic, require_component
 from app.db.session import get_db
 from app.models import ClinicBranch
 from app.schemas.clinic import ClinicBranchCreate, ClinicBranchRead, ClinicBranchUpdate
@@ -53,7 +53,7 @@ def get_branch(
 @router.post("", response_model=ClinicBranchRead, status_code=status.HTTP_201_CREATED)
 def create_branch(
     body: ClinicBranchCreate,
-    ctx: CurrentClinic = Depends(require_clinic_roles("admin")),
+    ctx: CurrentClinic = Depends(require_component("settings")),
     db: Session = Depends(get_db),
 ) -> ClinicBranch:
     branch = ClinicBranch(clinic_id=ctx.clinic["id"], **body.model_dump())
@@ -67,7 +67,7 @@ def create_branch(
 def update_branch(
     branch_id: str,
     body: ClinicBranchUpdate,
-    ctx: CurrentClinic = Depends(require_clinic_roles("admin")),
+    ctx: CurrentClinic = Depends(require_component("settings")),
     db: Session = Depends(get_db),
 ) -> ClinicBranch:
     branch = _get_branch_or_404(db, ctx.clinic["id"], branch_id)
@@ -81,7 +81,7 @@ def update_branch(
 @router.delete("/{branch_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_branch(
     branch_id: str,
-    ctx: CurrentClinic = Depends(require_clinic_roles("admin")),
+    ctx: CurrentClinic = Depends(require_component("settings")),
     db: Session = Depends(get_db),
 ) -> None:
     branch = _get_branch_or_404(db, ctx.clinic["id"], branch_id)

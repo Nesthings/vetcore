@@ -830,4 +830,52 @@ Prepara el esquema para las ideas diferidas de `IDEAS.txt` (login con foto de us
 
 ---
 
+## Subfase 2.9 — Permisos por componente (idea 2: activar/desactivar módulos por usuario) ✅
+
+**Fecha:** 2026-08-06
+
+### Qué se hizo
+El admin de la clínica ahora concede/deniega acceso a módulos del panel por usuario, con acceso por defecto según el rol.
+
+**Modelo:**
+- Migración `0009_user_component_permissions`: tabla con `(user_id, component, allowed)`, UNIQUE `(user_id, component)`. Solo guarda **overrides**: sin fila = default del rol.
+- `app/core/permissions.py`: catálogo de 15 componentes, `ROLE_DEFAULT_COMPONENTS` (espejo del comportamiento previo) y `effective_components` (default + overrides).
+- `deps.require_component(*slugs)`: 403 si el staff no tiene (al menos) uno de los componentes. Valida suscripción vía `get_current_clinic`.
+
+**Enforcement backend (el componente ES la puerta del módulo):**
+- Router-level en: pets, consultations (flujo paciente), agenda (appointments+schedule_blocks), waitlist, dashboard, inventory, kits, purchase_orders, invoices, services, templates, automation, audit.
+- Reports por endpoint: `reports` (operativo, todo staff) y `financial` (admin + componente).
+- Mutaciones de settings (users/branches/clinic logo) → `require_component("settings")`.
+- Se **quitaron restricciones duras de rol redundantes** en invoices/purchase_orders/services: el componente con su default por rol ya las cubre, y así el grant del admin sí surte efecto (ej. darle Facturación a recepción).
+- `financial` conserva `require_clinic_roles("admin")` + componente (regla sección 3.9).
+
+**Endpoints:**
+- `GET /users/me/components` → componentes efectivos del autenticado (para el nav/guard).
+- `GET /users/{id}/components` → catálogo + defaults + overrides + efectivos.
+- `PUT /users/{id}/components` → **sync completo**: los overrides recibidos reemplazan a los existentes; componente ausente = vuelve al default (se borra la fila).
+
+**Frontend:**
+- `PermissionsProvider` (`lib/permissions.tsx`) carga los componentes efectivos y expone `hasComponent`.
+- `AppLayout`: `NAV_ITEMS` mapea cada ruta a un componente y filtra por `hasComponent` (ya no usa `roles`).
+- `ProtectedRoute`: prop `component` → pantalla de acceso restringido si no aplica.
+- `UserFormDialog`: sección "Acceso a componentes" con tri-estado (Según rol / Permitir / Denegar); al guardar envía los overrides (grant/deny) y el resto se limpia con el sync.
+
+### Decisiones técnicas y por qué
+- **Componente = puerta del módulo**, rol = default: permite grants y revokes por usuario sin romper el modelo existente (el default replica exactamente el comportamiento anterior).
+- **Sync completo en PUT**: evita filas huérfanas; el tri-estado "Según rol" equivale a no enviar el componente.
+- **Financial sigue admin**: el documento (3.9) exige que las pantallas con montos sean admin.
+
+### Verificado
+- Admin: 15 componentes; recepción: 7 por default ✓
+- Recepción: /pets y /reports/operational → 200; /invoices, /services, /automation, /reports/financial → 403 ✓
+- Grant a recepción (invoices+kits) → 200; deny (audit) → 403; revert → restaurado ✓
+- Financial: admin 200, recepción 403 ✓
+- Ruff + lint 0 errores + build OK ✓
+
+### Notas / pendientes
+- El `NotificationBell` y el perfil quedan siempre accesibles para el staff (no son componentes).
+- El organigrama visual (idea 2) queda pendiente; `reports_to` ya existe desde la 2.8.
+
+---
+
 **Siguiente subfase:** 3.1 — Transcripción/resumen de consulta por voz con IA.

@@ -4,17 +4,21 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.deps import CurrentClinic, require_clinic_roles
+from app.api.deps import CurrentClinic, get_current_clinic, require_component
 from app.db.session import get_db
 from app.models import ServiceCatalog
 from app.schemas.services import ServiceCreate, ServiceRead, ServiceUpdate
 
-router = APIRouter(prefix="/services", tags=["services"])
+router = APIRouter(
+    prefix="/services",
+    tags=["services"],
+    dependencies=[Depends(require_component("services"))],
+)
 
 
 @router.get("", response_model=list[ServiceRead])
 def list_services(
-    ctx: CurrentClinic = Depends(require_clinic_roles("admin")),
+    ctx: CurrentClinic = Depends(get_current_clinic),
     db: Session = Depends(get_db),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
@@ -43,7 +47,7 @@ def _get_service_or_404(db: Session, clinic_id: str, service_id: str) -> Service
 @router.get("/{service_id}", response_model=ServiceRead)
 def get_service(
     service_id: str,
-    ctx: CurrentClinic = Depends(require_clinic_roles("admin")),
+    ctx: CurrentClinic = Depends(get_current_clinic),
     db: Session = Depends(get_db),
 ) -> ServiceCatalog:
     return _get_service_or_404(db, ctx.clinic["id"], service_id)
@@ -52,7 +56,7 @@ def get_service(
 @router.post("", response_model=ServiceRead, status_code=status.HTTP_201_CREATED)
 def create_service(
     body: ServiceCreate,
-    ctx: CurrentClinic = Depends(require_clinic_roles("admin")),
+    ctx: CurrentClinic = Depends(get_current_clinic),
     db: Session = Depends(get_db),
 ) -> ServiceCatalog:
     service = ServiceCatalog(clinic_id=ctx.clinic["id"], **body.model_dump())
@@ -66,7 +70,7 @@ def create_service(
 def update_service(
     service_id: str,
     body: ServiceUpdate,
-    ctx: CurrentClinic = Depends(require_clinic_roles("admin")),
+    ctx: CurrentClinic = Depends(get_current_clinic),
     db: Session = Depends(get_db),
 ) -> ServiceCatalog:
     service = _get_service_or_404(db, ctx.clinic["id"], service_id)
@@ -80,7 +84,7 @@ def update_service(
 @router.delete("/{service_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_service(
     service_id: str,
-    ctx: CurrentClinic = Depends(require_clinic_roles("admin")),
+    ctx: CurrentClinic = Depends(get_current_clinic),
     db: Session = Depends(get_db),
 ) -> None:
     service = _get_service_or_404(db, ctx.clinic["id"], service_id)

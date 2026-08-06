@@ -12,12 +12,16 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
-from app.api.deps import CurrentClinic, get_current_clinic
+from app.api.deps import CurrentClinic, get_current_clinic, require_component
 from app.db.session import get_db
 from app.models import Appointment, OutboundNotification, Pet, User
 from app.schemas.reminder import PendingReminder, ReminderRunResult, ReminderSchedule, ReminderStage
 
-router = APIRouter(prefix="/automation", tags=["automation"])
+router = APIRouter(
+    prefix="/automation",
+    tags=["automation"],
+    dependencies=[Depends(require_component("automation"))],
+)
 
 REMINDER_STAGES: list[tuple[str, int]] = [("48h", 48), ("24h", 24), ("2h", 2)]
 

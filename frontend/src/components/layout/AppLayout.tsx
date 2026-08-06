@@ -22,10 +22,12 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '@/lib/auth'
 import { cn } from '@/lib/utils'
 import { apiFetch } from '@/lib/api'
+import { usePermissions } from '@/lib/permissions'
 import { NotificationBell } from '@/components/layout/NotificationBell'
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth()
+  const { hasComponent } = usePermissions()
   const navigate = useNavigate()
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
 
@@ -42,61 +44,53 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     }
   }, [user?.clinic_id, user?.sub])
 
-  const role = user?.role
-
   const NAV_ITEMS: {
     to: string
     label: string
     icon: React.ElementType
     end: boolean
-    roles?: string[]
+    component: string
   }[] = [
-    { to: '/', label: 'Dashboard del día', icon: LayoutDashboard, end: true },
-    { to: '/agenda', label: 'Agenda', icon: CalendarDays, end: false },
-    { to: '/waitlist', label: 'Lista de espera', icon: Timer, end: false },
-    { to: '/pets', label: 'Pacientes', icon: Users, end: false },
-    { to: '/inventory', label: 'Inventario', icon: Package, end: false },
     {
-      to: '/kits',
-      label: 'Kits',
-      icon: PackageOpen,
-      end: false,
-      roles: ['admin', 'veterinario'],
+      to: '/',
+      label: 'Dashboard del día',
+      icon: LayoutDashboard,
+      end: true,
+      component: 'dashboard',
     },
+    { to: '/agenda', label: 'Agenda', icon: CalendarDays, end: false, component: 'agenda' },
+    { to: '/waitlist', label: 'Lista de espera', icon: Timer, end: false, component: 'waitlist' },
+    { to: '/pets', label: 'Pacientes', icon: Users, end: false, component: 'pets' },
+    { to: '/inventory', label: 'Inventario', icon: Package, end: false, component: 'inventory' },
+    { to: '/kits', label: 'Kits', icon: PackageOpen, end: false, component: 'kits' },
     {
       to: '/purchase-orders',
       label: 'Compras',
       icon: ShoppingCart,
       end: false,
-      roles: ['admin'],
+      component: 'purchase_orders',
     },
     {
       to: '/automation',
       label: 'Automatización',
       icon: BellRing,
       end: false,
-      roles: ['admin'],
+      component: 'automation',
     },
-    { to: '/reports', label: 'Reportes', icon: BarChart3, end: false },
-    { to: '/audit', label: 'Bitácora', icon: History, end: false },
+    { to: '/reports', label: 'Reportes', icon: BarChart3, end: false, component: 'reports' },
+    { to: '/audit', label: 'Bitácora', icon: History, end: false, component: 'audit' },
     {
       to: '/reports/financial',
       label: 'Financiero',
       icon: Receipt,
       end: false,
-      roles: ['admin'],
+      component: 'financial',
     },
-    {
-      to: '/templates',
-      label: 'Plantillas',
-      icon: FileText,
-      end: false,
-      roles: ['admin', 'veterinario'],
-    },
-    { to: '/services', label: 'Servicios', icon: Settings2, end: false, roles: ['admin'] },
-    { to: '/invoices', label: 'Facturación', icon: Receipt, end: false, roles: ['admin'] },
-    { to: '/settings', label: 'Configuración', icon: Settings2, end: false, roles: ['admin'] },
-  ].filter((i) => !i.roles || (role && i.roles.includes(role)))
+    { to: '/templates', label: 'Plantillas', icon: FileText, end: false, component: 'templates' },
+    { to: '/services', label: 'Servicios', icon: Settings2, end: false, component: 'services' },
+    { to: '/invoices', label: 'Facturación', icon: Receipt, end: false, component: 'invoices' },
+    { to: '/settings', label: 'Configuración', icon: Settings2, end: false, component: 'settings' },
+  ].filter((i) => hasComponent(i.component))
 
   const handleLogout = () => {
     logout()

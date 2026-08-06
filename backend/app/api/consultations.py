@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, 
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session, selectinload
 
-from app.api.deps import CurrentClinic, get_current_clinic, require_clinic_roles
+from app.api.deps import CurrentClinic, get_current_clinic, require_clinic_roles, require_component
 from app.core.events import record_audit
 from app.core.storage import (
     ALLOWED_IMAGE_EXTENSIONS,
@@ -35,7 +35,11 @@ from app.schemas.consultation import (
 from app.schemas.crm import SurveyRead
 from app.services.pdf import build_consultation_summary_pdf
 
-router = APIRouter(prefix="/consultations", tags=["consultations"])
+router = APIRouter(
+    prefix="/consultations",
+    tags=["consultations"],
+    dependencies=[Depends(require_component("pets"))],
+)
 
 CONSULTATION_MUTATORS = ("admin", "veterinario")
 

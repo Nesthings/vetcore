@@ -17,7 +17,7 @@ from app.api.deps import (
     CurrentClinic,
     CurrentUser,
     get_current_clinic,
-    require_clinic_roles,
+    require_component,
     require_roles,
 )
 from app.core.events import record_audit
@@ -75,7 +75,7 @@ def my_clinic(
 @router.patch("/me", response_model=ClinicRead, summary="Actualiza el perfil de mi clínica (admin)")
 def update_my_clinic(
     body: ClinicUpdate,
-    ctx: CurrentClinic = Depends(require_clinic_roles("admin")),
+    ctx: CurrentClinic = Depends(require_component("settings")),
     db: Session = Depends(get_db),
 ) -> Clinic:
     clinic = _get_clinic_or_404(db, ctx.clinic["id"])
@@ -94,7 +94,7 @@ def update_my_clinic(
 )
 def upload_clinic_logo(
     file: UploadFile = File(...),
-    ctx: CurrentClinic = Depends(require_clinic_roles("admin")),
+    ctx: CurrentClinic = Depends(require_component("settings")),
     db: Session = Depends(get_db),
 ) -> Clinic:
     clinic = _get_clinic_or_404(db, ctx.clinic["id"])

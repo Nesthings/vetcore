@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.api.deps import CurrentClinic, require_clinic_roles
+from app.api.deps import CurrentClinic, get_current_clinic, require_component
 from app.db.session import get_db
 from app.models import (
     ClinicBranch,
@@ -23,7 +23,11 @@ from app.schemas.purchase import (
     PurchaseOrderUpdate,
 )
 
-router = APIRouter(prefix="/purchase-orders", tags=["purchase-orders"])
+router = APIRouter(
+    prefix="/purchase-orders",
+    tags=["purchase-orders"],
+    dependencies=[Depends(require_component("purchase_orders"))],
+)
 
 
 def _with_names(db: Session, orders: list[PurchaseOrder]) -> list[dict]:
@@ -59,7 +63,7 @@ def _with_names(db: Session, orders: list[PurchaseOrder]) -> list[dict]:
 
 @router.get("", response_model=list[PurchaseOrderRead])
 def list_orders(
-    ctx: CurrentClinic = Depends(require_clinic_roles("admin")),
+    ctx: CurrentClinic = Depends(get_current_clinic),
     db: Session = Depends(get_db),
     limit: int = Query(default=50, ge=1, le=200),
 ) -> list[dict]:
@@ -87,7 +91,7 @@ def _get_order_or_404(db: Session, clinic_id: str, order_id: str) -> PurchaseOrd
 @router.get("/{order_id}", response_model=PurchaseOrderRead)
 def get_order(
     order_id: str,
-    ctx: CurrentClinic = Depends(require_clinic_roles("admin")),
+    ctx: CurrentClinic = Depends(get_current_clinic),
     db: Session = Depends(get_db),
 ) -> dict:
     return _with_names(db, [_get_order_or_404(db, ctx.clinic["id"], order_id)])[0]
@@ -96,7 +100,7 @@ def get_order(
 @router.post("", response_model=PurchaseOrderRead, status_code=status.HTTP_201_CREATED)
 def create_order(
     body: PurchaseOrderCreate,
-    ctx: CurrentClinic = Depends(require_clinic_roles("admin")),
+    ctx: CurrentClinic = Depends(get_current_clinic),
     db: Session = Depends(get_db),
 ) -> dict:
     order = PurchaseOrder(
@@ -116,7 +120,7 @@ def create_order(
 def update_order(
     order_id: str,
     body: PurchaseOrderUpdate,
-    ctx: CurrentClinic = Depends(require_clinic_roles("admin")),
+    ctx: CurrentClinic = Depends(get_current_clinic),
     db: Session = Depends(get_db),
 ) -> dict:
     order = _get_order_or_404(db, ctx.clinic["id"], order_id)
@@ -158,7 +162,7 @@ def update_order(
 @router.delete("/{order_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_order(
     order_id: str,
-    ctx: CurrentClinic = Depends(require_clinic_roles("admin")),
+    ctx: CurrentClinic = Depends(get_current_clinic),
     db: Session = Depends(get_db),
 ) -> None:
     order = _get_order_or_404(db, ctx.clinic["id"], order_id)

@@ -4,12 +4,16 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.deps import CurrentClinic, get_current_clinic, require_clinic_roles
+from app.api.deps import CurrentClinic, get_current_clinic, require_clinic_roles, require_component
 from app.db.session import get_db
 from app.models import AppointmentWaitlist, ClinicBranch, Pet
 from app.schemas.waitlist import WaitlistCreate, WaitlistRead, WaitlistUpdate
 
-router = APIRouter(prefix="/waitlist", tags=["waitlist"])
+router = APIRouter(
+    prefix="/waitlist",
+    tags=["waitlist"],
+    dependencies=[Depends(require_component("waitlist"))],
+)
 
 
 def _with_names(db: Session, rows: list[AppointmentWaitlist]) -> list[dict]:

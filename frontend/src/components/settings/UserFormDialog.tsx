@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -30,6 +30,16 @@ export interface StaffUser {
   specialty?: string | null
 }
 
+interface UserComponents {
+  role: string
+  catalog: { slug: string; label: string }[]
+  defaults: string[]
+  overrides: Record<string, boolean>
+  effective: string[]
+}
+
+type AccessValue = 'default' | 'grant' | 'deny'
+
 const ROLES = [
   { value: 'admin', label: 'Admin' },
   { value: 'veterinario', label: 'Veterinario' },
@@ -57,8 +67,29 @@ export function UserFormDialog({
   const [cedula, setCedula] = useState('')
   const [jobTitle, setJobTitle] = useState('')
   const [specialty, setSpecialty] = useState('')
+  const [components, setComponents] = useState<UserComponents | null>(null)
+  const [access, setAccess] = useState<Record<string, AccessValue>>({})
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const loadComponents = useCallback(async () => {
+    if (!user) return
+    try {
+      const res = await apiFetch<UserComponents>(`/users/${user.id}/components`)
+      setComponents(res)
+      const next: Record<string, AccessValue> = {}
+      for (const c of res.catalog) {
+        if (c.slug in res.overrides) {
+          next[c.slug] = res.overrides[c.slug] ? 'grant' : 'deny'
+        } else {
+          next[c.slug] = 'default'
+        }
+      }
+      setAccess(next)
+    } catch {
+      setComponents(null)
+    }
+  }, [user])
 
   useEffect(() => {
     if (!open) return
@@ -72,16 +103,20 @@ export function UserFormDialog({
     setJobTitle(user?.job_title ?? '')
     setSpecialty(user?.specialty ?? '')
     setError(null)
+    setComponents(null)
+    setAccess({})
     apiFetch<{ id: string; name: string }[]>('/branches')
       .then(setBranches)
       .catch(() => undefined)
-  }, [open, user])
+    loadComponents()
+  }, [open, user, loadComponents])
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
     setSubmitting(true)
     try {
+      let userId = user?.id
       if (user) {
         const body: Record<string, unknown> = {
           full_name: fullName,
@@ -95,7 +130,7 @@ export function UserFormDialog({
         if (password) body.password = password
         await apiFetch(`/users/${user.id}`, { method: 'PATCH', body: JSON.stringify(body) })
       } else {
-        await apiFetch('/users', {
+        const created = await apiFetch<{ id: string }>('/users', {
           method: 'POST',
           body: JSON.stringify({
             full_name: fullName,
@@ -109,6 +144,19 @@ export function UserFormDialog({
             specialty: specialty || null,
           }),
         })
+        userId = created.id
+      }
+
+      if (userId && Object.keys(access).length > 0) {
+        const overrides: Record<string, boolean> = {}
+        for (const [slug, value] of Object.entries(access)) {
+          if (value === 'grant') overrides[slug] = true
+          else if (value === 'deny') overrides[slug] = false
+        }
+        await apiFetch(`/users/${userId}/components`, {
+          method: 'PUT',
+          body: JSON.stringify({ overrides }),
+        })
       }
       onSaved()
     } catch (err) {
@@ -118,15 +166,19 @@ export function UserFormDialog({
     }
   }
 
+  const catalog = components?.catalog ?? []
+  const defaults = components?.defaults ?? []
+  const effective = components?.effective ?? []
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{user ? 'Editar usuario' : 'Nuevo usuario'}</DialogTitle>
           <DialogDescription>
             {user
-              ? 'Actualiza el rol, sucursal o contraseña.'
-              : 'Crea una cuenta de staff para la clínica.'}
+              ? 'Actualiza datos, rol o accesos a componentes.'
+              : 'Crea una cuenta de staff y define su acceso a los módulos.'}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="grid gap-4">
@@ -223,6 +275,53 @@ export function UserFormDialog({
               placeholder={user ? 'Dejar vacío para no cambiar' : 'Mínimo 8 caracteres'}
             />
           </div>
+
+          {catalog.length > 0 && (
+            <div className="rounded-md border border-border p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <p className="text-sm font-medium">Acceso a componentes</p>
+                <p className="text-xs text-muted-foreground">
+                  Por defecto: según rol · puedes conceder o denegar
+                </p>
+              </div>
+              <div className="grid gap-2">
+                {catalog.map((c) => {
+                  const isDefault = defaults.includes(c.slug)
+                  const isEffective = effective.includes(c.slug)
+                  return (
+                    <div
+                      key={c.slug}
+                      className="flex items-center justify-between gap-3 rounded-md border border-border/60 px-3 py-2"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium">{c.label}</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {isDefault ? 'Según rol' : 'No por rol'} ·{' '}
+                          {isEffective ? 'Acceso activo' : 'Sin acceso'}
+                        </p>
+                      </div>
+                      <select
+                        value={access[c.slug] ?? 'default'}
+                        onChange={(e) =>
+                          setAccess((prev) => ({
+                            ...prev,
+                            [c.slug]: e.target.value as AccessValue,
+                          }))
+                        }
+                        aria-label={`Acceso a ${c.label}`}
+                        className="h-8 w-32 shrink-0 rounded-md border border-input bg-background px-2 text-sm"
+                      >
+                        <option value="default">Según rol</option>
+                        <option value="grant">Permitir</option>
+                        <option value="deny">Denegar</option>
+                      </select>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
           {error && <p className="text-sm text-destructive">{error}</p>}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
