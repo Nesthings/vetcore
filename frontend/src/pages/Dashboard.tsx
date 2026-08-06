@@ -274,7 +274,7 @@ export function Dashboard() {
 
           <Separator />
           <p className="text-xs text-muted-foreground">
-            Los reportes financieros (ingresos) son exclusivos del admin y llegan en la Fase 2.
+            El módulo Financiero (ingresos y gastos) es exclusivo del admin.
           </p>
         </div>
       )}

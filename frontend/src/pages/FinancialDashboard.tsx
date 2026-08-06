@@ -1,6 +1,5 @@
 import { useCallback, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { ArrowLeft, DollarSign, Receipt, TrendingUp } from 'lucide-react'
+import { DollarSign, Receipt, TrendingUp } from 'lucide-react'
 import {
   Bar,
   BarChart,
@@ -100,12 +99,6 @@ export function FinancialDashboard() {
     <AppLayout>
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <Link
-            to="/reports"
-            className="mb-1 inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary-hover"
-          >
-            <ArrowLeft className="size-4" /> Reportes operativos
-          </Link>
           <h1 className="text-2xl font-semibold tracking-tight">Dashboard financiero</h1>
           <p className="text-sm text-muted-foreground">
             Exclusivo del admin · montos en moneda local

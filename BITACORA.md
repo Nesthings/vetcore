@@ -1220,4 +1220,21 @@ El botón de la ficha del paciente ahora va a `/consultas/nueva?pet=<id>` (la ma
 
 ---
 
+## Eliminación — Módulo "Reportes" (operativos)
+
+**Fecha:** 2026-08-06
+
+### Contexto
+El usuario indicó que el módulo de Reportes operativos no le sirve y pidió borrarlo **conservando el Financiero** (dashboard de movimientos/ingresos-egresos y gastos).
+
+### Qué se eliminó
+- **Backend:** endpoint `GET /reports/operational` (citas/consultas/top productos) y su helper `_branch_scope` de `api/reports.py`; imports sin uso (Appointment, Consultation, ConsultationItem, InventoryProduct, User). Componente `reports` fuera de `core/permissions.py` (catálogo y defaults de vet/recepción).
+- **Frontend:** `pages/Reports.tsx`, ruta `/reports` e import en `App.tsx`, entrada del nav, icono `BarChart3` en `AppLayout`, enlace "Reportes operativos" del `FinancialDashboard` y nota obsoleta del Dashboard.
+- **Documento maestro:** principio 9 (ahora refiere al módulo Financiero), subfase 2.6 y ítem "Reportes operativos" del checklist.
+
+### Qué se conserva
+- **Financiero** (`/reports/financial`, admin): dashboard con lista de movimientos (ingresos + egresos), CRUD de gastos y KPIs. El componente `financial` y el router `reports` (ahora solo financiero) siguen activos.
+
+---
+
 **Siguiente subfase:** por decidir (Fase 3 en hold).

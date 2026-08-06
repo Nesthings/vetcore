@@ -60,7 +60,7 @@ Estas reglas condicionan el diseño de datos y de endpoints. No las reinterprete
 6. **El PDF de resumen de consulta NO es una receta médica formal.** Es un documento informativo (qué se hizo, qué se aplicó, indicaciones). No le agregues elementos que simulen validez legal de prescripción.
 7. **Vinculación del dueño = invitación por token, nunca auto-registro libre.** El token se genera al dar de alta la mascota, atado a un teléfono/correo que la clínica ya capturó en persona.
 8. **Suspensión de una clínica por falta de pago no debe bloquear por completo al dueño.** Los datos de esa clínica pasan a modo solo-lectura para el dueño; sus otras mascotas (en clínicas activas) siguen funcionando con normalidad.
-9. **Permisos de reportes se dividen por contenido, no solo por rol.** Cualquier pantalla con montos de dinero es exclusiva del Admin de clínica. Los reportes operativos (sin cifras de dinero) los puede ver también vet/recepción.
+9. **Permisos de reportes se dividen por contenido, no solo por rol.** Cualquier pantalla con montos de dinero es exclusiva del Admin de clínica. El módulo Financiero (ingresos/egresos) solo lo ve el admin.
 10. **Consentimiento explícito (opt-in) es requerido antes de enviar recordatorios por WhatsApp** al dueño (cumplimiento LFPDPPP, México). No lo omitas ni lo actives por default.
 
 ---
@@ -614,7 +614,7 @@ CREATE TABLE lab_orders (
 - **2.3 — Agenda avanzada**: lista de espera + confirmación automática escalonada (48h/24h/2h).
 - **2.4 — CRM básico + Encuestas + Comparador de fotos de evolución**
 - **2.5 — Portal del dueño ampliado**: ver próximas citas, descargar facturas.
-- **2.6 — Reportes operativos + Dashboard financiero**: con la regla de permisos por contenido (sección 3, punto 9).
+- **2.6 — Dashboard financiero**: con la regla de permisos por contenido (sección 3, punto 9).
 - **2.7 — Centro de notificaciones internas + Bitácora/auditoría** (log de cambios: fotos, cancelaciones, ediciones).
 
 ### FASE 3 — Diferenciadores "wow"
@@ -672,10 +672,9 @@ CREATE TABLE lab_orders (
 37. Comparador de fotos de evolución
 38. Portal del dueño: próximas citas
 39. Portal del dueño: facturas descargables
-40. Reportes operativos (vet/recepción)
-41. Dashboard financiero (admin)
-42. Centro de notificaciones internas
-43. Bitácora/auditoría
+40. Dashboard financiero (admin)
+41. Centro de notificaciones internas
+42. Bitácora/auditoría
 
 ### Fase 3
 45. Transcripción por voz (integrada en Nueva consulta)

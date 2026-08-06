@@ -14,7 +14,6 @@ import {
   Timer,
   UserRound,
   Users,
-  BarChart3,
   Syringe,
 } from 'lucide-react'
 import { NavLink, useNavigate } from 'react-router-dom'
@@ -37,7 +36,6 @@ const NAV_ICONS: Record<string, React.ElementType> = {
   vaccination_plans: Syringe,
   purchase_orders: ShoppingCart,
   automation: BellRing,
-  reports: BarChart3,
   audit: History,
   financial: Receipt,
   templates: FileText,

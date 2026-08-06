@@ -25,7 +25,6 @@ import { Pets } from '@/pages/Pets'
 import { Profile } from '@/pages/Profile'
 import { Products } from '@/pages/Products'
 import { PurchaseOrders } from '@/pages/PurchaseOrders'
-import { Reports } from '@/pages/Reports'
 import { Services } from '@/pages/Services'
 import { Settings } from '@/pages/Settings'
 import { SetupWizard } from '@/pages/SetupWizard'
@@ -75,14 +74,6 @@ function App() {
                 element={
                   <ProtectedRoute roles={['admin']} component="automation">
                     <Automation />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/reports"
-                element={
-                  <ProtectedRoute component="reports">
-                    <Reports />
                   </ProtectedRoute>
                 }
               />

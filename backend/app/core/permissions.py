@@ -25,7 +25,6 @@ COMPONENTS: dict[str, str] = {
     "templates": "Plantillas",
     "vaccination_plans": "Planes de vacunación",
     "automation": "Automatización",
-    "reports": "Reportes",
     "financial": "Financiero",
     "audit": "Bitácora",
     "settings": "Configuración",
@@ -42,7 +41,6 @@ ROLE_DEFAULT_COMPONENTS: dict[str, set[str]] = {
         "inventory",
         "templates",
         "vaccination_plans",
-        "reports",
         "audit",
     },
     "recepcion": {
@@ -51,7 +49,6 @@ ROLE_DEFAULT_COMPONENTS: dict[str, set[str]] = {
         "waitlist",
         "pets",
         "inventory",
-        "reports",
         "audit",
     },
 }

@@ -1,7 +1,8 @@
-"""Reportes — separación por contenido (sección 3.9).
+"""Dashboard financiero — EXCLUSIVO del admin (sección 3.9).
 
-- `/reports/operational`: SIN cifras de dinero, lo ve todo el staff.
-- `/reports/financial`: con montos, EXCLUSIVO del admin.
+El módulo de "Reportes operativos" se eliminó por decisión del usuario
+(2026-08-06). Aquí quedan: el dashboard financiero con la lista de movimientos
+(ingresos de facturas + egresos) y el CRUD de gastos.
 """
 
 from datetime import UTC, datetime, timedelta
@@ -18,16 +19,11 @@ from app.api.deps import (
 from app.core.events import record_audit
 from app.db.session import get_db
 from app.models import (
-    Appointment,
     ClinicBranch,
-    Consultation,
-    ConsultationItem,
     FinancialExpense,
-    InventoryProduct,
     Invoice,
     InvoiceItem,
     Pet,
-    User,
 )
 from app.schemas.billing import ExpenseCreate, ExpenseRead
 
@@ -42,92 +38,6 @@ def _resolve_range(from_: datetime | None, to: datetime | None) -> tuple[datetim
     if from_ is None:
         from_ = to - timedelta(days=DEFAULT_RANGE_DAYS)
     return from_, to
-
-
-def _branch_scope(ctx: CurrentClinic, branch_id: str | None) -> list:
-    clauses = [ctx.clinic["id"]]
-    if branch_id:
-        clauses.append(branch_id)
-    return clauses
-
-
-@router.get("/operational", summary="Reporte operativo (sin cifras de dinero)")
-def operational_report(
-    ctx: CurrentClinic = Depends(require_component("reports")),
-    db: Session = Depends(get_db),
-    from_: datetime | None = Query(default=None, alias="from"),
-    to: datetime | None = Query(default=None),
-    branch_id: str | None = Query(default=None),
-) -> dict:
-    from_, to = _resolve_range(from_, to)
-    clinic_id = ctx.clinic["id"]
-
-    appt_base = [
-        Appointment.clinic_id == clinic_id,
-        Appointment.start_time >= from_,
-        Appointment.start_time <= to,
-    ]
-    if branch_id:
-        appt_base.append(Appointment.branch_id == branch_id)
-
-    citas_total = db.scalar(select(func.count()).select_from(Appointment).where(*appt_base)) or 0
-    citas_por_estado = {
-        row.status: row.count
-        for row in db.execute(
-            select(Appointment.status, func.count().label("count"))
-            .where(*appt_base)
-            .group_by(Appointment.status)
-        ).all()
-    }
-
-    cons_base = [
-        Consultation.clinic_id == clinic_id,
-        Consultation.created_at >= from_,
-        Consultation.created_at <= to,
-    ]
-    consultas_total = (
-        db.scalar(select(func.count()).select_from(Consultation).where(*cons_base)) or 0
-    )
-
-    vet_rows = db.execute(
-        select(User.full_name, func.count().label("count"))
-        .join(Consultation, Consultation.vet_user_id == User.id)
-        .where(*cons_base)
-        .group_by(User.full_name)
-        .order_by(func.count().desc())
-    ).all()
-    consultas_por_veterinario = [{"vet": r.full_name, "count": r.count} for r in vet_rows]
-
-    pacientes_atendidos = (
-        db.scalar(
-            select(func.count(func.distinct(Consultation.pet_id)))
-            .select_from(Consultation)
-            .where(*cons_base)
-        )
-        or 0
-    )
-
-    top_rows = db.execute(
-        select(InventoryProduct.name, func.count().label("count"))
-        .join(ConsultationItem, ConsultationItem.product_id == InventoryProduct.id)
-        .join(Consultation, Consultation.id == ConsultationItem.consultation_id)
-        .where(*cons_base)
-        .group_by(InventoryProduct.name)
-        .order_by(func.count().desc())
-        .limit(5)
-    ).all()
-    top_productos = [{"name": r.name, "count": r.count} for r in top_rows]
-
-    return {
-        "from": from_.isoformat(),
-        "to": to.isoformat(),
-        "citas_total": citas_total,
-        "citas_por_estado": citas_por_estado,
-        "consultas_total": consultas_total,
-        "consultas_por_veterinario": consultas_por_veterinario,
-        "pacientes_atendidos": pacientes_atendidos,
-        "top_productos": top_productos,
-    }
 
 
 @router.get("/financial", summary="Dashboard financiero (EXCLUSIVO del admin)")
