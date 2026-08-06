@@ -170,6 +170,13 @@
     text-rendering: optimizeLegibility;
   }
 
+  .dark body {
+    background-image:
+      radial-gradient(1100px 520px at 100% -5%, rgb(45 212 191 / 0.1), transparent 60%),
+      radial-gradient(900px 480px at -5% 100%, rgb(15 118 110 / 0.14), transparent 55%),
+      linear-gradient(180deg, var(--background) 0%, #17211e 45%, var(--background) 100%);
+  }
+
   /* Jerarquía tipográfica base */
   h1 {
     @apply text-3xl font-semibold tracking-tight;

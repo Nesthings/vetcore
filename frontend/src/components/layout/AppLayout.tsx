@@ -25,6 +25,7 @@ import { apiFetch } from '@/lib/api'
 import { usePermissions } from '@/lib/permissions'
 import { NAV_ROUTES } from '@/lib/nav'
 import { NotificationBell } from '@/components/layout/NotificationBell'
+import { ThemeToggle } from '@/components/layout/ThemeToggle'
 
 const NAV_ICONS: Record<string, React.ElementType> = {
   dashboard: LayoutDashboard,
@@ -130,6 +131,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             Hola, <span className="font-medium text-foreground">{displayName}</span>
           </p>
           <div className="flex items-center gap-2">
+            <ThemeToggle />
             <NotificationBell />
             <div ref={profileRef} className="relative">
               <button
