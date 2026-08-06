@@ -23,7 +23,26 @@ import { useAuth } from '@/lib/auth'
 import { cn } from '@/lib/utils'
 import { apiFetch } from '@/lib/api'
 import { usePermissions } from '@/lib/permissions'
+import { NAV_ROUTES } from '@/lib/nav'
 import { NotificationBell } from '@/components/layout/NotificationBell'
+
+const NAV_ICONS: Record<string, React.ElementType> = {
+  dashboard: LayoutDashboard,
+  agenda: CalendarDays,
+  waitlist: Timer,
+  pets: Users,
+  inventory: Package,
+  kits: PackageOpen,
+  purchase_orders: ShoppingCart,
+  automation: BellRing,
+  reports: BarChart3,
+  audit: History,
+  financial: Receipt,
+  templates: FileText,
+  services: Settings2,
+  invoices: Receipt,
+  settings: Settings2,
+}
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth()
@@ -44,53 +63,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     }
   }, [user?.clinic_id, user?.sub])
 
-  const NAV_ITEMS: {
-    to: string
-    label: string
-    icon: React.ElementType
-    end: boolean
-    component: string
-  }[] = [
-    {
-      to: '/',
-      label: 'Dashboard del día',
-      icon: LayoutDashboard,
-      end: true,
-      component: 'dashboard',
-    },
-    { to: '/agenda', label: 'Agenda', icon: CalendarDays, end: false, component: 'agenda' },
-    { to: '/waitlist', label: 'Lista de espera', icon: Timer, end: false, component: 'waitlist' },
-    { to: '/pets', label: 'Pacientes', icon: Users, end: false, component: 'pets' },
-    { to: '/inventory', label: 'Inventario', icon: Package, end: false, component: 'inventory' },
-    { to: '/kits', label: 'Kits', icon: PackageOpen, end: false, component: 'kits' },
-    {
-      to: '/purchase-orders',
-      label: 'Compras',
-      icon: ShoppingCart,
-      end: false,
-      component: 'purchase_orders',
-    },
-    {
-      to: '/automation',
-      label: 'Automatización',
-      icon: BellRing,
-      end: false,
-      component: 'automation',
-    },
-    { to: '/reports', label: 'Reportes', icon: BarChart3, end: false, component: 'reports' },
-    { to: '/audit', label: 'Bitácora', icon: History, end: false, component: 'audit' },
-    {
-      to: '/reports/financial',
-      label: 'Financiero',
-      icon: Receipt,
-      end: false,
-      component: 'financial',
-    },
-    { to: '/templates', label: 'Plantillas', icon: FileText, end: false, component: 'templates' },
-    { to: '/services', label: 'Servicios', icon: Settings2, end: false, component: 'services' },
-    { to: '/invoices', label: 'Facturación', icon: Receipt, end: false, component: 'invoices' },
-    { to: '/settings', label: 'Configuración', icon: Settings2, end: false, component: 'settings' },
-  ].filter((i) => hasComponent(i.component))
+  const NAV_ITEMS = NAV_ROUTES.filter((i) => hasComponent(i.component)).map((i) => ({
+    ...i,
+    icon: NAV_ICONS[i.component] ?? LayoutDashboard,
+  }))
 
   const handleLogout = () => {
     logout()

@@ -28,3 +28,6 @@ dist/
 # Logs
 *.log
 logs/
+
+# Media local (fotos, PDFs, logos)
+backend/media/

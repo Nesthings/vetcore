@@ -4,6 +4,7 @@ import { Loader2, ShieldX } from 'lucide-react'
 import { useAuth } from '@/lib/auth'
 import { usePermissions } from '@/lib/permissions'
 import { useSetup } from '@/lib/setup'
+import { firstAllowedRoute } from '@/lib/nav'
 
 const ROLE_HOME: Record<string, string> = {
   owner: '/portal',
@@ -77,7 +78,9 @@ export function ProtectedRoute({
       return <RouteLoading />
     }
     if (!hasComponent(component)) {
-      return <AccessDenied />
+      // Si no tiene acceso a esta pantalla, lo llevamos a la primera ruta a
+      // la que sí tiene acceso, en vez de mostrar "Acceso restringido".
+      return <Navigate to={firstAllowedRoute(hasComponent)} replace />
     }
   }
 
