@@ -4,6 +4,7 @@ import {
   CalendarCheck2,
   CalendarClock,
   CalendarX2,
+  ClipboardPlus,
   PackageMinus,
   PawPrint,
   TriangleAlert,
@@ -12,6 +13,7 @@ import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxi
 
 import { AppLayout } from '@/components/layout/AppLayout'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState } from '@/components/ui/error-state'
@@ -95,6 +97,17 @@ export function Dashboard() {
   return (
     <AppLayout>
       <div className="mb-6">
+        <Button
+          asChild
+          variant="success"
+          size="lg"
+          className="mb-6 h-12 w-full px-8 text-base sm:w-auto"
+        >
+          <Link to="/consultas/nueva">
+            <ClipboardPlus className="size-6" aria-hidden="true" />
+            Nueva consulta
+          </Link>
+        </Button>
         <h1 className="text-2xl font-semibold tracking-tight">Dashboard del día</h1>
         <p className="text-sm text-muted-foreground">
           {data ? `Resumen operativo del ${data.date}` : 'Resumen operativo de hoy'}
