@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String, Text, func
+from sqlalchemy import DateTime, ForeignKey, Numeric, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -50,3 +50,20 @@ class ClinicBranch(UUIDPkMixin, Base):
     )
 
     clinic: Mapped[Clinic] = relationship(back_populates="branches")
+
+
+class ClinicSubscriptionEvent(UUIDPkMixin, Base):
+    """Bitácora de eventos de suscripción de una clínica."""
+
+    __tablename__ = "clinic_subscription_events"
+
+    clinic_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("clinics.id"), nullable=False, index=True
+    )
+    event_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    amount: Mapped[float | None] = mapped_column(Numeric(10, 2))
+    notes: Mapped[str | None] = mapped_column(Text)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )

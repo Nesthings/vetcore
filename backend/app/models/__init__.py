@@ -1,7 +1,7 @@
 from app.models._references import consultation_templates, owners  # noqa: F401
 from app.models.appointment import Appointment, ScheduleBlock
 from app.models.billing import Invoice, InvoiceItem, ServiceCatalog
-from app.models.clinic import Clinic, ClinicBranch
+from app.models.clinic import Clinic, ClinicBranch, ClinicSubscriptionEvent
 from app.models.consultation import (
     Consultation,
     ConsultationAttachment,
@@ -16,6 +16,7 @@ __all__ = [
     "Appointment",
     "Clinic",
     "ClinicBranch",
+    "ClinicSubscriptionEvent",
     "Consultation",
     "ConsultationAttachment",
     "ConsultationItem",

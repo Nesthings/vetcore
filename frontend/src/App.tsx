@@ -17,8 +17,8 @@ import { OwnerPortal } from '@/pages/owner/OwnerPortal'
 import { PetDetail } from '@/pages/PetDetail'
 import { Pets } from '@/pages/Pets'
 import { Services } from '@/pages/Services'
-import { SessionHome } from '@/pages/SessionHome'
 import { Settings } from '@/pages/Settings'
+import { SuperAdminPanel } from '@/pages/superadmin/SuperAdminPanel'
 
 function App() {
   return (
@@ -122,8 +122,8 @@ function App() {
           <Route
             path="/super-admin"
             element={
-              <ProtectedRoute>
-                <SessionHome />
+              <ProtectedRoute roles={['super-admin']}>
+                <SuperAdminPanel />
               </ProtectedRoute>
             }
           />

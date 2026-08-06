@@ -18,6 +18,9 @@ from app.schemas.clinic import (
     ClinicBranchUpdate,
     ClinicCreate,
     ClinicRead,
+    ClinicSubscriptionChange,
+    ClinicSubscriptionEventRead,
+    ClinicSummaryRead,
     ClinicUpdate,
 )
 from app.schemas.consultation import (
@@ -48,6 +51,9 @@ __all__ = [
     "ClinicBranchUpdate",
     "ClinicCreate",
     "ClinicRead",
+    "ClinicSubscriptionChange",
+    "ClinicSubscriptionEventRead",
+    "ClinicSummaryRead",
     "ClinicUpdate",
     "ConsultationCreate",
     "ConsultationItemCreate",

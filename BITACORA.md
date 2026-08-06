@@ -451,4 +451,39 @@ Las verificaciones de frontend deben ejercitar el código JS real (no solo el ba
 
 ---
 
-**Siguiente subfase:** 1.8 — Panel Super-Admin (lista de clínicas, estado de suscripción, switch activar/desactivar, detalle de clínica, alta manual de clínica nueva).
+## Subfase 1.8 — Panel Super-Admin ✅
+
+**Fecha:** 2026-08-05
+
+### Qué se hizo
+**Backend:**
+- Modelo `ClinicSubscriptionEvent` (la tabla existía desde 0001).
+- `POST /clinics/{id}/subscription` — cambia `subscription_status` y **registra el evento** (`activated`/`suspended`/`cancelled`, `created_by` = super-admin).
+- `GET /clinics/{id}/events` — historial de eventos de suscripción.
+- `GET /clinics/{id}/summary` — conteos (sucursales, staff, pacientes, citas, facturas) para el detalle.
+
+**Frontend:**
+- `SuperAdminPanel` (`/super-admin`, rol super-admin): lista de clínicas con badge de estado y **switch Activar/Suspender**, alta manual de clínica, detalle con conteos e historial de eventos.
+- `ClinicFormDialog` (alta de tenant) y `ClinicDetailDialog` (conteos + eventos + toggle).
+- Layout propio del super-admin (sin sidebar de clínica) con logout.
+- Eliminado `SessionHome.tsx` (ya sin uso: /portal y /super-admin tienen sus paneles).
+
+### Decisiones técnicas y por qué
+- **Bitácora de suscripción:** `clinic_subscription_events` estaba vacía desde el esquema; el panel la alimenta para dar trazabilidad al dueño del producto.
+- **Endpoint dedicado de suscripción** (no reutilizar PATCH): el cambio de estado es una acción del panel con registro de evento; PATCH queda para datos de contacto.
+- **Panel transversal sin shell de clínica:** el super-admin opera sobre todos los tenants.
+- **`read_only`/bloqueo ya probado:** al suspender una clínica, su staff recibe 403 en `get_current_clinic` (el dueño conserva solo-lectura desde 1.7).
+
+### Verificado
+- Lista de clínicas (3) + alta manual (201, luego limpiada) ✓
+- Suspender Clínica Test → estado `suspended` + evento registrado; **reactivada** después de la prueba ✓
+- `GET /clinics/{id}/events` y `/summary` (2 sucursales, 2 staff, 1 paciente, 3 citas, 2 facturas) ✓
+- Admin de clínica → `/clinics` → **403** ✓
+- Ruff + lint 0 errores + build OK ✓
+
+### Notas / pendientes
+- El panel no maneja cobros/pagos (solo el estado y su bitácora); los pagos podrían alimentar `payment_received` en el futuro.
+
+---
+
+**Siguiente subfase:** 1.9 — Pantallas de cierre del MVP (Perfil/configuración de cuenta propia del staff, Transferir/cambiar dueño de una mascota, y confirmar si se adelanta el editor de plantillas de consulta — Fase 2).

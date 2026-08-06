@@ -58,3 +58,31 @@ class ClinicBranchRead(ClinicBranchBase):
     id: uuid.UUID
     clinic_id: uuid.UUID
     created_at: datetime
+
+
+class ClinicSubscriptionChange(BaseModel):
+    status: str = Field(pattern="^(trial|active|suspended|cancelled)$")
+    notes: str | None = None
+
+
+class ClinicSubscriptionEventRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    clinic_id: uuid.UUID
+    event_type: str
+    amount: float | None
+    notes: str | None
+    created_by: uuid.UUID | None
+    created_at: datetime
+
+
+class ClinicSummaryRead(BaseModel):
+    id: uuid.UUID
+    name: str
+    subscription_status: str
+    branches: int
+    staff: int
+    pets: int
+    appointments: int
+    invoices: int
