@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Loader2, Plus, UserRound } from 'lucide-react'
+import { Loader2, Plus, Trash2, UserRound } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -70,6 +70,8 @@ export function PetFormDialog({
   const [altPhone, setAltPhone] = useState('')
 
   const [submitting, setSubmitting] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const loadCatalog = useCallback(async () => {
@@ -117,6 +119,7 @@ export function PetFormDialog({
     setOwnerEmail('')
     setAltContactName('')
     setAltPhone('')
+    setConfirmDelete(false)
     setError(null)
   }, [open, pet])
 
@@ -211,6 +214,20 @@ export function PetFormDialog({
       setError(err instanceof Error ? err.message : 'No se pudo guardar la mascota')
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  const remove = async () => {
+    if (!pet) return
+    setError(null)
+    setDeleting(true)
+    try {
+      await apiFetch(`/pets/${pet.id}`, { method: 'DELETE' })
+      onSaved()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo eliminar la mascota')
+      setConfirmDelete(false)
+      setDeleting(false)
     }
   }
 
@@ -488,19 +505,56 @@ export function PetFormDialog({
 
           {error && <p className="text-sm text-destructive">{error}</p>}
 
+          {confirmDelete && pet && (
+            <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3">
+              <p className="text-sm font-medium text-destructive">¿Eliminar a {pet.name}?</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                La mascota dejará de aparecer en el expediente. Esta acción no se puede deshacer.
+              </p>
+            </div>
+          )}
+
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={submitting}>
-              {submitting ? (
-                <Loader2 className="animate-spin" />
-              ) : pet ? (
-                'Guardar cambios'
-              ) : (
-                'Guardar mascota'
-              )}
-            </Button>
+            {confirmDelete ? (
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setConfirmDelete(false)}
+                  disabled={deleting}
+                >
+                  Cancelar
+                </Button>
+                <Button type="button" variant="destructive" onClick={remove} disabled={deleting}>
+                  {deleting ? <Loader2 className="animate-spin" /> : 'Sí, eliminar'}
+                </Button>
+              </>
+            ) : (
+              <>
+                {pet && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="mr-auto text-destructive hover:text-destructive"
+                    onClick={() => setConfirmDelete(true)}
+                  >
+                    <Trash2 /> Eliminar mascota
+                  </Button>
+                )}
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={submitting}>
+                  {submitting ? (
+                    <Loader2 className="animate-spin" />
+                  ) : pet ? (
+                    'Guardar cambios'
+                  ) : (
+                    'Guardar mascota'
+                  )}
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </form>
       </DialogContent>
