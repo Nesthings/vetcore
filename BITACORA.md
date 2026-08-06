@@ -986,4 +986,39 @@ Corrección del modelo conceptual: el usuario aclaró que **el admin de la clín
 
 ---
 
+## Subfase 2.13 — Dueño al registrar mascota + diccionario dinámico de razas ✅
+
+**Fecha:** 2026-08-06
+
+### Qué se hizo
+**1. Dueño en el alta de mascota (Pacientes → Nueva mascota):**
+- Migración `0010_owner_contact`: `owners` + `full_name`, `alt_contact_name`, `alt_phone`.
+- `PetCreate.owner`: `{full_name, phone, email, alt_contact_name, alt_phone}`.
+- `create_pet` reutiliza o crea el owner (regla de identidad global: nunca duplica por email/teléfono, mismo patrón que la transferencia) y crea el vínculo `owner_pet_links` con `ON CONFLICT`.
+- Las lecturas de mascotas (`list`, `get`, `create`) ahora incluyen `owners` con nombre y contacto alternativo (`OwnerLinkRead` ampliado).
+
+**2. Diccionario dinámico de razas:**
+- `app/data/breeds.py`: 11 especies (perro, gato, ave, conejo, reptil, roedor, pez, anfibio, hurón, caballo, otro) con sus razas/variedades basadas en catálogos públicos (AKC/FCI, CFA, ARBA, etc.) — incluye mascotas inusuales (serpientes, camaleones, axolote, erizo pigmeo, suricata…). Toda especie incluye "Mestizo".
+- `GET /pets/breeds-catalog` (staff): especies + razas por especie.
+- `PetFormDialog`: especie → el dropdown de raza se despliega según la especie (dinámico), con Mestizo.
+- `PetDetail`: nueva tarjeta "Dueño" con nombre, teléfono, correo y contacto alternativo.
+
+### Decisiones técnicas y por qué
+- **Dueño como bloque opcional dentro del alta**: si no se captura, el flujo actual de Invitar/Transferir sigue funcionando.
+- **Reutilización del owner**: se evita duplicar la identidad del dueño (principio del documento) — el mismo patrón de `transfer_owner`.
+- **Catálogo estático pero "dinámico" en UI**: la lista de razas cambia según la especie seleccionada; es una sola fuente (`data/breeds.py`) reutilizable por el backend y expandible.
+
+### Verificado
+- Alta de mascota con dueño → `owners` en respuesta con nombre/teléfono/correo/alternativo ✓
+- Owner reutilizado si ya existía por email ✓
+- `breeds-catalog`: 11 especies, Mestizo en todas, perro 94 razas, gato 38, reptiles 26, peces 23 ✓
+- Ruff + lint 0 errores + build OK ✓
+- Datos de prueba eliminados.
+
+### Notas / pendientes
+- El catálogo de razas se puede ampliar/especializar después (agregar variedades a la DB si crece).
+- Queda en `TODO.md` el acceso del dueño por token.
+
+---
+
 **Siguiente subfase:** 3.1 — Transcripción/resumen de consulta por voz con IA.

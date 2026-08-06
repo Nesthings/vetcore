@@ -4,6 +4,16 @@ from datetime import date, datetime
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class PetOwnerCreate(BaseModel):
+    """Dueño al registrar la mascota (contacto + alternativo)."""
+
+    full_name: str | None = Field(default=None, max_length=200)
+    phone: str | None = Field(default=None, max_length=30)
+    email: str | None = Field(default=None, max_length=200)
+    alt_contact_name: str | None = Field(default=None, max_length=200)
+    alt_phone: str | None = Field(default=None, max_length=30)
+
+
 class PetBase(BaseModel):
     name: str = Field(min_length=1, max_length=150)
     species: str = Field(min_length=1, max_length=50)
@@ -16,7 +26,7 @@ class PetBase(BaseModel):
 
 
 class PetCreate(PetBase):
-    pass
+    owner: PetOwnerCreate | None = None
 
 
 class PetUpdate(BaseModel):
@@ -31,6 +41,17 @@ class PetUpdate(BaseModel):
     is_active: bool | None = None
 
 
+class OwnerLinkRead(BaseModel):
+    owner_id: uuid.UUID
+    full_name: str | None = None
+    phone: str | None
+    email: str | None
+    alt_contact_name: str | None = None
+    alt_phone: str | None = None
+    linked_at: datetime
+    is_active: bool
+
+
 class PetRead(PetBase):
     model_config = ConfigDict(from_attributes=True)
 
@@ -40,6 +61,7 @@ class PetRead(PetBase):
     created_at: datetime
     latest_weight_kg: float | None = None
     alert_count: int | None = None
+    owners: list[OwnerLinkRead] | None = None
 
 
 class PetWeightCreate(BaseModel):
@@ -56,14 +78,6 @@ class PetWeightRead(BaseModel):
     weight_kg: float
     recorded_at: datetime
     consultation_id: uuid.UUID | None
-
-
-class OwnerLinkRead(BaseModel):
-    owner_id: uuid.UUID
-    phone: str | None
-    email: str | None
-    linked_at: datetime
-    is_active: bool
 
 
 class OwnerTransferRequest(BaseModel):

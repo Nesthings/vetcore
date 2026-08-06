@@ -23,6 +23,7 @@ from app.core.storage import (
     save_media,
     validate_extension,
 )
+from app.data.breeds import BREEDS_BY_SPECIES, breeds_for, species_options
 from app.db.session import get_db
 from app.models import (
     Appointment,
@@ -71,6 +72,14 @@ class InvitationResponse(BaseModel):
     expires_at: datetime
 
 
+@router.get("/breeds-catalog", summary="Catálogo de especies y razas para el alta de mascotas")
+def breeds_catalog() -> dict:
+    return {
+        "species": species_options(),
+        "breeds": {key: breeds_for(key) for key in BREEDS_BY_SPECIES},
+    }
+
+
 @router.get("", response_model=list[PetRead])
 def list_pets(
     ctx: CurrentClinic = Depends(get_current_clinic),
@@ -98,7 +107,7 @@ def list_pets(
         )
         for pet in pets:
             pet.alert_count = counts.get(pet.id, 0)
-    return [_pet_with_latest_weight(db, pet) for pet in pets]
+    return [_with_owners(db, _pet_with_latest_weight(db, pet)) for pet in pets]
 
 
 def _pet_with_latest_weight(db: Session, pet: Pet) -> Pet:
@@ -110,6 +119,63 @@ def _pet_with_latest_weight(db: Session, pet: Pet) -> Pet:
     )
     pet.latest_weight_kg = Decimal(latest) if latest is not None else None
     return pet
+
+
+def _with_owners(db: Session, pet: Pet) -> Pet:
+    rows = (
+        db.execute(
+            text(
+                "SELECT o.id AS owner_id, o.full_name, o.phone, o.email, "
+                "o.alt_contact_name, o.alt_phone, l.linked_at, l.is_active "
+                "FROM owner_pet_links l JOIN owners o ON o.id = l.owner_id "
+                "WHERE l.pet_id = :pid AND l.clinic_id = :cid "
+                "ORDER BY l.linked_at DESC"
+            ),
+            {"pid": pet.id, "cid": pet.clinic_id},
+        )
+        .mappings()
+        .all()
+    )
+    pet.owners = [OwnerLinkRead(**dict(r)) for r in rows]
+    return pet
+
+
+def _get_or_create_owner(
+    db: Session, phone: str | None, email: str | None, full_name: str | None
+) -> str | None:
+    """Reutiliza un owner existente (por email o teléfono) o crea uno nuevo.
+
+    Regla de identidad global: nunca se duplica la cuenta del dueño.
+    Devuelve el id del owner o None si no se pudo determinar.
+    """
+    if email:
+        owner = db.execute(
+            text("SELECT id FROM owners WHERE email = :email"), {"email": email}
+        ).scalar()
+    elif phone:
+        owner = db.execute(
+            text("SELECT id FROM owners WHERE phone = :phone"), {"phone": phone}
+        ).scalar()
+    else:
+        return None
+
+    if owner is None:
+        owner = db.execute(
+            text(
+                "INSERT INTO owners (phone, email, full_name) "
+                "VALUES (:phone, :email, :name) RETURNING id"
+            ),
+            {"phone": phone, "email": email, "name": full_name},
+        ).scalar()
+    elif full_name:
+        db.execute(
+            text(
+                "UPDATE owners SET full_name = "
+                "COALESCE(NULLIF(:name, ''), full_name) WHERE id = :oid"
+            ),
+            {"name": full_name, "oid": owner},
+        )
+    return owner
 
 
 def _get_pet_or_404(db: Session, clinic_id: str, pet_id: str) -> Pet:
@@ -134,8 +200,37 @@ def create_pet(
     ctx: CurrentClinic = Depends(require_clinic_roles(*PET_MUTATORS)),
     db: Session = Depends(get_db),
 ) -> Pet:
-    pet = Pet(clinic_id=ctx.clinic["id"], **body.model_dump())
+    pet = Pet(clinic_id=ctx.clinic["id"], **body.model_dump(exclude={"owner"}))
     db.add(pet)
+    db.flush()
+
+    if body.owner is not None and (body.owner.phone or body.owner.email):
+        owner = _get_or_create_owner(
+            db, body.owner.phone, body.owner.email, body.owner.full_name
+        )
+        if owner is not None and body.owner.alt_contact_name:
+            db.execute(
+                text(
+                    "UPDATE owners SET alt_contact_name = :alt, alt_phone = :altp "
+                    "WHERE id = :oid"
+                ),
+                {
+                    "alt": body.owner.alt_contact_name,
+                    "altp": body.owner.alt_phone,
+                    "oid": owner,
+                },
+            )
+        if owner is not None:
+            db.execute(
+                text(
+                    "INSERT INTO owner_pet_links (owner_id, pet_id, clinic_id, is_active) "
+                    "VALUES (:oid, :pid, :cid, true) "
+                    "ON CONFLICT (owner_id, pet_id) "
+                    "DO UPDATE SET is_active = true, revoked_at = NULL"
+                ),
+                {"oid": owner, "pid": pet.id, "cid": ctx.clinic["id"]},
+            )
+
     record_audit(
         db,
         clinic_id=ctx.clinic["id"],
@@ -147,7 +242,7 @@ def create_pet(
     )
     db.commit()
     db.refresh(pet)
-    return pet
+    return _with_owners(db, _pet_with_latest_weight(db, pet))
 
 
 @router.patch("/{pet_id}", response_model=PetRead)
@@ -173,7 +268,7 @@ def update_pet(
     )
     db.commit()
     db.refresh(pet)
-    return _pet_with_latest_weight(db, pet)
+    return _with_owners(db, _pet_with_latest_weight(db, pet))
 
 
 @router.delete("/{pet_id}", status_code=status.HTTP_204_NO_CONTENT)

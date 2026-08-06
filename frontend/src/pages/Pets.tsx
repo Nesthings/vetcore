@@ -20,6 +20,17 @@ import {
 } from '@/components/ui/table'
 import { apiFetch } from '@/lib/api'
 
+export interface PetOwner {
+  owner_id: string
+  full_name?: string | null
+  phone?: string | null
+  email?: string | null
+  alt_contact_name?: string | null
+  alt_phone?: string | null
+  linked_at: string
+  is_active: boolean
+}
+
 export interface Pet {
   id: string
   clinic_id: string
@@ -34,6 +45,7 @@ export interface Pet {
   is_active: boolean
   created_at: string
   latest_weight_kg?: number | null
+  owners?: PetOwner[] | null
 }
 
 interface PetWithAlerts extends Pet {
