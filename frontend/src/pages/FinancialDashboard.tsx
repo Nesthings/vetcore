@@ -14,6 +14,7 @@ import {
 } from 'recharts'
 
 import { AppLayout } from '@/components/layout/AppLayout'
+import { ExpenseDialog } from '@/components/financial/ExpenseDialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -21,7 +22,27 @@ import { ErrorState } from '@/components/ui/error-state'
 import { LoadingState } from '@/components/ui/loading-state'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import { apiFetch } from '@/lib/api'
+
+interface Movement {
+  id: string
+  tipo: 'ingreso' | 'egreso'
+  monto: number
+  fecha: string
+  origen: string
+  concepto: string
+  detalle: string
+  sucursal: string
+  status: string | null
+}
 
 interface FinancialReport {
   from: string
@@ -32,6 +53,7 @@ interface FinancialReport {
   pendientes_por_cobrar: number
   ticket_promedio: number
   top_servicios: { name: string; total: number }[]
+  movements: Movement[]
 }
 
 function toInputValue(d: Date): string {
@@ -53,6 +75,7 @@ export function FinancialDashboard() {
   const [data, setData] = useState<FinancialReport | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [expenseOpen, setExpenseOpen] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -71,9 +94,7 @@ export function FinancialDashboard() {
     }
   }, [from, to])
 
-  const estadoData = data
-    ? Object.entries(data.facturas_por_estado).map(([k, v]) => ({ name: k, count: v }))
-    : []
+  const movements = data?.movements ?? []
 
   return (
     <AppLayout>
@@ -249,21 +270,87 @@ export function FinancialDashboard() {
           </div>
 
           <Card className="shadow-card">
-            <CardHeader>
-              <CardTitle>Facturas por estado</CardTitle>
+            <CardHeader className="flex-row items-center justify-between space-y-0">
+              <div>
+                <CardTitle>Movimientos</CardTitle>
+                <CardDescription>
+                  Ingresos (facturas) y egresos (gastos) con su detalle y origen
+                </CardDescription>
+              </div>
+              <Button size="sm" onClick={() => setExpenseOpen(true)}>
+                Registrar gasto
+              </Button>
             </CardHeader>
             <CardContent>
-              <div className="flex flex-wrap gap-2">
-                {estadoData.map((e) => (
-                  <Badge key={e.name} variant="outline">
-                    {e.name}: {e.count}
-                  </Badge>
-                ))}
-              </div>
+              {movements.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Sin movimientos en el rango seleccionado.
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Fecha y hora</TableHead>
+                        <TableHead>Tipo</TableHead>
+                        <TableHead>Concepto / origen</TableHead>
+                        <TableHead>Sucursal</TableHead>
+                        <TableHead className="text-right">Monto</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {movements.map((m) => (
+                        <TableRow key={`${m.tipo}-${m.id}`}>
+                          <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+                            {new Date(m.fecha).toLocaleString('es-MX', {
+                              day: '2-digit',
+                              month: 'short',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={m.tipo === 'ingreso' ? 'success' : 'destructive'}>
+                              {m.tipo === 'ingreso' ? 'Ingreso' : 'Egreso'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <p className="font-medium">{m.concepto}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {m.origen}
+                              {m.detalle !== '—' ? ` · ${m.detalle}` : ''}
+                            </p>
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            {m.sucursal}
+                          </TableCell>
+                          <TableCell
+                            className={`text-right font-semibold ${
+                              m.tipo === 'ingreso' ? 'text-success' : 'text-destructive'
+                            }`}
+                          >
+                            {m.tipo === 'ingreso' ? '+' : '-'}${m.monto.toFixed(2)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
       )}
+
+      <ExpenseDialog
+        open={expenseOpen}
+        onOpenChange={setExpenseOpen}
+        onSaved={() => {
+          setExpenseOpen(false)
+          load()
+        }}
+      />
     </AppLayout>
   )
 }

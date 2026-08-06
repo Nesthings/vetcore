@@ -11,6 +11,7 @@ from app.models.consultation import (
     ConsultationSummaryPdf,
     ConsultationTemplate,
 )
+from app.models.expense import FinancialExpense
 from app.models.inventory import (
     InventoryLot,
     InventoryMovement,
@@ -44,6 +45,7 @@ __all__ = [
     "ConsultationTemplate",
     "DigitalConsent",
     "CustomBreed",
+    "FinancialExpense",
     "InventoryLot",
     "InventoryMovement",
     "InventoryProduct",

@@ -5,6 +5,25 @@ from decimal import Decimal
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class ExpenseCreate(BaseModel):
+    concept: str = Field(min_length=1, max_length=150)
+    amount: float = Field(gt=0)
+    notes: str | None = Field(default=None, max_length=2000)
+    recorded_at: datetime | None = None
+
+
+class ExpenseRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    clinic_id: uuid.UUID
+    concept: str
+    amount: float
+    notes: str | None
+    recorded_at: datetime
+    created_at: datetime
+
+
 class InvoiceItemCreate(BaseModel):
     service_id: uuid.UUID | None = None
     product_id: uuid.UUID | None = None
