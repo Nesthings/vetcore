@@ -6,7 +6,6 @@ si la clínica está suspendida, el dueño conserva lectura (badge read_only).
 Incluye preferencias (opt-in WhatsApp, principio 10) y encuestas (2.4).
 """
 
-from datetime import UTC, datetime
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile, status
@@ -33,8 +32,6 @@ from app.models import (
     User,
 )
 from app.schemas.crm import (
-    OwnerPreferencesRead,
-    OwnerPreferencesUpdate,
     SurveyCreate,
     SurveyRead,
 )
@@ -183,8 +180,7 @@ def owner_pet_detail(
             "care_instructions": c.care_instructions,
             "vet_name": vets.get(c.vet_user_id),
             "items": [
-                {"description": i.description, "quantity": float(i.quantity)}
-                for i in c.items
+                {"description": i.description, "quantity": float(i.quantity)} for i in c.items
             ],
             "summary_pdf_url": pdfs.get(c.id),
             "survey": surveys.get(c.id),
@@ -267,90 +263,6 @@ def revert_cartilla_photo(
     db.commit()
     db.refresh(pet)
     return {"cartilla_photo_url": pet.cartilla_photo_url, "revertible": False}
-
-
-@router.get(
-    "/preferences",
-    response_model=OwnerPreferencesRead,
-    summary="Preferencias del dueño (canal y opt-in de recordatorios)",
-)
-def owner_preferences(
-    owner: CurrentUser = Depends(get_current_owner),
-    db: Session = Depends(get_db),
-) -> OwnerPreferencesRead:
-    row = (
-        db.execute(
-            text(
-                "SELECT preferred_channel, accepts_reminders, accepts_reminders_at "
-                "FROM owner_preferences WHERE owner_id = :o"
-            ),
-            {"o": owner.sub},
-        )
-        .mappings()
-        .first()
-    )
-    if row is None:
-        return OwnerPreferencesRead(
-            owner_id=owner.sub, preferred_channel="whatsapp", accepts_reminders=False
-        )
-    return OwnerPreferencesRead(owner_id=owner.sub, **dict(row))
-
-
-@router.put(
-    "/preferences",
-    response_model=OwnerPreferencesRead,
-    summary="Actualiza preferencias (opt-in WhatsApp registrado)",
-)
-def update_owner_preferences(
-    body: OwnerPreferencesUpdate,
-    owner: CurrentUser = Depends(get_current_owner),
-    db: Session = Depends(get_db),
-) -> OwnerPreferencesRead:
-    current = (
-        db.execute(
-            text(
-                "SELECT preferred_channel, accepts_reminders, accepts_reminders_at "
-                "FROM owner_preferences WHERE owner_id = :o"
-            ),
-            {"o": owner.sub},
-        )
-        .mappings()
-        .first()
-    )
-    channel = body.preferred_channel or (current["preferred_channel"] if current else "whatsapp")
-    accepts = body.accepts_reminders
-    accepts_at = None
-    if accepts is None:
-        accepts = current["accepts_reminders"] if current else False
-        accepts_at = current["accepts_reminders_at"] if current else None
-    elif accepts:
-        accepts_at = datetime.now(UTC)
-
-    db.execute(
-        text(
-            "INSERT INTO owner_preferences "
-            "(owner_id, preferred_channel, accepts_reminders, accepts_reminders_at) "
-            "VALUES (:o, :ch, :ac, :at) "
-            "ON CONFLICT (owner_id) DO UPDATE SET "
-            "preferred_channel = EXCLUDED.preferred_channel, "
-            "accepts_reminders = EXCLUDED.accepts_reminders, "
-            "accepts_reminders_at = EXCLUDED.accepts_reminders_at"
-        ),
-        {"o": owner.sub, "ch": channel, "ac": accepts, "at": accepts_at},
-    )
-    db.commit()
-    row = (
-        db.execute(
-            text(
-                "SELECT preferred_channel, accepts_reminders, accepts_reminders_at "
-                "FROM owner_preferences WHERE owner_id = :o"
-            ),
-            {"o": owner.sub},
-        )
-        .mappings()
-        .first()
-    )
-    return OwnerPreferencesRead(owner_id=owner.sub, **dict(row))
 
 
 def _owner_consultation(db: Session, owner_id: str, consultation_id: str) -> Consultation:
@@ -456,20 +368,24 @@ def owner_appointments(
     owner: CurrentUser = Depends(get_current_owner),
     db: Session = Depends(get_db),
 ) -> list[dict]:
-    rows = db.execute(
-        text(
-            "SELECT a.id, a.pet_id, a.clinic_id, a.procedure_type, a.start_time, a.end_time, "
-            "a.status, c.name AS clinic_name, p.name AS pet_name "
-            "FROM owner_pet_links l "
-            "JOIN appointments a ON a.pet_id = l.pet_id "
-            "JOIN clinics c ON c.id = a.clinic_id "
-            "JOIN pets p ON p.id = a.pet_id "
-            "WHERE l.owner_id = :o AND l.is_active = true "
-            "AND a.start_time >= now() "
-            "ORDER BY a.start_time"
-        ),
-        {"o": owner.sub},
-    ).mappings().all()
+    rows = (
+        db.execute(
+            text(
+                "SELECT a.id, a.pet_id, a.clinic_id, a.procedure_type, a.start_time, a.end_time, "
+                "a.status, c.name AS clinic_name, p.name AS pet_name "
+                "FROM owner_pet_links l "
+                "JOIN appointments a ON a.pet_id = l.pet_id "
+                "JOIN clinics c ON c.id = a.clinic_id "
+                "JOIN pets p ON p.id = a.pet_id "
+                "WHERE l.owner_id = :o AND l.is_active = true "
+                "AND a.start_time >= now() "
+                "ORDER BY a.start_time"
+            ),
+            {"o": owner.sub},
+        )
+        .mappings()
+        .all()
+    )
     return [dict(r) for r in rows]
 
 
@@ -481,20 +397,24 @@ def owner_invoices(
     owner: CurrentUser = Depends(get_current_owner),
     db: Session = Depends(get_db),
 ) -> list[dict]:
-    rows = db.execute(
-        text(
-            "SELECT i.id, i.pet_id, i.clinic_id, i.branch_id, i.total, i.status, i.created_at, "
-            "c.name AS clinic_name, p.name AS pet_name, b.name AS branch_name "
-            "FROM owner_pet_links l "
-            "JOIN invoices i ON i.pet_id = l.pet_id "
-            "JOIN clinics c ON c.id = i.clinic_id "
-            "JOIN pets p ON p.id = i.pet_id "
-            "LEFT JOIN clinic_branches b ON b.id = i.branch_id "
-            "WHERE l.owner_id = :o AND l.is_active = true AND i.status != 'cancelled' "
-            "ORDER BY i.created_at DESC"
-        ),
-        {"o": owner.sub},
-    ).mappings().all()
+    rows = (
+        db.execute(
+            text(
+                "SELECT i.id, i.pet_id, i.clinic_id, i.branch_id, i.total, i.status, i.created_at, "
+                "c.name AS clinic_name, p.name AS pet_name, b.name AS branch_name "
+                "FROM owner_pet_links l "
+                "JOIN invoices i ON i.pet_id = l.pet_id "
+                "JOIN clinics c ON c.id = i.clinic_id "
+                "JOIN pets p ON p.id = i.pet_id "
+                "LEFT JOIN clinic_branches b ON b.id = i.branch_id "
+                "WHERE l.owner_id = :o AND l.is_active = true AND i.status != 'cancelled' "
+                "ORDER BY i.created_at DESC"
+            ),
+            {"o": owner.sub},
+        )
+        .mappings()
+        .all()
+    )
     return [dict(r) for r in rows]
 
 
@@ -514,8 +434,7 @@ def owner_invoice_receipt(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Factura no encontrada")
     link = db.execute(
         text(
-            "SELECT 1 FROM owner_pet_links "
-            "WHERE owner_id = :o AND pet_id = :p AND is_active = true"
+            "SELECT 1 FROM owner_pet_links WHERE owner_id = :o AND pet_id = :p AND is_active = true"
         ),
         {"o": owner.sub, "p": invoice.pet_id},
     ).scalar()

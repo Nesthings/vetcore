@@ -4,18 +4,6 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class OwnerPreferencesRead(BaseModel):
-    owner_id: uuid.UUID
-    preferred_channel: str
-    accepts_reminders: bool
-    accepts_reminders_at: datetime | None = None
-
-
-class OwnerPreferencesUpdate(BaseModel):
-    preferred_channel: str | None = Field(default=None, pattern="^(whatsapp|email|sms)$")
-    accepts_reminders: bool | None = None
-
-
 class SurveyCreate(BaseModel):
     rating: int = Field(ge=1, le=5)
     comments: str | None = None

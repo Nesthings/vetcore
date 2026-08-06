@@ -695,4 +695,28 @@ Las verificaciones de frontend deben ejercitar el código JS real (no solo el ba
 
 ---
 
+## Revert — Preferencias/CRM del dueño (decisión del producto)
+
+**Fecha:** 2026-08-05
+
+### Contexto
+El usuario tenía la duda de si el dueño debía tener "perfil". Se verificó el documento:
+- El acceso es **solo por token de invitación** (nunca auto-registro, principio 7).
+- El documento SÍ contempla login del owner ("un solo login", principio 2; `owners.password_hash`; rol `owner`; "Activar cuenta con token").
+
+Resuelta la confusión, el usuario decidió **quitar la pantalla de preferencias/CRM del dueño** (construida en 2.4) y **diferir un acceso por token directo sin login** a la lista TODO.
+
+### Qué se deshizo
+- **Backend:** `GET /owner/preferences` y `PUT /owner/preferences` eliminados de `owner.py`. Schemas `OwnerPreferencesRead`/`OwnerPreferencesUpdate` eliminados de `schemas/crm.py` y exports.
+- **Frontend:** tarjeta "Preferencias de contacto" y su estado/lógica eliminadas de `OwnerPortal.tsx`.
+
+### Qué se conserva
+- Login del owner, Cartilla, próximas citas, facturas/recibos, encuestas, comparador de fotos, flujo de invitación por token. Todo sigue funcionando (verificado: pets/citas/facturas OK; `/owner/preferences` → 404).
+- La tabla `owner_preferences` y el motor de recordatorios (2.3) se mantienen: sin UI del dueño, el opt-in queda en `false` por defecto (cumple el principio 10: nunca enviar sin consentimiento). El consentimiento deberá gestionarse por otro medio (clínica/seed) si se activan recordatorios.
+
+### Nuevo pendiente
+- Creado `TODO.md` con el ítem: **Acceso directo por token (sin login)** — el enlace de invitación que lleve directo a la cartilla sin crear cuenta/sesión.
+
+---
+
 **Siguiente subfase:** 2.6 — Reportes operativos + Dashboard financiero (con la regla de permisos por contenido, sección 3.9).
