@@ -9,7 +9,7 @@ Incluye preferencias (opt-in WhatsApp, principio 10) y encuestas (2.4).
 from datetime import UTC, datetime
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile, status
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session, selectinload
 
@@ -27,6 +27,7 @@ from app.models import (
     Clinic,
     Consultation,
     ConsultationSummaryPdf,
+    Invoice,
     Pet,
     PetWeightRecord,
     User,
@@ -445,3 +446,82 @@ def get_survey(
         .first()
     )
     return SurveyRead(**dict(row)) if row else None
+
+
+@router.get(
+    "/appointments",
+    summary="Próximas citas del dueño (todas sus mascotas)",
+)
+def owner_appointments(
+    owner: CurrentUser = Depends(get_current_owner),
+    db: Session = Depends(get_db),
+) -> list[dict]:
+    rows = db.execute(
+        text(
+            "SELECT a.id, a.pet_id, a.clinic_id, a.procedure_type, a.start_time, a.end_time, "
+            "a.status, c.name AS clinic_name, p.name AS pet_name "
+            "FROM owner_pet_links l "
+            "JOIN appointments a ON a.pet_id = l.pet_id "
+            "JOIN clinics c ON c.id = a.clinic_id "
+            "JOIN pets p ON p.id = a.pet_id "
+            "WHERE l.owner_id = :o AND l.is_active = true "
+            "AND a.start_time >= now() "
+            "ORDER BY a.start_time"
+        ),
+        {"o": owner.sub},
+    ).mappings().all()
+    return [dict(r) for r in rows]
+
+
+@router.get(
+    "/invoices",
+    summary="Facturas de las mascotas del dueño",
+)
+def owner_invoices(
+    owner: CurrentUser = Depends(get_current_owner),
+    db: Session = Depends(get_db),
+) -> list[dict]:
+    rows = db.execute(
+        text(
+            "SELECT i.id, i.pet_id, i.clinic_id, i.branch_id, i.total, i.status, i.created_at, "
+            "c.name AS clinic_name, p.name AS pet_name, b.name AS branch_name "
+            "FROM owner_pet_links l "
+            "JOIN invoices i ON i.pet_id = l.pet_id "
+            "JOIN clinics c ON c.id = i.clinic_id "
+            "JOIN pets p ON p.id = i.pet_id "
+            "LEFT JOIN clinic_branches b ON b.id = i.branch_id "
+            "WHERE l.owner_id = :o AND l.is_active = true AND i.status != 'cancelled' "
+            "ORDER BY i.created_at DESC"
+        ),
+        {"o": owner.sub},
+    ).mappings().all()
+    return [dict(r) for r in rows]
+
+
+@router.get(
+    "/invoices/{invoice_id}/receipt",
+    summary="Recibo PDF de una factura del dueño",
+)
+def owner_invoice_receipt(
+    invoice_id: str,
+    owner: CurrentUser = Depends(get_current_owner),
+    db: Session = Depends(get_db),
+) -> Response:
+    from app.api.invoices import receipt_response
+
+    invoice = db.get(Invoice, invoice_id)
+    if invoice is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Factura no encontrada")
+    link = db.execute(
+        text(
+            "SELECT 1 FROM owner_pet_links "
+            "WHERE owner_id = :o AND pet_id = :p AND is_active = true"
+        ),
+        {"o": owner.sub, "p": invoice.pet_id},
+    ).scalar()
+    if not link:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="La factura no pertenece a una mascota tuya",
+        )
+    return receipt_response(db, invoice)

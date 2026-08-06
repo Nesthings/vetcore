@@ -15,6 +15,7 @@ import { Invoices } from '@/pages/Invoices'
 import { Kits } from '@/pages/Kits'
 import { NewConsultation } from '@/pages/NewConsultation'
 import { OwnerPetDetail } from '@/pages/owner/OwnerPetDetail'
+import { OwnerInvoices } from '@/pages/owner/OwnerInvoices'
 import { OwnerPortal } from '@/pages/owner/OwnerPortal'
 import { PetDetail } from '@/pages/PetDetail'
 import { Pets } from '@/pages/Pets'
@@ -170,6 +171,14 @@ function App() {
             element={
               <ProtectedRoute roles={['owner']}>
                 <OwnerPetDetail />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/portal/invoices"
+            element={
+              <ProtectedRoute roles={['owner']}>
+                <OwnerInvoices />
               </ProtectedRoute>
             }
           />

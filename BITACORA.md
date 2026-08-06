@@ -665,4 +665,34 @@ Las verificaciones de frontend deben ejercitar el código JS real (no solo el ba
 
 ---
 
-**Siguiente subfase:** 2.5 — Portal del dueño ampliado (ver próximas citas, descargar facturas).
+## Subfase 2.5 — Portal del dueño ampliado (citas y facturas) ✅
+
+**Fecha:** 2026-08-05
+
+### Qué se hizo
+**Backend:**
+- `GET /owner/appointments` — próximas citas de TODAS las mascotas del dueño (vía `owner_pet_links`), con clínica, mascota y estado.
+- `GET /owner/invoices` — facturas de las mascotas del dueño (pet, clínica, sucursal, total, estado, fecha; excluye canceladas).
+- `GET /owner/invoices/{id}/receipt` — **recibo PDF** validando que la factura pertenezca a una mascota vinculada. Se extrajo `receipt_response()` en `invoices.py` para reutilizarlo entre admin y dueño.
+
+**Frontend:**
+- `OwnerPortal`: sección **"Próximas citas"** (todas las mascotas) y enlace **"Mis facturas"**.
+- `OwnerInvoices` (`/portal/invoices`, rol owner): listado con total/estado y **descarga del recibo PDF** (fetch con token → blob).
+
+### Decisiones técnicas y por qué
+- **Global por identidad del dueño:** citas y facturas se agregan a través de `owner_pet_links`; si una clínica está suspendida, siguen visibles (solo lectura, principio 8).
+- **El dueño solo accede a sus facturas:** el endpoint de recibo valida el vínculo antes de generar el PDF (404 si no le pertenece).
+- **Recibo compartido:** `receipt_response()` en `invoices.py` evita duplicar la lógica del PDF entre admin y dueño.
+- La facturación admin (`/invoices`) sigue siendo solo admin; la del dueño es solo lectura.
+
+### Verificado
+- Dueño: 1 cita próxima, 3 facturas (560/645/1151), recibo PDF HTTP 200 ✓
+- Todo vía proxy (frontend) ✓
+- Ruff + lint 0 errores + build OK ✓
+
+### Notas / pendientes
+- Las citas y facturas del dueño se muestran por mascota/clínica; el detalle per-mascota ya estaba en 1.7.
+
+---
+
+**Siguiente subfase:** 2.6 — Reportes operativos + Dashboard financiero (con la regla de permisos por contenido, sección 3.9).

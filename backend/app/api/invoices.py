@@ -194,7 +194,12 @@ def invoice_receipt(
     db: Session = Depends(get_db),
 ) -> Response:
     invoice = _get_invoice_or_404(db, ctx.clinic["id"], invoice_id)
-    clinic = db.get(Clinic, ctx.clinic["id"])
+    return receipt_response(db, invoice)
+
+
+def receipt_response(db: Session, invoice: Invoice) -> Response:
+    """Genera la respuesta PDF de un recibo (reutilizada por el dueño, 2.5)."""
+    clinic = db.get(Clinic, invoice.clinic_id)
     pet = db.get(Pet, invoice.pet_id) if invoice.pet_id else None
 
     items = []
@@ -215,7 +220,7 @@ def invoice_receipt(
         )
 
     data = {
-        "clinic_name": clinic.name,
+        "clinic_name": clinic.name if clinic else "—",
         "invoice_id": str(invoice.id)[:8].upper(),
         "pet_name": pet.name if pet else "—",
         "status": invoice.status,
@@ -227,7 +232,7 @@ def invoice_receipt(
     return Response(
         content=pdf,
         media_type="application/pdf",
-        headers={"Content-Disposition": f'inline; filename="recibo_{invoice_id[:8]}.pdf"'},
+        headers={"Content-Disposition": f'inline; filename="recibo_{str(invoice.id)[:8]}.pdf"'},
     )
 
 

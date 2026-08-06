@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { BellRing, LogOut, PawPrint } from 'lucide-react'
+import { BellRing, CalendarDays, LogOut, PawPrint, Receipt } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -16,6 +16,15 @@ interface Preferences {
   preferred_channel: string
   accepts_reminders: boolean
   accepts_reminders_at?: string | null
+}
+
+interface OwnerAppointment {
+  id: string
+  pet_name?: string | null
+  clinic_name?: string | null
+  procedure_type: string
+  start_time: string
+  status: string
 }
 
 export interface OwnerPet {
@@ -39,6 +48,7 @@ export function OwnerPortal() {
   const { logout } = useAuth()
   const navigate = useNavigate()
   const [pets, setPets] = useState<OwnerPet[]>([])
+  const [appointments, setAppointments] = useState<OwnerAppointment[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [prefs, setPrefs] = useState<Preferences | null>(null)
@@ -47,12 +57,14 @@ export function OwnerPortal() {
     setLoading(true)
     setError(null)
     try {
-      const [res, p] = await Promise.all([
+      const [res, p, appts] = await Promise.all([
         apiFetch<OwnerPet[]>('/owner/pets'),
         apiFetch<Preferences>('/owner/preferences'),
+        apiFetch<OwnerAppointment[]>('/owner/appointments'),
       ])
       setPets(res)
       setPrefs(p)
+      setAppointments(appts)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudieron cargar tus mascotas')
     } finally {
@@ -151,6 +163,52 @@ export function OwnerPortal() {
             title="Aún no tienes mascotas vinculadas"
             description="Cuando una clínica te invite por token, tu mascota aparecerá aquí."
           />
+        )}
+
+        {appointments.length > 0 && (
+          <Card className="mb-6 shadow-card">
+            <CardHeader className="flex-row items-center justify-between space-y-0">
+              <div>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <CalendarDays className="size-4 text-primary" aria-hidden="true" />
+                  Próximas citas
+                </CardTitle>
+                <CardDescription>Todas tus mascotas</CardDescription>
+              </div>
+              <Link
+                to="/portal/invoices"
+                className="flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary-hover"
+              >
+                <Receipt className="size-4" /> Mis facturas
+              </Link>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {appointments.map((a) => (
+                  <div
+                    key={a.id}
+                    className="flex items-center justify-between rounded-md border border-border px-3 py-2 text-sm"
+                  >
+                    <div>
+                      <span className="font-medium">{a.pet_name ?? '—'}</span>
+                      <span className="text-muted-foreground"> · {a.procedure_type}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary">{a.clinic_name}</Badge>
+                      <span className="text-muted-foreground">
+                        {new Date(a.start_time).toLocaleString('es-MX', {
+                          day: 'numeric',
+                          month: 'short',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         )}
 
         {!loading && !error && pets.length > 0 && (
