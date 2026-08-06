@@ -117,6 +117,13 @@ export function Products() {
                 <p className="text-sm font-semibold">
                   {p.price != null ? `$${Number(p.price).toFixed(2)}` : 'Sin precio'}
                 </p>
+                <p className="text-xs text-muted-foreground">
+                  {p.stock_quantity > 0 ? (
+                    <span>{p.stock_quantity} en existencia</span>
+                  ) : (
+                    <span className="font-medium text-destructive">Agotado</span>
+                  )}
+                </p>
                 <div className="flex justify-end gap-1 pt-1">
                   <Button
                     variant="ghost"

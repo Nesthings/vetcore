@@ -1175,8 +1175,11 @@ Nuevo módulo **"Productos"** para la venta retail de la veterinaria (croquetas,
 - Componente `products` en permisos del admin; Ruff + lint 0 errores + build OK ✓
 - Datos de prueba eliminados.
 
+### Ajuste posterior (mismo día)
+- **Cantidad en existencia:** el usuario pidió un campo de stock. Migración `0017_product_stock` agrega `sale_products.stock_quantity` (Integer, default 0). Modelo/schemas/CRUD actualizados; el modal tiene "Cantidad en existencia" y las tarjetas muestran "N en existencia" o "Agotado". Verificado por API (crear con stock 12, PATCH a 4, DELETE).
+
 ### Notas / pendientes
-- Es un catálogo independiente; si después se quiere vender desde Facturación, se puede integrar como fuente de conceptos (igual que servicios/insumos).
+- Es un catálogo independiente; si después se quiere vender desde Facturación, se puede integrar como fuente de conceptos (igual que servicios/insumos) y descontar stock.
 
 ---
 

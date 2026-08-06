@@ -4,6 +4,7 @@ export interface SaleProduct {
   name: string
   category: string
   price: number | null
+  stock_quantity: number
   photo_url: string | null
   active: boolean
   created_at: string

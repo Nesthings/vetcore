@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Numeric, String, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -22,6 +22,9 @@ class SaleProduct(UUIDPkMixin, Base):
     name: Mapped[str] = mapped_column(String(150), nullable=False)
     category: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     price: Mapped[float | None] = mapped_column(Numeric(10, 2))
+    stock_quantity: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
     photo_url: Mapped[str | None] = mapped_column(Text)
     active: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default="true"

@@ -95,6 +95,7 @@ def create_product(
         name=body.name,
         category=body.category,
         price=body.price,
+        stock_quantity=body.stock_quantity,
         active=body.active,
     )
     db.add(product)

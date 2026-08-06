@@ -30,6 +30,7 @@ export function ProductFormDialog({
   const [name, setName] = useState('')
   const [category, setCategory] = useState('')
   const [price, setPrice] = useState('')
+  const [stock, setStock] = useState('')
   const [active, setActive] = useState(true)
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -40,6 +41,7 @@ export function ProductFormDialog({
     setName(product?.name ?? '')
     setCategory(product?.category ?? '')
     setPrice(product?.price != null ? String(product.price) : '')
+    setStock(product?.stock_quantity != null ? String(product.stock_quantity) : '')
     setActive(product?.active ?? true)
     setPhotoFile(null)
     setError(null)
@@ -54,6 +56,7 @@ export function ProductFormDialog({
         name,
         category,
         price: price ? Number(price) : null,
+        stock_quantity: Number(stock) || 0,
         active,
       })
       let id: string
@@ -131,18 +134,29 @@ export function ProductFormDialog({
                 placeholder="Opcional"
               />
             </div>
-            <div className="flex items-end">
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={active}
-                  onChange={(e) => setActive(e.target.checked)}
-                  className="size-4 rounded border-border"
-                />
-                Producto activo
-              </label>
+            <div className="space-y-2">
+              <Label htmlFor="p-stock">Cantidad en existencia</Label>
+              <Input
+                id="p-stock"
+                type="number"
+                min="0"
+                step="1"
+                value={stock}
+                onChange={(e) => setStock(e.target.value)}
+                placeholder="0"
+              />
             </div>
           </div>
+
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={active}
+              onChange={(e) => setActive(e.target.checked)}
+              className="size-4 rounded border-border"
+            />
+            Producto activo
+          </label>
 
           <div className="flex items-center gap-3 rounded-md border border-border/60 p-3">
             <div className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-md bg-secondary">
