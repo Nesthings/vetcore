@@ -287,6 +287,7 @@ def checkout_consultation(
         status="paid",
         total=total.quantize(Decimal("0.01")),
         send_receipt_whatsapp=body.send_receipt_whatsapp,
+        send_receipt_email=body.send_receipt_email,
     )
     for ii in invoice_items:
         invoice.items.append(ii)

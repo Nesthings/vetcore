@@ -80,6 +80,7 @@ class ConsultationCheckoutRequest(BaseModel):
     services: list[CheckoutServiceItem] = Field(default_factory=list)
     products: list[CheckoutProductItem] = Field(default_factory=list)
     send_receipt_whatsapp: bool = False
+    send_receipt_email: bool = False
 
 
 class CheckoutResult(BaseModel):

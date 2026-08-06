@@ -98,6 +98,7 @@ export function NewConsultation() {
   const [weight, setWeight] = useState('')
   const [dateTime, setDateTime] = useState(toLocalInput(new Date()))
   const [sendWhatsapp, setSendWhatsapp] = useState(false)
+  const [sendEmail, setSendEmail] = useState(false)
 
   const [serviceLines, setServiceLines] = useState<ServiceLine[]>([])
   const [productLines, setProductLines] = useState<ProductLine[]>([])
@@ -257,6 +258,7 @@ export function NewConsultation() {
           services: serviceLines.map((l) => ({ service_id: l.service_id, quantity: l.quantity })),
           products: productLines.map((l) => ({ product_id: l.product_id, quantity: l.quantity })),
           send_receipt_whatsapp: sendWhatsapp,
+          send_receipt_email: sendEmail,
         }),
       })
       setDone(res)
@@ -293,6 +295,11 @@ export function NewConsultation() {
                 {sendWhatsapp && (
                   <p className="text-xs text-muted-foreground">
                     Recibo por WhatsApp: pendiente de implementar.
+                  </p>
+                )}
+                {sendEmail && (
+                  <p className="text-xs text-muted-foreground">
+                    Recibo por correo: pendiente de implementar.
                   </p>
                 )}
                 <Button asChild variant="ghost">
@@ -748,16 +755,33 @@ export function NewConsultation() {
                   </div>
                 )}
 
-                <label className="mt-3 flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={sendWhatsapp}
-                    onChange={(e) => setSendWhatsapp(e.target.checked)}
-                    className="size-4 rounded border-border"
-                  />
-                  Enviar recibo por WhatsApp
-                  <span className="text-xs text-muted-foreground">(lógica pendiente)</span>
-                </label>
+                <div className="mt-3 space-y-2">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={sendWhatsapp}
+                      onChange={(e) => setSendWhatsapp(e.target.checked)}
+                      className="size-4 rounded border-border"
+                    />
+                    Enviar recibo por WhatsApp
+                    <span className="text-xs text-muted-foreground">(lógica pendiente)</span>
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={sendEmail}
+                      disabled={!owner?.email}
+                      onChange={(e) => setSendEmail(e.target.checked)}
+                      className="size-4 rounded border-border"
+                    />
+                    Enviar recibo por correo
+                    {owner?.email ? (
+                      <span className="text-xs text-muted-foreground">(a {owner.email})</span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">(sin correo del dueño)</span>
+                    )}
+                  </label>
+                </div>
               </CardContent>
             </Card>
 

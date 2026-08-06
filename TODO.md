@@ -20,3 +20,9 @@ Lista de trabajo diferido. Cada ítem se mueve a una subfase cuando se decide im
 
 - [ ] **3.5 — Dashboard de inteligencia de negocio.** Top enfermedades, razas, predicción de horas pico.
 - [ ] **3.6 — Diario de salud del dueño.** Síntomas reportados antes de la cita.
+
+## Envío de recibos (lógica diferida)
+
+- [ ] **Envío de recibo por WhatsApp y por correo.** En el checkout de "Nueva consulta" ya se guardan los flags `invoices.send_receipt_whatsapp` y `invoices.send_receipt_email` (migraciones 0018/0019); falta la lógica real de envío.
+  - Destinos: WhatsApp al teléfono del dueño y correo a `owners.email` (el dueño queda vinculado en `invoices.owner_id`).
+  - Implicaciones: credenciales del proveedor (WhatsApp/SMTP), adjuntar el recibo PDF (`/invoices/{id}/receipt`), estado/reintentos del envío y respeto al opt-in del dueño (principio 10).
