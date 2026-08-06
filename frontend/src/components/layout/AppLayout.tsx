@@ -1,22 +1,4 @@
-import {
-  BellRing,
-  CalendarDays,
-  FileText,
-  Home,
-  LayoutDashboard,
-  LogOut,
-  Package,
-  PawPrint,
-  Receipt,
-  Settings2,
-  ShoppingBag,
-  ShoppingCart,
-  History,
-  Timer,
-  UserRound,
-  Users,
-  Syringe,
-} from 'lucide-react'
+import { LogOut, PawPrint, Settings2, UserRound } from 'lucide-react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
 
@@ -24,36 +6,22 @@ import { useAuth } from '@/lib/auth'
 import { cn } from '@/lib/utils'
 import { apiFetch } from '@/lib/api'
 import { usePermissions } from '@/lib/permissions'
-import { NAV_ROUTES } from '@/lib/nav'
+import { useNavConfig } from '@/lib/nav-config'
+import { MODULE_META, NAV_ROUTES } from '@/lib/nav'
 import { NotificationBell } from '@/components/layout/NotificationBell'
 import { ThemeToggle } from '@/components/layout/ThemeToggle'
-
-const NAV_ICONS: Record<string, React.ElementType> = {
-  dashboard: Home,
-  agenda: CalendarDays,
-  waitlist: Timer,
-  pets: Users,
-  inventory: Package,
-  products: ShoppingBag,
-  vaccination_plans: Syringe,
-  purchase_orders: ShoppingCart,
-  automation: BellRing,
-  audit: History,
-  financial: Receipt,
-  templates: FileText,
-  services: Settings2,
-  invoices: Receipt,
-}
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth()
   const { hasComponent } = usePermissions()
+  const { pinned, pin } = useNavConfig()
   const navigate = useNavigate()
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [fullName, setFullName] = useState<string | null>(null)
   const [clinicName, setClinicName] = useState<string>('')
   const [clinicLogoUrl, setClinicLogoUrl] = useState<string | null>(null)
   const [profileOpen, setProfileOpen] = useState(false)
+  const [navDragOver, setNavDragOver] = useState(false)
   const profileRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -86,10 +54,20 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     return () => document.removeEventListener('mousedown', onClick)
   }, [])
 
-  const NAV_ITEMS = NAV_ROUTES.filter((i) => hasComponent(i.component)).map((i) => ({
+  const NAV_ITEMS = NAV_ROUTES.filter(
+    (i) =>
+      i.component === 'dashboard' || (pinned.includes(i.component) && hasComponent(i.component)),
+  ).map((i) => ({
     ...i,
-    icon: NAV_ICONS[i.component] ?? LayoutDashboard,
+    icon: MODULE_META[i.component].icon,
   }))
+
+  const handleNavDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setNavDragOver(false)
+    const component = e.dataTransfer.getData('text/plain')
+    if (component && component !== 'dashboard') pin(component)
+  }
 
   const handleLogout = () => {
     logout()
@@ -117,15 +95,37 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        <nav className="flex-1 space-y-1 p-3">
+        <nav
+          onDragOver={(e) => {
+            e.preventDefault()
+            e.dataTransfer.dropEffect = 'move'
+            setNavDragOver(true)
+          }}
+          onDragLeave={() => setNavDragOver(false)}
+          onDrop={handleNavDrop}
+          className={cn(
+            'flex-1 space-y-1 p-3 transition-colors',
+            navDragOver && 'rounded-lg bg-primary/10 outline-2 outline-dashed outline-primary/40',
+          )}
+        >
           {NAV_ITEMS.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
               end={item.end}
+              draggable={item.component !== 'dashboard'}
+              onDragStart={(e) => {
+                e.dataTransfer.setData('text/plain', item.component)
+                e.dataTransfer.effectAllowed = 'move'
+              }}
+              title={
+                item.component !== 'dashboard'
+                  ? 'Arrastra al Inicio para quitar de la barra'
+                  : undefined
+              }
               className={({ isActive }) =>
                 cn(
-                  'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all duration-200',
+                  'flex cursor-grab items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all duration-200 active:cursor-grabbing',
                   isActive
                     ? 'bg-gradient-to-r from-primary to-primary-hover text-primary-foreground shadow-glow'
                     : 'text-muted-foreground hover:bg-accent/70 hover:text-accent-foreground',

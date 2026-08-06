@@ -3,17 +3,13 @@ import { Link } from 'react-router-dom'
 import {
   CalendarCheck2,
   CalendarClock,
-  CalendarDays,
   CalendarX2,
   ClipboardPlus,
   LayoutDashboard,
-  Package,
   PackageMinus,
   PawPrint,
   ShoppingBag,
-  Timer,
   TriangleAlert,
-  Users,
 } from 'lucide-react'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 
@@ -27,6 +23,8 @@ import { LoadingState } from '@/components/ui/loading-state'
 import { Separator } from '@/components/ui/separator'
 import { apiFetch } from '@/lib/api'
 import { usePermissions } from '@/lib/permissions'
+import { useNavConfig } from '@/lib/nav-config'
+import { MODULE_META, NAV_ROUTES } from '@/lib/nav'
 import { cn } from '@/lib/utils'
 
 interface DayDashboard {
@@ -59,54 +57,6 @@ const STATUS_LABELS: Record<
   no_show: { label: 'No asistió', variant: 'secondary' },
 }
 
-const MODULES = [
-  {
-    label: 'Agenda',
-    to: '/agenda',
-    component: 'agenda',
-    icon: CalendarDays,
-    desc: 'Citas y horarios',
-    text: 'text-teal-700 dark:text-teal-300',
-    iconBg: 'bg-teal-500/15',
-  },
-  {
-    label: 'Lista de espera',
-    to: '/waitlist',
-    component: 'waitlist',
-    icon: Timer,
-    desc: 'Espera de citas',
-    text: 'text-amber-700 dark:text-amber-300',
-    iconBg: 'bg-amber-500/15',
-  },
-  {
-    label: 'Pacientes',
-    to: '/pets',
-    component: 'pets',
-    icon: Users,
-    desc: 'Expedientes clínicos',
-    text: 'text-sky-700 dark:text-sky-300',
-    iconBg: 'bg-sky-500/15',
-  },
-  {
-    label: 'Insumos',
-    to: '/inventory',
-    component: 'inventory',
-    icon: Package,
-    desc: 'Inventario y lotes',
-    text: 'text-violet-700 dark:text-violet-300',
-    iconBg: 'bg-violet-500/15',
-  },
-  {
-    label: 'Productos',
-    to: '/products',
-    component: 'products',
-    icon: ShoppingBag,
-    desc: 'Catálogo de venta',
-    text: 'text-rose-700 dark:text-rose-300',
-    iconBg: 'bg-rose-500/15',
-  },
-]
-
 function KpiCard({
   label,
   value,
@@ -136,6 +86,8 @@ export function Dashboard() {
   const [data, setData] = useState<DayDashboard | null>(null)
   const [error, setError] = useState<string | null>(null)
   const { hasComponent } = usePermissions()
+  const { pinned, unpin } = useNavConfig()
+  const [modulesDragOver, setModulesDragOver] = useState(false)
 
   const load = useCallback(async () => {
     setError(null)
@@ -151,7 +103,17 @@ export function Dashboard() {
     load()
   }, [load])
 
-  const visibleModules = MODULES.filter((m) => hasComponent(m.component))
+  const moduleItems = NAV_ROUTES.filter(
+    (r) =>
+      r.component !== 'dashboard' && !pinned.includes(r.component) && hasComponent(r.component),
+  )
+
+  const handleModulesDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setModulesDragOver(false)
+    const component = e.dataTransfer.getData('text/plain')
+    if (component) unpin(component)
+  }
 
   return (
     <AppLayout>
@@ -181,28 +143,57 @@ export function Dashboard() {
         <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           Módulos
         </p>
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-          {visibleModules.map((m) => (
-            <Link
-              key={m.to}
-              to={m.to}
-              className="group flex flex-col gap-3 rounded-xl border border-border/60 bg-card/80 p-4 shadow-sm backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-glow"
-            >
-              <div
-                className={cn(
-                  'flex size-11 items-center justify-center rounded-lg transition-transform duration-200 group-hover:scale-105',
-                  m.iconBg,
-                )}
+        <div
+          onDragOver={(e) => {
+            e.preventDefault()
+            e.dataTransfer.dropEffect = 'move'
+            setModulesDragOver(true)
+          }}
+          onDragLeave={() => setModulesDragOver(false)}
+          onDrop={handleModulesDrop}
+          className={cn(
+            'grid grid-cols-2 gap-4 rounded-xl sm:grid-cols-3 lg:grid-cols-5',
+            modulesDragOver && 'outline-2 outline-dashed outline-primary/40',
+          )}
+        >
+          {moduleItems.map((m) => {
+            const meta = MODULE_META[m.component]
+            return (
+              <Link
+                key={m.to}
+                to={m.to}
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData('text/plain', m.component)
+                  e.dataTransfer.effectAllowed = 'move'
+                }}
+                title="Arrastra a la barra lateral para fijarlo"
+                className="group flex cursor-grab flex-col gap-3 rounded-xl border border-border/60 bg-card/80 p-4 shadow-sm backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-glow active:cursor-grabbing"
               >
-                <m.icon className={cn('size-5', m.text)} aria-hidden="true" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold">{m.label}</p>
-                <p className="text-xs text-muted-foreground">{m.desc}</p>
-              </div>
-            </Link>
-          ))}
+                <div
+                  className={cn(
+                    'flex size-11 items-center justify-center rounded-lg transition-transform duration-200 group-hover:scale-105',
+                    meta.iconBg,
+                  )}
+                >
+                  <meta.icon className={cn('size-5', meta.text)} aria-hidden="true" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold">{m.label}</p>
+                  <p className="text-xs text-muted-foreground">{meta.desc}</p>
+                </div>
+              </Link>
+            )
+          })}
+          {moduleItems.length === 0 && (
+            <p className="col-span-full text-sm text-muted-foreground">
+              Todos los módulos están en la barra lateral. Arrastra uno aquí para quitarlo.
+            </p>
+          )}
         </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Arrastra un módulo al sidebar para fijarlo, o desde el sidebar a aquí para quitarlo.
+        </p>
       </div>
 
       <div className="mb-6 flex items-center gap-2">
