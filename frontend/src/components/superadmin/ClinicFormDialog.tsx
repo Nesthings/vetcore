@@ -28,6 +28,11 @@ export function ClinicFormDialog({
   const [contactPhone, setContactPhone] = useState('')
   const [contactEmail, setContactEmail] = useState('')
   const [status, setStatus] = useState('trial')
+  const [adminName, setAdminName] = useState('')
+  const [adminEmail, setAdminEmail] = useState('')
+  const [adminPassword, setAdminPassword] = useState('')
+  const [adminTitle, setAdminTitle] = useState('')
+  const [adminCedula, setAdminCedula] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -38,6 +43,11 @@ export function ClinicFormDialog({
       setContactPhone('')
       setContactEmail('')
       setStatus('trial')
+      setAdminName('')
+      setAdminEmail('')
+      setAdminPassword('')
+      setAdminTitle('')
+      setAdminCedula('')
       setError(null)
     }
   }, [open])
@@ -55,6 +65,13 @@ export function ClinicFormDialog({
           contact_phone: contactPhone || null,
           contact_email: contactEmail || null,
           subscription_status: status,
+          first_admin: {
+            full_name: adminName,
+            email: adminEmail,
+            password: adminPassword,
+            professional_title: adminTitle || null,
+            cedula: adminCedula || null,
+          },
         }),
       })
       onSaved()
@@ -67,14 +84,17 @@ export function ClinicFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Alta de clínica</DialogTitle>
-          <DialogDescription>Crea un nuevo tenant en la red VetCore.</DialogDescription>
+          <DialogDescription>
+            Crea un nuevo tenant. Su primer admin arrancará el wizard de configuración al iniciar
+            sesión.
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="grid gap-4">
           <div className="space-y-2">
-            <Label>Nombre *</Label>
+            <Label>Nombre de la clínica *</Label>
             <Input value={name} onChange={(e) => setName(e.target.value)} required />
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -108,6 +128,57 @@ export function ClinicFormDialog({
               />
             </div>
           </div>
+
+          <div className="rounded-md border border-border p-4">
+            <p className="mb-1 text-sm font-medium">Primer super-usuario (admin)</p>
+            <p className="mb-3 text-xs text-muted-foreground">
+              Cuenta con la que la clínica arrancará; al entrar verá el wizard de configuración.
+            </p>
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label>Nombre completo *</Label>
+                <Input value={adminName} onChange={(e) => setAdminName(e.target.value)} required />
+              </div>
+              <div className="space-y-2">
+                <Label>Correo *</Label>
+                <Input
+                  type="email"
+                  value={adminEmail}
+                  onChange={(e) => setAdminEmail(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Contraseña *</Label>
+                <Input
+                  type="password"
+                  value={adminPassword}
+                  onChange={(e) => setAdminPassword(e.target.value)}
+                  minLength={8}
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Título profesional</Label>
+                  <Input
+                    value={adminTitle}
+                    onChange={(e) => setAdminTitle(e.target.value)}
+                    placeholder="ej. MVZ"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Cédula profesional</Label>
+                  <Input
+                    value={adminCedula}
+                    onChange={(e) => setAdminCedula(e.target.value)}
+                    placeholder="ej. 1234567"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
           {error && <p className="text-sm text-destructive">{error}</p>}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

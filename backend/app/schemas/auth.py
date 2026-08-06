@@ -22,6 +22,7 @@ class MeResponse(BaseModel):
     branch_id: str | None = None
     full_name: str | None = None
     photo_url: str | None = None
+    setup_completed: bool | None = None
 
 
 class ActivateRequest(BaseModel):

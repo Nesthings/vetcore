@@ -145,6 +145,7 @@ def login_super_admin(body: LoginRequest, db: Session = Depends(get_db)) -> Logi
 def me(user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)) -> MeResponse:
     full_name = None
     photo_url = None
+    setup_completed = None
     if user.role == "super-admin":
         row = db.execute(
             text("SELECT full_name, photo_url FROM super_admins WHERE id = :uid"),
@@ -159,6 +160,11 @@ def me(user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_
         ).mappings().first()
         if row:
             full_name, photo_url = row["full_name"], row["photo_url"]
+        if user.clinic_id:
+            setup_completed = db.execute(
+                text("SELECT setup_completed FROM clinics WHERE id = :cid"),
+                {"cid": user.clinic_id},
+            ).scalar()
     return MeResponse(
         sub=user.sub,
         role=user.role,
@@ -166,6 +172,7 @@ def me(user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_
         branch_id=user.branch_id,
         full_name=full_name,
         photo_url=photo_url,
+        setup_completed=setup_completed,
     )
 
 

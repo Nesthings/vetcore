@@ -3,6 +3,7 @@ import { ShieldX } from 'lucide-react'
 
 import { useAuth } from '@/lib/auth'
 import { usePermissions } from '@/lib/permissions'
+import { useSetup } from '@/lib/setup'
 
 const ROLE_HOME: Record<string, string> = {
   'super-admin': '/super-admin',
@@ -37,6 +38,7 @@ export function ProtectedRoute({
 }) {
   const { isAuthenticated, user } = useAuth()
   const { hasComponent } = usePermissions()
+  const { me, loading: setupLoading } = useSetup()
   const location = useLocation()
 
   if (!isAuthenticated) {
@@ -49,6 +51,17 @@ export function ProtectedRoute({
 
   if (component && !hasComponent(component)) {
     return <AccessDenied />
+  }
+
+  // Wizard de configuración: solo la primera vez que el admin entra a una
+  // clínica nueva (setup_completed=false). Fuerza la ruta /setup.
+  if (
+    user?.role === 'admin' &&
+    !setupLoading &&
+    me?.setup_completed === false &&
+    location.pathname !== '/setup'
+  ) {
+    return <Navigate to="/setup" replace />
   }
 
   // Si ya está autenticado y visita una página sin rol específico, lo manda a su home

@@ -22,6 +22,7 @@ from app.api.deps import (
 )
 from app.core.events import record_audit
 from app.core.images import process_cartilla_photo
+from app.core.security import hash_password
 from app.core.storage import (
     ALLOWED_IMAGE_EXTENSIONS,
     public_url,
@@ -148,8 +149,39 @@ def create_clinic(
     db: Session = Depends(get_db),
     _: object = Depends(require_roles("super-admin")),
 ) -> Clinic:
-    clinic = Clinic(**body.model_dump())
+    """Alta de tenant.
+
+    Toda clínica nueva arranca con `setup_completed=false`: la primera vez que
+    entra su admin (primer super-usuario) se muestra el wizard de
+    configuración. Si llega `first_admin`, se crea también la cuenta admin
+    inicial (rol admin) en la misma transacción.
+    """
+    data = body.model_dump(exclude={"first_admin"})
+    clinic = Clinic(**data, setup_completed=False)
     db.add(clinic)
+    db.flush()
+
+    if body.first_admin is not None:
+        admin_data = body.first_admin.model_dump()
+        exists = db.scalar(
+            select(User).where(User.clinic_id == clinic.id, User.email == admin_data["email"])
+        )
+        if exists:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Ya existe un usuario con ese email en la clínica",
+            )
+        db.add(
+            User(
+                clinic_id=clinic.id,
+                role="admin",
+                full_name=admin_data["full_name"],
+                email=admin_data["email"],
+                password_hash=hash_password(admin_data["password"]),
+                professional_title=admin_data.get("professional_title"),
+                cedula=admin_data.get("cedula"),
+            )
+        )
     db.commit()
     db.refresh(clinic)
     return clinic

@@ -20,6 +20,24 @@ class ClinicCreate(ClinicBase):
     subscription_status: str = Field(
         default="trial", pattern="^(trial|active|suspended|cancelled)$"
     )
+    first_admin: "FirstAdminCreate | None" = None
+
+
+class FirstAdminCreate(BaseModel):
+    """Primer super-usuario (admin) de una clínica nueva.
+
+    Se crea junto con la clínica para que su primer login arranque el wizard
+    de configuración (setup_completed=false).
+    """
+
+    full_name: str = Field(min_length=1, max_length=200)
+    email: str = Field(min_length=3, max_length=200)
+    password: str = Field(min_length=8, max_length=128)
+    professional_title: str | None = Field(default=None, max_length=150)
+    cedula: str | None = Field(default=None, max_length=50)
+
+
+ClinicCreate.model_rebuild()
 
 
 class ClinicUpdate(BaseModel):

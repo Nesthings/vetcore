@@ -874,7 +874,48 @@ El admin de la clínica ahora concede/deniega acceso a módulos del panel por us
 
 ### Notas / pendientes
 - El `NotificationBell` y el perfil quedan siempre accesibles para el staff (no son componentes).
-- El organigrama visual (idea 2) queda pendiente; `reports_to` ya existe desde la 2.8.
+- El organigrama (reports_to) se configura desde el wizard; la vista visual queda como idea futura.
+
+---
+
+## Subfase 2.10 — Setup wizard (idea 2: configuración inicial del tenant) ✅
+
+**Fecha:** 2026-08-06
+
+### Qué se hizo
+Pantalla de configuración inicial tipo Ubuntu, que aparece **solo la primera vez** que entra el admin de una clínica nueva (trigger: `clinics.setup_completed=false`).
+
+**Trigger y alta:**
+- Toda clínica nueva nace con `setup_completed=false`.
+- `POST /clinics` (super-admin) acepta `first_admin` (nombre, email, password, título, cédula): crea el tenant + la cuenta admin inicial en la misma transacción.
+- `/auth/me` ahora expone `setup_completed` para el staff.
+- `ProtectedRoute`: si el rol es `admin` y `setup_completed=false`, redirige a `/setup` (excepto en `/setup`).
+
+**Wizard (`SetupWizard`, 7 pasos):**
+1. **Clínica**: nombre, logo, contacto, dirección.
+2. **Super usuario**: título, cédula, cargo, especialidad, teléfono, foto.
+3. **Sucursales**: define cuántas y sus nombres (nuevo requisito del usuario).
+4. **Equipo**: alta de dependientes (vet/recepción/admin) con sucursal y contraseña.
+5. **Organigrama**: quién reporta a quién (`reports_to`).
+6. **Accesos**: activa/desactiva componentes por usuario (solo envía las diferencias al default del rol).
+7. **Listo**: `setup_completed=true` → entra al panel.
+
+### Decisiones técnicas y por qué
+- **El componente es el guard**: `ProtectedRoute` fuerza `/setup` con `me.setup_completed===false`, sin bloquear rutas públicas.
+- **`SetupProvider`** (`lib/setup.tsx`) carga `/auth/me` una vez y expone `refresh()` para actualizarlo al terminar.
+- **first_admin dentro de `POST /clinics`**: evita clínicas sin nadie que pueda iniciar sesión; el alta queda atómica.
+- El paso de accesos usa el mismo endpoint `PUT /users/{id}/components` (sync completo) que la 2.9.
+
+### Verificado
+- Crear clínica con `first_admin` → `setup_completed=false` ✓
+- Login del admin nuevo → `/auth/me` con `setup_completed=false` ✓
+- Pasos 1-7 simulados por API: clínica, perfil, sucursales (Norte/Sur), equipo, organigrama, grant de componentes, `setup_completed=true` ✓
+- Luego `/auth/me` → `setup_completed=true` (el wizard ya no aparece) ✓
+- Ruff + lint 0 errores + build OK ✓
+
+### Notas / pendientes
+- El wizard está pensado para el primer super-usuario; los demás admins también lo verán hasta completarlo (caso borde aceptable).
+- Queda en `IDEAS.txt` la idea 1 (login con selección de usuario con foto).
 
 ---
 
