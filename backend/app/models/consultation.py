@@ -50,6 +50,7 @@ class Consultation(UUIDPkMixin, Base):
     treatment: Mapped[str | None] = mapped_column(Text)
     care_instructions: Mapped[str | None] = mapped_column(Text)
     next_appointment_suggestion: Mapped[date | None] = mapped_column(Date)
+    performed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

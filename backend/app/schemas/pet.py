@@ -58,6 +58,14 @@ class OwnerLinkRead(BaseModel):
     is_active: bool
 
 
+class OwnerContactUpdate(BaseModel):
+    full_name: str | None = Field(default=None, max_length=150)
+    phone: str | None = Field(default=None, max_length=30)
+    email: str | None = Field(default=None, max_length=150)
+    alt_contact_name: str | None = Field(default=None, max_length=150)
+    alt_phone: str | None = Field(default=None, max_length=30)
+
+
 class PetRead(PetBase):
     model_config = ConfigDict(from_attributes=True)
 

@@ -205,7 +205,7 @@ export function PetDetail() {
               <UserRoundCog /> Transferir dueño
             </Button>
             <Button asChild size="sm">
-              <Link to={`/pets/${id}/consultas/nueva`}>
+              <Link to={`/consultas/nueva?pet=${id}`}>
                 <ClipboardPlus /> Nueva consulta
               </Link>
             </Button>

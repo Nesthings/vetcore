@@ -1183,4 +1183,41 @@ Nuevo módulo **"Productos"** para la venta retail de la veterinaria (croquetas,
 
 ---
 
+## "Nueva consulta" como checkout (caja) ✅
+
+**Fecha:** 2026-08-06
+
+### Qué se hizo
+El botón **"Nueva consulta"** ahora es un **checkout** que completa la consulta y genera todo: la consulta (con el vet que atendió, motivo, **peso** y fecha/hora), la **factura pagada** (servicios + productos → subtotal), el **descuento de stock** de Productos y el **PDF/recibo** para imprimir. Decisiones del usuario: es el mismo flujo de "Nueva consulta" (no un módulo aparte), genera **factura + PDF**, y **recepción puede usarlo**.
+
+**Backend:**
+- Migración `0018_checkout_fields`: `consultations.performed_at` (fecha/hora capturada en el checkout) y `invoices.send_receipt_whatsapp` (casilla del recibo por WhatsApp; la lógica de envío se implementa después).
+- `POST /consultations/checkout` (admin/vet/**recepción**): valida pet/sucursal/vet/servicios/productos; en **una transacción** crea la consulta (con sus items = servicios+productos aplicados), el **peso registrado**, la **factura paid** (descuento automático de servicios, sin exponer el módulo de Facturación a recepción), descuenta stock de `sale_products` (409 si no alcanza) y genera el **PDF de resumen** y el **recibo** (guarda el flag de WhatsApp).
+- `PUT /pets/{pet_id}/owner-contact` (admin/vet/recepción): la recepción **verifica/corrige** el contacto del dueño activo (nombre, teléfono, correo, alternativos). Devuelve los valores frescos tras el update.
+- `CONSULTATION_MUTATORS`/checkout permiten el rol recepción.
+
+**Frontend (`NewConsultation.tsx`, ruta `/consultas/nueva`):**
+1. **A quién se consultó** (vet) + sucursal + **buscar la mascota** (con preview de dueño/teléfono para evitar confusiones).
+2. **Dueño y contacto** editables (certificación) — si se cambian, se persisten vía owner-contact.
+3. **Último peso de la mascota** (prellenado con `latest_weight_kg`, editable) — se registra en la consulta.
+4. **Fecha y hora** + motivo.
+5. **Servicios** del catálogo (se suman al subtotal con su descuento) y **Productos** (se suman y descuentan stock; opción deshabilitada si está agotado).
+6. **Próxima vacunación** según el esquema (próxima dosis programada).
+7. **Resumen/subtotal** + casilla **"Enviar recibo por WhatsApp"** (lógica pendiente).
+8. Éxito → enlaces a **"Imprimir recibo (PDF)"** y **"Ver resumen (PDF)"**.
+
+El botón de la ficha del paciente ahora va a `/consultas/nueva?pet=<id>` (la mascota se precarga; desde ahí también se puede buscar otra).
+
+### Verificado
+- Checkout con servicio (Cirugía $3800) + producto (Cama ×2 $350) → factura total $4500, flag WhatsApp true, stock 5→3, peso 12.5 registrado, ambos PDF 200 ✓
+- `owner-contact` actualiza y devuelve los valores frescos ✓
+- Ruff + lint 0 errores + build OK ✓
+- Datos de prueba eliminados (factura/consulta/producto/peso/PDFs) y contacto del dueño restaurado.
+
+### Notas / pendientes
+- El recibo por WhatsApp queda como flag guardado (`send_receipt_whatsapp`); la integración con el proveedor (WhatsApp) se hace después.
+- La consulta se crea con motivo + items (sin diagnóstico/tratamiento, que son del vet); el resumen PDF queda informativo y la ficha puede ampliarlo después.
+
+---
+
 **Siguiente subfase:** por decidir (Fase 3 en hold).

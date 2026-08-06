@@ -55,5 +55,36 @@ class ConsultationRead(BaseModel):
     treatment: str | None
     care_instructions: str | None
     next_appointment_suggestion: date | None
+    performed_at: datetime | None
     created_at: datetime
     items: list[ConsultationItemRead] = Field(default_factory=list)
+
+
+class CheckoutServiceItem(BaseModel):
+    service_id: uuid.UUID
+    quantity: float = Field(default=1, gt=0)
+
+
+class CheckoutProductItem(BaseModel):
+    product_id: uuid.UUID
+    quantity: float = Field(default=1, gt=0)
+
+
+class ConsultationCheckoutRequest(BaseModel):
+    branch_id: uuid.UUID
+    pet_id: uuid.UUID
+    vet_user_id: uuid.UUID
+    reason: str | None = None
+    weight_kg: float | None = Field(default=None, gt=0)
+    performed_at: datetime | None = None
+    services: list[CheckoutServiceItem] = Field(default_factory=list)
+    products: list[CheckoutProductItem] = Field(default_factory=list)
+    send_receipt_whatsapp: bool = False
+
+
+class CheckoutResult(BaseModel):
+    consultation_id: uuid.UUID
+    invoice_id: uuid.UUID
+    summary_pdf_url: str
+    receipt_pdf_url: str
+    total: float

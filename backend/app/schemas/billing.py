@@ -33,6 +33,7 @@ class InvoiceCreate(BaseModel):
     pet_id: uuid.UUID | None = None
     consultation_id: uuid.UUID | None = None
     status: str = Field(default="paid", pattern="^(pending|paid|cancelled)$")
+    send_receipt_whatsapp: bool = False
     items: list[InvoiceItemCreate] = Field(min_length=1)
 
 
@@ -51,6 +52,7 @@ class InvoiceRead(BaseModel):
     consultation_id: uuid.UUID | None
     total: Decimal
     status: str
+    send_receipt_whatsapp: bool
     created_at: datetime
     items: list[InvoiceItemRead] = Field(default_factory=list)
     pet_name: str | None = None

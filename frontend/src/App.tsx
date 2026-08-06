@@ -119,7 +119,7 @@ function App() {
                 }
               />
               <Route
-                path="/pets/:id/consultas/nueva"
+                path="/consultas/nueva"
                 element={
                   <ProtectedRoute component="pets">
                     <NewConsultation />

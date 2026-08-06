@@ -46,6 +46,7 @@ from app.schemas.pet import (
     ClinicalAlertCreate,
     ClinicalAlertRead,
     ClinicalAlertUpdate,
+    OwnerContactUpdate,
     OwnerLinkRead,
     OwnerTransferRequest,
     OwnerTransferResponse,
@@ -564,6 +565,77 @@ def pet_owner_links(
         .all()
     )
     return [OwnerLinkRead(**dict(r)) for r in rows]
+
+
+@router.put(
+    "/{pet_id}/owner-contact",
+    response_model=OwnerLinkRead,
+    summary="Actualiza el contacto del dueño activo (recepción certifica los datos)",
+)
+def update_owner_contact(
+    pet_id: str,
+    body: OwnerContactUpdate,
+    ctx: CurrentClinic = Depends(require_clinic_roles("admin", "veterinario", "recepcion")),
+    db: Session = Depends(get_db),
+) -> OwnerLinkRead:
+    """Edita el contacto del dueño activo de la mascota. Lo usa el checkout de
+    'Nueva consulta' para que la recepción certifique/corrija los datos."""
+    _get_pet_or_404(db, ctx.clinic["id"], pet_id)
+    row = (
+        db.execute(
+            text(
+                "SELECT o.id AS owner_id, o.full_name, o.phone, o.email, "
+                "o.alt_contact_name, o.alt_phone, l.linked_at, l.is_active "
+                "FROM owner_pet_links l JOIN owners o ON o.id = l.owner_id "
+                "WHERE l.pet_id = :pid AND l.clinic_id = :cid AND l.is_active = true "
+                "ORDER BY l.linked_at DESC LIMIT 1"
+            ),
+            {"pid": pet_id, "cid": ctx.clinic["id"]},
+        )
+        .mappings()
+        .first()
+    )
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="La mascota no tiene un dueño activo",
+        )
+    data = body.model_dump(exclude_unset=True)
+    if not data:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="No hay campos para actualizar",
+        )
+    assignments = ", ".join(f"{col} = :{col}" for col in data)
+    params = {col: value for col, value in data.items()}
+    params["oid"] = row["owner_id"]
+    db.execute(text(f"UPDATE owners SET {assignments} WHERE id = :oid"), params)
+    record_audit(
+        db,
+        clinic_id=ctx.clinic["id"],
+        actor_type="user",
+        actor_id=ctx.user.sub,
+        action="owner_contact_updated",
+        entity_type="pet",
+        entity_id=pet_id,
+        metadata={"fields": list(data.keys())},
+    )
+    db.commit()
+    fresh = (
+        db.execute(
+            text(
+                "SELECT o.id AS owner_id, o.full_name, o.phone, o.email, "
+                "o.alt_contact_name, o.alt_phone, l.linked_at, l.is_active "
+                "FROM owner_pet_links l JOIN owners o ON o.id = l.owner_id "
+                "WHERE l.pet_id = :pid AND l.clinic_id = :cid AND l.is_active = true "
+                "ORDER BY l.linked_at DESC LIMIT 1"
+            ),
+            {"pid": pet_id, "cid": ctx.clinic["id"]},
+        )
+        .mappings()
+        .first()
+    )
+    return OwnerLinkRead(**dict(fresh))
 
 
 @router.post(

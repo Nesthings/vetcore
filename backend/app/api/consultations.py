@@ -1,8 +1,12 @@
 """CRUD de consultas — por-tenant, vet/admin para mutar.
 
 Incluye la generación del PDF de resumen (informativo, no receta) y la
-subida de adjuntos (foto/nota).
+subida de adjuntos (foto/nota). El checkout (`POST /consultations/checkout`)
+completa la consulta como una caja: consulta + factura + recibo PDF.
 """
+
+from datetime import UTC, datetime
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy import select, text
@@ -24,16 +28,23 @@ from app.models import (
     ConsultationAttachment,
     ConsultationItem,
     ConsultationSummaryPdf,
+    Invoice,
+    InvoiceItem,
     Pet,
+    PetWeightRecord,
+    SaleProduct,
+    ServiceCatalog,
     User,
 )
 from app.schemas.consultation import (
+    CheckoutResult,
+    ConsultationCheckoutRequest,
     ConsultationCreate,
     ConsultationRead,
     ConsultationUpdate,
 )
 from app.schemas.crm import SurveyRead
-from app.services.pdf import build_consultation_summary_pdf
+from app.services.pdf import build_consultation_summary_pdf, build_invoice_receipt_pdf
 
 router = APIRouter(
     prefix="/consultations",
@@ -123,6 +134,248 @@ def create_consultation(
     db.add(consultation)
     db.commit()
     return _get_consultation_or_404(db, ctx.clinic["id"], str(consultation.id))
+
+
+@router.post(
+    "/checkout",
+    response_model=CheckoutResult,
+    status_code=status.HTTP_201_CREATED,
+    summary="Checkout de consulta: genera consulta + factura + recibos (PDF)",
+)
+def checkout_consultation(
+    body: ConsultationCheckoutRequest,
+    ctx: CurrentClinic = Depends(require_clinic_roles("admin", "veterinario", "recepcion")),
+    db: Session = Depends(get_db),
+) -> CheckoutResult:
+    """Completa la consulta como una caja: registra la consulta (con el vet
+    que atendió, motivo, peso y la fecha/hora capturada), genera la factura
+    pagada con los servicios y productos seleccionados (descontando stock del
+    catálogo de Productos) y produce el PDF de resumen y el recibo para imprimir.
+    """
+    clinic_id = ctx.clinic["id"]
+
+    pet = db.scalar(select(Pet).where(Pet.id == body.pet_id, Pet.clinic_id == clinic_id))
+    if pet is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Paciente no encontrado")
+    branch = db.get(ClinicBranch, body.branch_id)
+    if branch is None or branch.clinic_id != ctx.clinic["id"]:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sucursal no encontrada")
+    vet = db.scalar(
+        select(User).where(
+            User.id == body.vet_user_id,
+            User.clinic_id == clinic_id,
+            User.role.in_(("admin", "veterinario")),
+        )
+    )
+    if vet is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Veterinario no encontrado en esta clínica",
+        )
+    if not body.services and not body.products:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Selecciona al menos un servicio o producto",
+        )
+
+    total = Decimal("0")
+    invoice_items: list[InvoiceItem] = []
+    consultation_items: list[ConsultationItem] = []
+
+    for s in body.services:
+        service = db.get(ServiceCatalog, s.service_id)
+        if service is None or service.clinic_id != clinic_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Servicio no encontrado"
+            )
+        discount = float(service.discount_percent or 0)
+        qty = Decimal(str(s.quantity))
+        line_total = qty * Decimal(str(service.price)) * (
+            Decimal("1") - Decimal(str(discount)) / Decimal("100")
+        )
+        total += line_total
+        invoice_items.append(
+            InvoiceItem(
+                service_id=service.id,
+                description=service.name,
+                quantity=float(qty),
+                unit_price=float(service.price),
+                discount_percent=discount,
+            )
+        )
+        consultation_items.append(
+            ConsultationItem(description=service.name, quantity=float(qty))
+        )
+
+    for p in body.products:
+        product = db.get(SaleProduct, p.product_id)
+        if product is None or product.clinic_id != clinic_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Producto no encontrado"
+            )
+        if not product.active:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"El producto «{product.name}» está inactivo",
+            )
+        if product.price is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"El producto «{product.name}» no tiene precio",
+            )
+        qty = Decimal(str(p.quantity))
+        if qty > product.stock_quantity:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Stock insuficiente para «{product.name}» "
+                f"(disponible: {int(product.stock_quantity)})",
+            )
+        product.stock_quantity -= int(qty)
+        line_total = qty * Decimal(str(product.price))
+        total += line_total
+        invoice_items.append(
+            InvoiceItem(
+                description=product.name,
+                quantity=float(qty),
+                unit_price=float(product.price),
+                discount_percent=0,
+            )
+        )
+        consultation_items.append(
+            ConsultationItem(description=product.name, quantity=float(qty))
+        )
+
+    owner_id = db.execute(
+        text(
+            "SELECT owner_id FROM owner_pet_links "
+            "WHERE pet_id = :pid AND clinic_id = :cid AND is_active = true "
+            "ORDER BY linked_at DESC LIMIT 1"
+        ),
+        {"pid": body.pet_id, "cid": clinic_id},
+    ).scalar()
+
+    performed_at = body.performed_at or datetime.now(UTC)
+    consultation = Consultation(
+        clinic_id=clinic_id,
+        branch_id=body.branch_id,
+        pet_id=body.pet_id,
+        vet_user_id=body.vet_user_id,
+        reason=body.reason,
+        performed_at=performed_at,
+    )
+    for ci in consultation_items:
+        consultation.items.append(ci)
+    db.add(consultation)
+    db.flush()
+
+    if body.weight_kg is not None:
+        db.add(
+            PetWeightRecord(
+                pet_id=body.pet_id,
+                clinic_id=clinic_id,
+                weight_kg=body.weight_kg,
+                consultation_id=consultation.id,
+            )
+        )
+
+    invoice = Invoice(
+        clinic_id=clinic_id,
+        branch_id=body.branch_id,
+        owner_id=owner_id,
+        pet_id=body.pet_id,
+        consultation_id=consultation.id,
+        status="paid",
+        total=total.quantize(Decimal("0.01")),
+        send_receipt_whatsapp=body.send_receipt_whatsapp,
+    )
+    for ii in invoice_items:
+        invoice.items.append(ii)
+    db.add(invoice)
+    db.flush()
+
+    record_audit(
+        db,
+        clinic_id=clinic_id,
+        actor_type="user",
+        actor_id=ctx.user.sub,
+        action="consultation_created",
+        entity_type="consultation",
+        entity_id=consultation.id,
+        metadata={"checkout": True, "pet_id": str(body.pet_id)},
+    )
+    record_audit(
+        db,
+        clinic_id=clinic_id,
+        actor_type="user",
+        actor_id=ctx.user.sub,
+        action="invoice_created",
+        entity_type="invoice",
+        entity_id=invoice.id,
+        metadata={"total": float(invoice.total)},
+    )
+    db.commit()
+
+    clinic = db.get(Clinic, clinic_id)
+    date_str = performed_at.astimezone().strftime("%d/%m/%Y %H:%M")
+
+    summary_data = {
+        "clinic_name": f"{clinic.name}" + (f" — {branch.name}" if branch else ""),
+        "pet_name": pet.name,
+        "species": pet.species,
+        "breed": pet.breed,
+        "vet_name": vet.full_name,
+        "date_str": date_str,
+        "reason": consultation.reason,
+        "diagnosis": None,
+        "treatment": None,
+        "care_instructions": None,
+        "items": [
+            {"description": i.description, "quantity": i.quantity} for i in consultation.items
+        ],
+        "next_appointment_suggestion": None,
+    }
+    summary_bytes = build_consultation_summary_pdf(summary_data)
+    summary_rel = save_media("summaries", f"consulta_{consultation.id}.pdf", summary_bytes)
+    summary_url = public_url(summary_rel)
+    db.add(ConsultationSummaryPdf(consultation_id=consultation.id, pdf_url=summary_url))
+
+    receipt_items = []
+    for item in invoice.items:
+        line_total = (
+            Decimal(str(item.quantity))
+            * Decimal(str(item.unit_price))
+            * (Decimal("1") - Decimal(str(item.discount_percent)) / Decimal("100"))
+        )
+        receipt_items.append(
+            {
+                "description": item.description,
+                "quantity": float(item.quantity),
+                "unit_price": float(item.unit_price),
+                "discount_percent": float(item.discount_percent or 0),
+                "line_total": float(line_total),
+            }
+        )
+    receipt_data = {
+        "clinic_name": clinic.name,
+        "invoice_id": str(invoice.id)[:8].upper(),
+        "pet_name": pet.name,
+        "status": invoice.status,
+        "date_str": date_str,
+        "items": receipt_items,
+        "total": float(invoice.total),
+    }
+    receipt_bytes = build_invoice_receipt_pdf(receipt_data)
+    receipt_rel = save_media("receipts", f"recibo_{invoice.id}.pdf", receipt_bytes)
+    receipt_url = public_url(receipt_rel)
+    db.commit()
+
+    return CheckoutResult(
+        consultation_id=consultation.id,
+        invoice_id=invoice.id,
+        summary_pdf_url=summary_url,
+        receipt_pdf_url=receipt_url,
+        total=float(invoice.total),
+    )
 
 
 @router.patch("/{consultation_id}", response_model=ConsultationRead)
