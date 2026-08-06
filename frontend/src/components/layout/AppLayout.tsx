@@ -160,6 +160,16 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                     <UserRound className="size-4" aria-hidden="true" />
                     Ver perfil
                   </NavLink>
+                  {hasComponent('settings') && (
+                    <NavLink
+                      to="/settings"
+                      onClick={() => setProfileOpen(false)}
+                      className="flex items-center gap-3 border-t border-border px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                    >
+                      <Settings2 className="size-4" aria-hidden="true" />
+                      Configuración de la clínica
+                    </NavLink>
+                  )}
                   <button
                     type="button"
                     onClick={handleLogout}
