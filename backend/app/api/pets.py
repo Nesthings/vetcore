@@ -256,7 +256,9 @@ def get_pet(
     ctx: CurrentClinic = Depends(get_current_clinic),
     db: Session = Depends(get_db),
 ) -> Pet:
-    return _pet_with_latest_weight(db, _get_pet_or_404(db, ctx.clinic["id"], pet_id))
+    return _with_owners(
+        db, _pet_with_latest_weight(db, _get_pet_or_404(db, ctx.clinic["id"], pet_id))
+    )
 
 
 @router.post("", response_model=PetRead, status_code=status.HTTP_201_CREATED)
