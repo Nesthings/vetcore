@@ -22,12 +22,28 @@ interface BreedsCatalog {
   markings: Record<string, string[]>
 }
 
+export interface PetFormValue {
+  id: string
+  name: string
+  species: string
+  breed?: string | null
+  color_primary?: string | null
+  color_secondary?: string | null
+  markings?: string | null
+  sex?: string | null
+  birth_date?: string | null
+  allergies?: string | null
+  clinical_alert_text?: string | null
+}
+
 export function PetFormDialog({
   open,
+  pet,
   onOpenChange,
   onSaved,
 }: {
   open: boolean
+  pet?: PetFormValue | null
   onOpenChange: (open: boolean) => void
   onSaved: () => void
 }) {
@@ -68,6 +84,41 @@ export function PetFormDialog({
   useEffect(() => {
     if (open) loadCatalog()
   }, [open, loadCatalog])
+
+  useEffect(() => {
+    if (!open) return
+    if (pet) {
+      setName(pet.name)
+      setSpecies(pet.species)
+      setBreed(pet.breed ?? '')
+      setBreedQuery(pet.breed ?? '')
+      setColorPrimary(pet.color_primary ?? '')
+      setColorSecondary(pet.color_secondary ?? '')
+      setMarkings(pet.markings ?? '')
+      setSex(pet.sex ?? '')
+      setBirthDate(pet.birth_date ?? '')
+      setAllergies(pet.allergies ?? '')
+      setAlertText(pet.clinical_alert_text ?? '')
+    } else {
+      setName('')
+      setSpecies('perro')
+      setBreed('')
+      setBreedQuery('')
+      setColorPrimary('')
+      setColorSecondary('')
+      setMarkings('')
+      setSex('')
+      setBirthDate('')
+      setAllergies('')
+      setAlertText('')
+    }
+    setOwnerName('')
+    setOwnerPhone('')
+    setOwnerEmail('')
+    setAltContactName('')
+    setAltPhone('')
+    setError(null)
+  }, [open, pet])
 
   const allBreeds = catalog?.breeds[species] ?? ['Mestizo']
   const allColors = catalog?.colors[species] ?? []
@@ -122,35 +173,42 @@ export function PetFormDialog({
     setError(null)
     setSubmitting(true)
     try {
-      const owner =
-        ownerName || ownerPhone || ownerEmail
-          ? {
-              full_name: ownerName || null,
-              phone: ownerPhone || null,
-              email: ownerEmail || null,
-              alt_contact_name: altContactName || null,
-              alt_phone: altPhone || null,
-            }
-          : null
-      await apiFetch('/pets', {
-        method: 'POST',
-        body: JSON.stringify({
-          name,
-          species,
-          breed: breed || breedQuery.trim() || null,
-          color_primary: colorPrimary || null,
-          color_secondary: colorSecondary || null,
-          markings: markings || null,
-          sex: sex || null,
-          birth_date: birthDate || null,
-          allergies: allergies || null,
-          clinical_alert_text: alertText || null,
-          owner,
-        }),
-      })
+      const payload = {
+        name,
+        species,
+        breed: breed || breedQuery.trim() || null,
+        color_primary: colorPrimary || null,
+        color_secondary: colorSecondary || null,
+        markings: markings || null,
+        sex: sex || null,
+        birth_date: birthDate || null,
+        allergies: allergies || null,
+        clinical_alert_text: alertText || null,
+      }
+      if (pet) {
+        await apiFetch(`/pets/${pet.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify(payload),
+        })
+      } else {
+        const owner =
+          ownerName || ownerPhone || ownerEmail
+            ? {
+                full_name: ownerName || null,
+                phone: ownerPhone || null,
+                email: ownerEmail || null,
+                alt_contact_name: altContactName || null,
+                alt_phone: altPhone || null,
+              }
+            : null
+        await apiFetch('/pets', {
+          method: 'POST',
+          body: JSON.stringify({ ...payload, owner }),
+        })
+      }
       onSaved()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo registrar la mascota')
+      setError(err instanceof Error ? err.message : 'No se pudo guardar la mascota')
     } finally {
       setSubmitting(false)
     }
@@ -160,9 +218,11 @@ export function PetFormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Nueva mascota</DialogTitle>
+          <DialogTitle>{pet ? 'Editar mascota' : 'Nueva mascota'}</DialogTitle>
           <DialogDescription>
-            Da de alta a un paciente, su expediente clínico y a su dueño.
+            {pet
+              ? 'Actualiza los datos del expediente del paciente.'
+              : 'Da de alta a un paciente, su expediente clínico y a su dueño.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -357,72 +417,74 @@ export function PetFormDialog({
             />
           </div>
 
-          <div className="rounded-md border border-border p-4">
-            <div className="mb-3 flex items-center gap-2">
-              <UserRound className="size-4 text-primary" aria-hidden="true" />
-              <p className="text-sm font-medium">Dueño de la mascota</p>
-            </div>
-            <div className="grid gap-3">
-              <div className="space-y-2">
-                <Label htmlFor="owner-name">Nombre</Label>
-                <Input
-                  id="owner-name"
-                  value={ownerName}
-                  onChange={(e) => setOwnerName(e.target.value)}
-                  placeholder="Nombre del dueño"
-                />
+          {!pet && (
+            <div className="rounded-md border border-border p-4">
+              <div className="mb-3 flex items-center gap-2">
+                <UserRound className="size-4 text-primary" aria-hidden="true" />
+                <p className="text-sm font-medium">Dueño de la mascota</p>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-3">
                 <div className="space-y-2">
-                  <Label htmlFor="owner-phone">Número de contacto</Label>
+                  <Label htmlFor="owner-name">Nombre</Label>
                   <Input
-                    id="owner-phone"
-                    value={ownerPhone}
-                    onChange={(e) => setOwnerPhone(e.target.value)}
-                    placeholder="55 1234 5678"
+                    id="owner-name"
+                    value={ownerName}
+                    onChange={(e) => setOwnerName(e.target.value)}
+                    placeholder="Nombre del dueño"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="owner-email">Correo</Label>
-                  <Input
-                    id="owner-email"
-                    type="email"
-                    value={ownerEmail}
-                    onChange={(e) => setOwnerEmail(e.target.value)}
-                    placeholder="correo@ejemplo.com"
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="owner-phone">Número de contacto</Label>
+                    <Input
+                      id="owner-phone"
+                      value={ownerPhone}
+                      onChange={(e) => setOwnerPhone(e.target.value)}
+                      placeholder="55 1234 5678"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="owner-email">Correo</Label>
+                    <Input
+                      id="owner-email"
+                      type="email"
+                      value={ownerEmail}
+                      onChange={(e) => setOwnerEmail(e.target.value)}
+                      placeholder="correo@ejemplo.com"
+                    />
+                  </div>
                 </div>
-              </div>
 
-              <div className="flex items-center gap-2 pt-1">
-                <div className="h-px flex-1 bg-border" aria-hidden="true" />
-                <span className="text-xs font-medium text-muted-foreground">
-                  Contacto alternativo
-                </span>
-                <div className="h-px flex-1 bg-border" aria-hidden="true" />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="alt-name">Nombre alternativo</Label>
-                  <Input
-                    id="alt-name"
-                    value={altContactName}
-                    onChange={(e) => setAltContactName(e.target.value)}
-                    placeholder="Nombre de respaldo"
-                  />
+                <div className="flex items-center gap-2 pt-1">
+                  <div className="h-px flex-1 bg-border" aria-hidden="true" />
+                  <span className="text-xs font-medium text-muted-foreground">
+                    Contacto alternativo
+                  </span>
+                  <div className="h-px flex-1 bg-border" aria-hidden="true" />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="alt-phone">Número alternativo</Label>
-                  <Input
-                    id="alt-phone"
-                    value={altPhone}
-                    onChange={(e) => setAltPhone(e.target.value)}
-                    placeholder="55 9876 5432"
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="alt-name">Nombre alternativo</Label>
+                    <Input
+                      id="alt-name"
+                      value={altContactName}
+                      onChange={(e) => setAltContactName(e.target.value)}
+                      placeholder="Nombre de respaldo"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="alt-phone">Número alternativo</Label>
+                    <Input
+                      id="alt-phone"
+                      value={altPhone}
+                      onChange={(e) => setAltPhone(e.target.value)}
+                      placeholder="55 9876 5432"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
 
           {error && <p className="text-sm text-destructive">{error}</p>}
 
@@ -431,7 +493,13 @@ export function PetFormDialog({
               Cancelar
             </Button>
             <Button type="submit" disabled={submitting}>
-              {submitting ? <Loader2 className="animate-spin" /> : 'Guardar mascota'}
+              {submitting ? (
+                <Loader2 className="animate-spin" />
+              ) : pet ? (
+                'Guardar cambios'
+              ) : (
+                'Guardar mascota'
+              )}
             </Button>
           </DialogFooter>
         </form>

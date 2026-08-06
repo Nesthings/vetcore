@@ -61,6 +61,7 @@ export function Pets() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [formOpen, setFormOpen] = useState(false)
+  const [editing, setEditing] = useState<PetWithAlerts | null>(null)
 
   const load = async (q = search) => {
     setLoading(true)
@@ -89,7 +90,13 @@ export function Pets() {
           <h1 className="text-2xl font-semibold tracking-tight">Pacientes</h1>
           <p className="text-sm text-muted-foreground">Expediente de las mascotas de la clínica</p>
         </div>
-        <Button size="sm" onClick={() => setFormOpen(true)}>
+        <Button
+          size="sm"
+          onClick={() => {
+            setEditing(null)
+            setFormOpen(true)
+          }}
+        >
           <Plus /> Nueva mascota
         </Button>
       </div>
@@ -116,7 +123,13 @@ export function Pets() {
           description="Registra tu primera mascota para empezar su expediente."
           icon={Users}
           action={
-            <Button size="sm" onClick={() => setFormOpen(true)}>
+            <Button
+              size="sm"
+              onClick={() => {
+                setEditing(null)
+                setFormOpen(true)
+              }}
+            >
               <Plus /> Registrar mascota
             </Button>
           }
@@ -183,7 +196,10 @@ export function Pets() {
                       variant="ghost"
                       size="icon-sm"
                       aria-label={`Editar ${p.name}`}
-                      onClick={() => setFormOpen(true)}
+                      onClick={() => {
+                        setEditing(p)
+                        setFormOpen(true)
+                      }}
                     >
                       <Pencil />
                     </Button>
@@ -197,9 +213,11 @@ export function Pets() {
 
       <PetFormDialog
         open={formOpen}
+        pet={editing}
         onOpenChange={setFormOpen}
         onSaved={() => {
           setFormOpen(false)
+          setEditing(null)
           load()
         }}
       />
