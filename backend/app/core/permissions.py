@@ -17,7 +17,7 @@ COMPONENTS: dict[str, str] = {
     "agenda": "Agenda",
     "waitlist": "Lista de espera",
     "pets": "Pacientes",
-    "inventory": "Inventario",
+    "inventory": "Inventario de insumos",
     "purchase_orders": "Órdenes de compra",
     "invoices": "Facturación",
     "services": "Servicios",
