@@ -108,8 +108,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               <PawPrint className="size-5" aria-hidden="true" />
             )}
           </div>
-          <div className="min-w-0 leading-tight">
-            <p className="truncate text-sm font-semibold text-foreground">
+          <div className="min-w-0 flex-1 leading-tight">
+            <p className="break-words text-sm font-semibold text-foreground">
               {clinicName || 'VetCore'}
             </p>
             <p className="text-xs text-muted-foreground">Panel clínico</p>
