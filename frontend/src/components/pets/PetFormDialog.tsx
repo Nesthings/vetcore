@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Loader2, UserRound } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Loader2, Plus, UserRound } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -33,6 +33,10 @@ export function PetFormDialog({
   const [name, setName] = useState('')
   const [species, setSpecies] = useState('perro')
   const [breed, setBreed] = useState('')
+  const [breedQuery, setBreedQuery] = useState('')
+  const [breedOpen, setBreedOpen] = useState(false)
+  const breedRef = useRef<HTMLDivElement>(null)
+  const [addingBreed, setAddingBreed] = useState(false)
   const [sex, setSex] = useState('')
   const [birthDate, setBirthDate] = useState('')
   const [allergies, setAllergies] = useState('')
@@ -60,7 +64,51 @@ export function PetFormDialog({
     if (open) loadCatalog()
   }, [open, loadCatalog])
 
-  const breeds = catalog?.breeds[species] ?? ['Mestizo']
+  const allBreeds = catalog?.breeds[species] ?? ['Mestizo']
+
+  const filteredBreeds = useMemo(() => {
+    const q = breedQuery.trim().toLowerCase()
+    if (!q) return allBreeds
+    return allBreeds.filter((b) => b.toLowerCase().includes(q))
+  }, [allBreeds, breedQuery])
+
+  const exactMatch = allBreeds.some((b) => b.toLowerCase() === breedQuery.trim().toLowerCase())
+  const canAdd = breedQuery.trim().length > 0 && !exactMatch
+
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (breedRef.current && !breedRef.current.contains(e.target as Node)) {
+        setBreedOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onClick)
+    return () => document.removeEventListener('mousedown', onClick)
+  }, [])
+
+  const pickBreed = (value: string) => {
+    setBreed(value)
+    setBreedQuery(value)
+    setBreedOpen(false)
+  }
+
+  const addCustomBreed = async () => {
+    const value = breedQuery.trim()
+    if (!value || addingBreed) return
+    setAddingBreed(true)
+    setError(null)
+    try {
+      await apiFetch('/pets/breeds', {
+        method: 'POST',
+        body: JSON.stringify({ species, breed: value }),
+      })
+      await loadCatalog()
+      pickBreed(value)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo agregar la raza')
+    } finally {
+      setAddingBreed(false)
+    }
+  }
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -82,7 +130,7 @@ export function PetFormDialog({
         body: JSON.stringify({
           name,
           species,
-          breed: breed || null,
+          breed: breed || breedQuery.trim() || null,
           sex: sex || null,
           birth_date: birthDate || null,
           allergies: allergies || null,
@@ -122,6 +170,8 @@ export function PetFormDialog({
                 onChange={(e) => {
                   setSpecies(e.target.value)
                   setBreed('')
+                  setBreedQuery('')
+                  setBreedOpen(false)
                 }}
                 className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
               >
@@ -143,19 +193,56 @@ export function PetFormDialog({
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="breed">Raza</Label>
-              <select
-                id="breed"
-                value={breed}
-                onChange={(e) => setBreed(e.target.value)}
-                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-              >
-                <option value="">—</option>
-                {breeds.map((b) => (
-                  <option key={b} value={b}>
-                    {b}
-                  </option>
-                ))}
-              </select>
+              <div className="relative" ref={breedRef}>
+                <Input
+                  id="breed"
+                  value={breedQuery}
+                  onChange={(e) => {
+                    setBreedQuery(e.target.value)
+                    setBreedOpen(true)
+                  }}
+                  onFocus={() => setBreedOpen(true)}
+                  placeholder="Escribe para buscar…"
+                  autoComplete="off"
+                />
+                {breedOpen && (
+                  <div className="absolute z-20 mt-1 max-h-52 w-full overflow-y-auto rounded-md border border-border bg-card p-1 shadow-card">
+                    {filteredBreeds.map((b) => (
+                      <button
+                        key={b}
+                        type="button"
+                        onClick={() => pickBreed(b)}
+                        className="block w-full rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
+                      >
+                        {b}
+                      </button>
+                    ))}
+                    {filteredBreeds.length === 0 && !canAdd && (
+                      <p className="px-2 py-1.5 text-sm text-muted-foreground">Sin resultados.</p>
+                    )}
+                    {canAdd && (
+                      <button
+                        type="button"
+                        onClick={addCustomBreed}
+                        disabled={addingBreed}
+                        className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm font-medium text-primary hover:bg-accent"
+                      >
+                        {addingBreed ? (
+                          <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+                        ) : (
+                          <Plus className="size-3.5" aria-hidden="true" />
+                        )}
+                        Agregar «{breedQuery.trim()}» a la lista
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {exactMatch || breedQuery.trim() === ''
+                  ? `${allBreeds.length} razas disponibles`
+                  : 'Si no encuentras la raza, agrégala a la lista.'}
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="sex">Sexo</Label>

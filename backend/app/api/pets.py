@@ -30,6 +30,7 @@ from app.models import (
     ClinicalAlert,
     Consultation,
     ConsultationAttachment,
+    CustomBreed,
     Pet,
     PetWeightRecord,
     User,
@@ -72,12 +73,64 @@ class InvitationResponse(BaseModel):
     expires_at: datetime
 
 
-@router.get("/breeds-catalog", summary="Catálogo de especies y razas para el alta de mascotas")
-def breeds_catalog() -> dict:
-    return {
-        "species": species_options(),
-        "breeds": {key: breeds_for(key) for key in BREEDS_BY_SPECIES},
+@router.get(
+    "/breeds-catalog",
+    summary="Catálogo de especies y razas (base + personalizadas de la clínica)",
+)
+def breeds_catalog(
+    ctx: CurrentClinic = Depends(get_current_clinic),
+    db: Session = Depends(get_db),
+) -> dict:
+    custom = {}
+    rows = db.execute(
+        select(CustomBreed.species, CustomBreed.breed)
+        .where(CustomBreed.clinic_id == ctx.clinic["id"])
+        .order_by(CustomBreed.breed)
+    ).all()
+    for species, breed in rows:
+        custom.setdefault(species, []).append(breed)
+
+    breeds = {
+        key: list(dict.fromkeys([*breeds_for(key), *custom.get(key, [])]))
+        for key in BREEDS_BY_SPECIES
     }
+    for species, extra in custom.items():
+        breeds.setdefault(species, list(dict.fromkeys(extra)))
+    return {"species": species_options(), "breeds": breeds}
+
+
+class BreedCreate(BaseModel):
+    species: str = Field(min_length=1, max_length=50)
+    breed: str = Field(min_length=1, max_length=100)
+
+
+@router.post(
+    "/breeds",
+    status_code=status.HTTP_201_CREATED,
+    summary="Agrega una raza personalizada a la clínica",
+)
+def add_custom_breed(
+    body: BreedCreate,
+    ctx: CurrentClinic = Depends(require_clinic_roles(*PET_MUTATORS)),
+    db: Session = Depends(get_db),
+) -> dict:
+    existing = db.scalar(
+        select(CustomBreed).where(
+            CustomBreed.clinic_id == ctx.clinic["id"],
+            CustomBreed.species == body.species,
+            CustomBreed.breed == body.breed,
+        )
+    )
+    if existing is None:
+        db.add(
+            CustomBreed(
+                clinic_id=ctx.clinic["id"],
+                species=body.species,
+                breed=body.breed,
+            )
+        )
+        db.commit()
+    return {"species": body.species, "breed": body.breed, "created": existing is None}
 
 
 @router.get("", response_model=list[PetRead])

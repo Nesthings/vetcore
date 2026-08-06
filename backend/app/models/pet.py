@@ -76,3 +76,21 @@ class ClinicalAlert(UUIDPkMixin, Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+class CustomBreed(UUIDPkMixin, Base):
+    """Raza personalizada agregada por una clínica (fuera del catálogo base).
+
+    Se fusiona con el catálogo estático al desplegar las razas de una especie.
+    """
+
+    __tablename__ = "custom_breeds"
+
+    clinic_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("clinics.id"), nullable=False, index=True
+    )
+    species: Mapped[str] = mapped_column(String(50), nullable=False)
+    breed: Mapped[str] = mapped_column(String(100), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )

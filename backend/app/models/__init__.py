@@ -20,7 +20,7 @@ from app.models.inventory import (
     PurchaseOrderItem,
 )
 from app.models.notification import InternalNotification, OutboundNotification
-from app.models.pet import ClinicalAlert, Pet, PetWeightRecord
+from app.models.pet import ClinicalAlert, CustomBreed, Pet, PetWeightRecord
 from app.models.staff import User, UserComponentPermission
 
 __all__ = [
@@ -36,6 +36,7 @@ __all__ = [
     "ConsultationItem",
     "ConsultationSummaryPdf",
     "ConsultationTemplate",
+    "CustomBreed",
     "InventoryKit",
     "InventoryKitItem",
     "InventoryLot",
