@@ -10,11 +10,6 @@ export interface NavRoute {
 // para que un rol sin acceso no vea ni entre a una pantalla.
 export const NAV_ROUTES: NavRoute[] = [
   { to: '/', label: 'Dashboard del día', component: 'dashboard', end: true },
-  { to: '/agenda', label: 'Agenda', component: 'agenda' },
-  { to: '/waitlist', label: 'Lista de espera', component: 'waitlist' },
-  { to: '/pets', label: 'Pacientes', component: 'pets' },
-  { to: '/inventory', label: 'Insumos', component: 'inventory' },
-  { to: '/products', label: 'Productos', component: 'products' },
   { to: '/vaccination-plans', label: 'Planes de vacunación', component: 'vaccination_plans' },
   { to: '/purchase-orders', label: 'Compras', component: 'purchase_orders' },
   { to: '/automation', label: 'Automatización', component: 'automation' },

@@ -3,12 +3,16 @@ import { Link } from 'react-router-dom'
 import {
   CalendarCheck2,
   CalendarClock,
+  CalendarDays,
   CalendarX2,
   ClipboardPlus,
+  Package,
   PackageMinus,
   PawPrint,
   ShoppingBag,
+  Timer,
   TriangleAlert,
+  Users,
 } from 'lucide-react'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 
@@ -21,6 +25,8 @@ import { ErrorState } from '@/components/ui/error-state'
 import { LoadingState } from '@/components/ui/loading-state'
 import { Separator } from '@/components/ui/separator'
 import { apiFetch } from '@/lib/api'
+import { usePermissions } from '@/lib/permissions'
+import { cn } from '@/lib/utils'
 
 interface DayDashboard {
   date: string
@@ -52,6 +58,54 @@ const STATUS_LABELS: Record<
   no_show: { label: 'No asistió', variant: 'secondary' },
 }
 
+const MODULES = [
+  {
+    label: 'Agenda',
+    to: '/agenda',
+    component: 'agenda',
+    icon: CalendarDays,
+    desc: 'Citas y horarios',
+    text: 'text-teal-700 dark:text-teal-300',
+    iconBg: 'bg-teal-500/15',
+  },
+  {
+    label: 'Lista de espera',
+    to: '/waitlist',
+    component: 'waitlist',
+    icon: Timer,
+    desc: 'Espera de citas',
+    text: 'text-amber-700 dark:text-amber-300',
+    iconBg: 'bg-amber-500/15',
+  },
+  {
+    label: 'Pacientes',
+    to: '/pets',
+    component: 'pets',
+    icon: Users,
+    desc: 'Expedientes clínicos',
+    text: 'text-sky-700 dark:text-sky-300',
+    iconBg: 'bg-sky-500/15',
+  },
+  {
+    label: 'Insumos',
+    to: '/inventory',
+    component: 'inventory',
+    icon: Package,
+    desc: 'Inventario y lotes',
+    text: 'text-violet-700 dark:text-violet-300',
+    iconBg: 'bg-violet-500/15',
+  },
+  {
+    label: 'Productos',
+    to: '/products',
+    component: 'products',
+    icon: ShoppingBag,
+    desc: 'Catálogo de venta',
+    text: 'text-rose-700 dark:text-rose-300',
+    iconBg: 'bg-rose-500/15',
+  },
+]
+
 function KpiCard({
   label,
   value,
@@ -80,6 +134,7 @@ function KpiCard({
 export function Dashboard() {
   const [data, setData] = useState<DayDashboard | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const { hasComponent } = usePermissions()
 
   const load = useCallback(async () => {
     setError(null)
@@ -94,6 +149,8 @@ export function Dashboard() {
   useEffect(() => {
     load()
   }, [load])
+
+  const visibleModules = MODULES.filter((m) => hasComponent(m.component))
 
   return (
     <AppLayout>
@@ -123,39 +180,40 @@ export function Dashboard() {
         </p>
       </div>
 
+      <div className="mb-6">
+        <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          Módulos
+        </p>
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+          {visibleModules.map((m) => (
+            <Link
+              key={m.to}
+              to={m.to}
+              className="group flex flex-col gap-3 rounded-xl border border-border/60 bg-card/80 p-4 shadow-sm backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-glow"
+            >
+              <div
+                className={cn(
+                  'flex size-11 items-center justify-center rounded-lg transition-transform duration-200 group-hover:scale-105',
+                  m.iconBg,
+                )}
+              >
+                <m.icon className={cn('size-5', m.text)} aria-hidden="true" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold">{m.label}</p>
+                <p className="text-xs text-muted-foreground">{m.desc}</p>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </div>
+
       {error && <ErrorState description={error} onRetry={load} className="mb-6" />}
 
       {!data && !error && <LoadingState label="Cargando dashboard…" />}
 
       {data && (
         <div className="space-y-6">
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
-            <KpiCard
-              label="Citas de hoy"
-              value={data.citas_total}
-              icon={CalendarCheck2}
-              hint={`${data.citas_por_estado.confirmed} confirmadas`}
-            />
-            <KpiCard
-              label="Pendientes"
-              value={data.citas_por_estado.scheduled}
-              icon={CalendarClock}
-              hint="por confirmar"
-            />
-            <KpiCard
-              label="Completadas"
-              value={data.citas_por_estado.completed}
-              icon={CalendarCheck2}
-            />
-            <KpiCard
-              label="Bloques de horario"
-              value={data.bloques_hoy}
-              icon={CalendarX2}
-              hint="horario bloqueado"
-            />
-            <KpiCard label="Pacientes activos" value={data.pacientes_activos} icon={PawPrint} />
-          </div>
-
           <div className="grid gap-6 lg:grid-cols-3">
             <Card className="shadow-card lg:col-span-2">
               <CardHeader>
@@ -225,6 +283,33 @@ export function Dashboard() {
                 )}
               </CardContent>
             </Card>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+            <KpiCard
+              label="Citas de hoy"
+              value={data.citas_total}
+              icon={CalendarCheck2}
+              hint={`${data.citas_por_estado.confirmed} confirmadas`}
+            />
+            <KpiCard
+              label="Pendientes"
+              value={data.citas_por_estado.scheduled}
+              icon={CalendarClock}
+              hint="por confirmar"
+            />
+            <KpiCard
+              label="Completadas"
+              value={data.citas_por_estado.completed}
+              icon={CalendarCheck2}
+            />
+            <KpiCard
+              label="Bloques de horario"
+              value={data.bloques_hoy}
+              icon={CalendarX2}
+              hint="horario bloqueado"
+            />
+            <KpiCard label="Pacientes activos" value={data.pacientes_activos} icon={PawPrint} />
           </div>
 
           <Card className="shadow-card">
