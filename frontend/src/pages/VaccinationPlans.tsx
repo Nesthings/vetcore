@@ -26,6 +26,8 @@ function stepsSummary(steps: VaccinationPlan['steps']): string {
     if (s.offset_days % 365 === 0)
       return `${s.offset_days / 365} año${s.offset_days / 365 > 1 ? 's' : ''}`
     if (s.offset_days % 30 === 0) return `${s.offset_days / 30} meses`
+    if (s.offset_days % 15 === 0) return `${s.offset_days / 15} quincenas`
+    if (s.offset_days % 7 === 0) return `${s.offset_days / 7} semanas`
     return `${s.offset_days} días`
   })
   return `${steps.length} dosis · cada ${parts.join(' → ')}`

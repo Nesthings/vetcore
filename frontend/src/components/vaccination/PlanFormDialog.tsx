@@ -12,6 +12,13 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { apiFetch } from '@/lib/api'
 import type { VaccinationPlan } from '@/lib/vaccination'
@@ -19,7 +26,7 @@ import type { VaccinationPlan } from '@/lib/vaccination'
 interface StepDraft {
   label: string
   value: string
-  unit: 'dias' | 'meses' | 'anos'
+  unit: 'dias' | 'semanas' | 'quincenas' | 'meses' | 'anos'
 }
 
 type Unit = StepDraft['unit']
@@ -28,12 +35,16 @@ const toDays = (step: StepDraft): number => {
   const value = Number(step.value) || 0
   if (step.unit === 'anos') return value * 365
   if (step.unit === 'meses') return value * 30
+  if (step.unit === 'quincenas') return value * 15
+  if (step.unit === 'semanas') return value * 7
   return value
 }
 
 const fromDays = (days: number): { value: string; unit: Unit } => {
   if (days > 0 && days % 365 === 0) return { value: String(days / 365), unit: 'anos' }
   if (days > 0 && days % 30 === 0) return { value: String(days / 30), unit: 'meses' }
+  if (days > 0 && days % 15 === 0) return { value: String(days / 15), unit: 'quincenas' }
+  if (days > 0 && days % 7 === 0) return { value: String(days / 7), unit: 'semanas' }
   return { value: String(days), unit: 'dias' }
 }
 
@@ -197,26 +208,38 @@ export function PlanFormDialog({
                     onChange={(e) => updateStep(idx, { label: e.target.value })}
                     required
                   />
-                  <Input
-                    type="number"
-                    min="0"
-                    className="w-24"
-                    placeholder="Cada"
-                    value={s.value}
-                    disabled={idx === 0}
-                    onChange={(e) => updateStep(idx, { value: e.target.value })}
-                    required
-                  />
-                  <select
-                    className="h-9 w-28 rounded-md border border-input bg-background px-2 text-sm"
-                    value={s.unit}
-                    disabled={idx === 0}
-                    onChange={(e) => updateStep(idx, { unit: e.target.value as Unit })}
-                  >
-                    <option value="dias">días</option>
-                    <option value="meses">meses</option>
-                    <option value="anos">años</option>
-                  </select>
+                  {idx === 0 ? (
+                    <span className="w-48 shrink-0 rounded-md border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
+                      Se agenda el día de la asignación
+                    </span>
+                  ) : (
+                    <>
+                      <Input
+                        type="number"
+                        min="0"
+                        className="w-24"
+                        placeholder="Cada"
+                        value={s.value}
+                        onChange={(e) => updateStep(idx, { value: e.target.value })}
+                        required
+                      />
+                      <Select
+                        value={s.unit}
+                        onValueChange={(v) => updateStep(idx, { unit: v as Unit })}
+                      >
+                        <SelectTrigger className="w-32" aria-label="Unidad de tiempo">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="dias">días</SelectItem>
+                          <SelectItem value="semanas">semanas</SelectItem>
+                          <SelectItem value="quincenas">quincenas</SelectItem>
+                          <SelectItem value="meses">meses</SelectItem>
+                          <SelectItem value="anos">años</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </>
+                  )}
                   {steps.length > 1 && (
                     <Button
                       type="button"
@@ -233,7 +256,7 @@ export function PlanFormDialog({
             </div>
             <p className="text-xs text-muted-foreground">
               La primera dosis se agenda el día de la asignación; las siguientes suman el intervalo
-              de la dosis anterior (ej. 0, +2 meses, +2 meses, +1 año).
+              de la dosis anterior (ej. 0, +2 meses, +2 quincenas, +1 año).
             </p>
           </div>
 
