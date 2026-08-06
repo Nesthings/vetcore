@@ -15,6 +15,7 @@ from app.api import (
     health,
     inventory,
     invoices,
+    owner,
     pets,
     schedule_blocks,
     services,
@@ -51,6 +52,7 @@ app.include_router(inventory.router, prefix="/api/v1")
 app.include_router(invoices.router, prefix="/api/v1")
 app.include_router(services.router, prefix="/api/v1")
 app.include_router(dose.router, prefix="/api/v1")
+app.include_router(owner.router, prefix="/api/v1")
 
 # Media (MVP local). La URL pública /media/... es la que devuelven los endpoints.
 media_dir = Path(settings.media_root)

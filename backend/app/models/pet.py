@@ -25,6 +25,8 @@ class Pet(UUIDPkMixin, Base):
     allergies: Mapped[str | None] = mapped_column(Text)
     clinical_alert_text: Mapped[str | None] = mapped_column(Text)
     clinical_photo_url: Mapped[str | None] = mapped_column(Text)
+    cartilla_photo_url: Mapped[str | None] = mapped_column(Text)
+    cartilla_photo_prev_url: Mapped[str | None] = mapped_column(Text)
     is_active: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default="true"
     )

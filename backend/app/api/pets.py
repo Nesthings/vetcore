@@ -6,10 +6,13 @@ Incluye la foto clínica del expediente (distinta de la foto de la Cartilla,
 principio 5) y la línea de tiempo que fusiona consultas y citas.
 """
 
+import secrets
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
-from sqlalchemy import select
+from pydantic import BaseModel, Field
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.api.deps import CurrentClinic, get_current_clinic, require_clinic_roles
@@ -28,6 +31,18 @@ router = APIRouter(prefix="/pets", tags=["pets"])
 PET_MUTATORS = ("admin", "veterinario")
 
 MAX_IMAGE_BYTES = 5 * 1024 * 1024  # 5 MB
+
+
+class InvitationCreate(BaseModel):
+    contact_phone: str | None = Field(default=None, max_length=30)
+    contact_email: str | None = Field(default=None, max_length=200)
+    expires_in_days: int = Field(default=7, ge=1, le=30)
+
+
+class InvitationResponse(BaseModel):
+    token: str
+    activation_url: str
+    expires_at: datetime
 
 
 @router.get("", response_model=list[PetRead])
@@ -246,3 +261,53 @@ def pet_timeline(
 
     events.sort(key=lambda e: e["date"], reverse=True)
     return events
+
+
+@router.post(
+    "/{pet_id}/invitations",
+    response_model=InvitationResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Genera la invitación del dueño (token de activación)",
+)
+def create_invitation(
+    pet_id: str,
+    body: InvitationCreate,
+    ctx: CurrentClinic = Depends(require_clinic_roles(*PET_MUTATORS)),
+    db: Session = Depends(get_db),
+) -> InvitationResponse:
+    """Cierra el flujo de invitación (Subfase 1.7): la clínica capturó el
+    teléfono/correo del dueño en persona y genera el token. El link se
+    comparte por WhatsApp/email (en dev se devuelve en la respuesta)."""
+    _get_pet_or_404(db, ctx.clinic["id"], pet_id)
+
+    if not body.contact_phone and not body.contact_email:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Se necesita al menos un teléfono o correo de contacto",
+        )
+
+    token = secrets.token_urlsafe(32)
+    expires_at = datetime.now(UTC) + timedelta(days=body.expires_in_days)
+    db.execute(
+        text(
+            "INSERT INTO owner_invitations "
+            "(clinic_id, pet_id, contact_phone, contact_email, token, status, "
+            "expires_at, created_by) "
+            "VALUES (:c, :p, :phone, :email, :token, 'pending', :expires, :by)"
+        ),
+        {
+            "c": ctx.clinic["id"],
+            "p": pet_id,
+            "phone": body.contact_phone,
+            "email": body.contact_email,
+            "token": token,
+            "expires": expires_at,
+            "by": ctx.user.sub,
+        },
+    )
+    db.commit()
+    return InvitationResponse(
+        token=token,
+        activation_url=f"/activate?token={token}",
+        expires_at=expires_at,
+    )

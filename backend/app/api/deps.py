@@ -64,6 +64,30 @@ def require_roles(*roles: str):
     return dependency
 
 
+def get_current_owner(
+    user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> CurrentUser:
+    """Valida que el token pertenezca a un `owner` existente.
+
+    La identidad del dueño es GLOBAL (tabla `owners`, sin clinic_id). El acceso
+    al portal NO se bloquea por el estado de suscripción de las clínicas: si la
+    clínica está suspendida, el dueño conserva SOLO-LECTURA (principio 8).
+    """
+    if user.role != "owner":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo el dueño de la mascota",
+        )
+    exists = db.execute(text("SELECT 1 FROM owners WHERE id = :oid"), {"oid": user.sub}).scalar()
+    if not exists:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Cuenta de dueño no encontrada",
+        )
+    return user
+
+
 def require_staff(user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
     if user.role not in STAFF_ROLES:
         raise HTTPException(

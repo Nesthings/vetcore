@@ -409,4 +409,46 @@ Las verificaciones de frontend deben ejercitar el código JS real (no solo el ba
 
 ---
 
-**Siguiente subfase:** 1.7 — Cartilla digital del dueño (vista solo-lectura de vacunas/historial/último peso, foto compartida editable por el dueño con límites/compresión/EXIF/historial, flujo completo de invitación por token con reutilización de cuenta `owner` global).
+## Subfase 1.7 — Cartilla digital del dueño + Invitación por token ✅
+
+**Fecha:** 2026-08-05
+
+### Qué se hizo
+**Backend:**
+- Migración `0005`: `cartilla_photo_url` + `cartilla_photo_prev_url` en `pets` (principio 5: foto de la Cartilla ≠ foto clínica).
+- `Pillow` agregado. `app/core/images.py`: conversión a JPEG, crop cuadrado centrado (aspect ratio fijo), resize máx. 1024px, calidad 85 y **eliminación total de EXIF** (incluida la GPS).
+- `app/api/owner.py` con dependencia `get_current_owner` (identidad GLOBAL vía `owner_pet_links`, **no bloqueada por suscripción** — principio 8):
+  - `GET /owner/pets` — mascotas del dueño con clínica y flag `read_only`.
+  - `GET /owner/pets/{id}` — detalle solo-lectura: peso, consultas (con items y `summary_pdf_url`), citas próximas.
+  - `PUT /owner/pets/{id}/photo` — subida con procesamiento; guarda la foto anterior en `prev`.
+  - `POST /owner/pets/{id}/photo/revert` — restaura la foto anterior.
+- `POST /pets/{id}/invitations` (admin/vet): genera el token y el `activation_url` — cierra el flujo iniciado en 1.2.
+
+**Frontend:**
+- `OwnerPortal` (`/portal`, rol owner): lista de mascotas del dueño con clínica y badge "Solo lectura".
+- `OwnerPetDetail` (`/portal/pets/:id`): cartilla con foto editable (subir/restaurar), historial de consultas con PDFs descargables, próximas citas; mensaje si la clínica está suspendida (solo lectura, no se bloquea).
+- `InviteOwnerDialog` en la ficha clínica (`PetDetail`): captura teléfono/correo → genera el enlace de activación y permite copiarlo.
+- Rutas `/portal` con `ProtectedRoute roles={['owner']}`.
+
+### Decisiones técnicas y por qué
+- **Foto de la Cartilla como columna nueva en `pets`** (principio 5): el esquema solo tenía `clinical_photo_url`; se agregó campo distinto + `_prev_url` para revertir (sección 8).
+- **Pillow para todo el procesamiento:** formato único JPEG, aspect ratio fijo (cuadrado), compresión a 1024px, y `exif=b""` al guardar limpia la ubicación GPS.
+- **`get_current_owner` global:** el dueño accede a todas sus mascotas sin importar la clínica; si la clínica está suspendida, `read_only=True` y la UI **muestra** los datos (no bloquea). El staff no puede tocar `/owner` (403).
+- **Invitación completa:** la clínica genera el token al tener el contacto (sección 3.7, "invitación por token, nunca auto-registro"); al activar, el `owner` se reutiliza por email/teléfono (regla global, ya probado en 1.2).
+- **"Vacunas" = historial de consultas/items** (el esquema no tiene tabla de vacunas; se cubren como items + PDFs de resumen).
+
+### Verificado
+- Invitación → token (43 chars) + `activation_url`; activación crea owner; login owner ✓
+- `GET /owner/pets` y detalle: 2 consultas con 2 PDFs ✓
+- Foto con EXIF subida → servida como **JPEG 1024×1024 SIN EXIF** ✓
+- Revert: 2ª foto → revert → restaura la 1ª ✓
+- Staff → `/owner/*` → **403** ✓
+- Ruff + lint 0 errores + build OK ✓
+
+### Notas / pendientes
+- El envío del link por WhatsApp/email queda pendiente (Motor de Automatización, Fase 2/3); en dev la clínica copia el enlace.
+- `read_only` se probó para clínica activa (False); el flag para suspendida se deriva de `subscription_status` (lógica trivial en `_pet_cartilla`).
+
+---
+
+**Siguiente subfase:** 1.8 — Panel Super-Admin (lista de clínicas, estado de suscripción, switch activar/desactivar, detalle de clínica, alta manual de clínica nueva).

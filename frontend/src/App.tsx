@@ -12,6 +12,8 @@ import { DesignSystem } from '@/pages/DesignSystem'
 import { Inventory } from '@/pages/Inventory'
 import { Invoices } from '@/pages/Invoices'
 import { NewConsultation } from '@/pages/NewConsultation'
+import { OwnerPetDetail } from '@/pages/owner/OwnerPetDetail'
+import { OwnerPortal } from '@/pages/owner/OwnerPortal'
 import { PetDetail } from '@/pages/PetDetail'
 import { Pets } from '@/pages/Pets'
 import { Services } from '@/pages/Services'
@@ -104,8 +106,16 @@ function App() {
           <Route
             path="/portal"
             element={
-              <ProtectedRoute>
-                <SessionHome />
+              <ProtectedRoute roles={['owner']}>
+                <OwnerPortal />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/portal/pets/:id"
+            element={
+              <ProtectedRoute roles={['owner']}>
+                <OwnerPetDetail />
               </ProtectedRoute>
             }
           />
