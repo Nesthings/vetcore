@@ -17,6 +17,7 @@ import { FinancialDashboard } from '@/pages/FinancialDashboard'
 import { Inventory } from '@/pages/Inventory'
 import { Invoices } from '@/pages/Invoices'
 import { NewConsultation } from '@/pages/NewConsultation'
+import { NewSale } from '@/pages/NewSale'
 import { OwnerPetDetail } from '@/pages/owner/OwnerPetDetail'
 import { OwnerInvoices } from '@/pages/owner/OwnerInvoices'
 import { OwnerPortal } from '@/pages/owner/OwnerPortal'
@@ -114,6 +115,14 @@ function App() {
                 element={
                   <ProtectedRoute component="pets">
                     <NewConsultation />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/ventas/nueva"
+                element={
+                  <ProtectedRoute component="pets">
+                    <NewSale />
                   </ProtectedRoute>
                 }
               />

@@ -7,6 +7,7 @@ import {
   ClipboardPlus,
   PackageMinus,
   PawPrint,
+  ShoppingBag,
   TriangleAlert,
 } from 'lucide-react'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
@@ -97,17 +98,25 @@ export function Dashboard() {
   return (
     <AppLayout>
       <div className="mb-6">
-        <Button
-          asChild
-          variant="success"
-          size="lg"
-          className="mb-6 h-12 w-full px-8 text-base sm:w-auto"
-        >
-          <Link to="/consultas/nueva">
-            <ClipboardPlus className="size-6" aria-hidden="true" />
-            Nueva consulta
-          </Link>
-        </Button>
+        <div className="mb-6 flex flex-col gap-3 sm:flex-row">
+          <Button
+            asChild
+            variant="success"
+            size="lg"
+            className="h-12 w-full px-8 text-base sm:w-auto"
+          >
+            <Link to="/consultas/nueva">
+              <ClipboardPlus className="size-6" aria-hidden="true" />
+              Nueva consulta
+            </Link>
+          </Button>
+          <Button asChild size="lg" className="h-12 w-full px-8 text-base sm:w-auto">
+            <Link to="/ventas/nueva">
+              <ShoppingBag className="size-6" aria-hidden="true" />
+              Nueva venta
+            </Link>
+          </Button>
+        </div>
         <h1 className="text-2xl font-semibold tracking-tight">Dashboard del día</h1>
         <p className="text-sm text-muted-foreground">
           {data ? `Resumen operativo del ${data.date}` : 'Resumen operativo de hoy'}

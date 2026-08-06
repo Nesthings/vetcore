@@ -72,6 +72,7 @@ from app.schemas.purchase import (
     PurchaseOrderUpdate,
 )
 from app.schemas.reminder import PendingReminder, ReminderRunResult, ReminderSchedule, ReminderStage
+from app.schemas.sale import SaleCreate, SaleProductItem, SaleResult
 from app.schemas.services import ServiceCreate, ServiceRead, ServiceUpdate
 from app.schemas.staff import ProfileUpdate, UserCreate, UserRead, UserUpdate
 from app.schemas.vaccination import (
@@ -152,6 +153,9 @@ __all__ = [
     "ReminderRunResult",
     "ReminderSchedule",
     "ReminderStage",
+    "SaleCreate",
+    "SaleProductItem",
+    "SaleResult",
     "ScheduleBlockCreate",
     "ScheduleBlockRead",
     "ServiceCreate",
