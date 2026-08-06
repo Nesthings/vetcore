@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, Camera, ClipboardPlus, MailPlus, PawPrint, TriangleAlert } from 'lucide-react'
+import {
+  ArrowLeft,
+  Camera,
+  ClipboardPlus,
+  MailPlus,
+  PawPrint,
+  TriangleAlert,
+  UserRoundCog,
+} from 'lucide-react'
 import {
   CartesianGrid,
   Line,
@@ -13,6 +21,7 @@ import {
 
 import { AppLayout } from '@/components/layout/AppLayout'
 import { InviteOwnerDialog } from '@/components/pets/InviteOwnerDialog'
+import { TransferOwnerDialog } from '@/components/pets/TransferOwnerDialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -47,6 +56,7 @@ export function PetDetail() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [inviteOpen, setInviteOpen] = useState(false)
+  const [transferOpen, setTransferOpen] = useState(false)
 
   const load = useCallback(async () => {
     if (!id) return
@@ -99,6 +109,9 @@ export function PetDetail() {
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={() => setInviteOpen(true)}>
               <MailPlus /> Invitar dueño
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setTransferOpen(true)}>
+              <UserRoundCog /> Transferir dueño
             </Button>
             <Button asChild size="sm">
               <Link to={`/pets/${id}/consultas/nueva`}>
@@ -271,6 +284,15 @@ export function PetDetail() {
           petName={pet.name}
           open={inviteOpen}
           onOpenChange={setInviteOpen}
+        />
+      )}
+
+      {pet && (
+        <TransferOwnerDialog
+          petId={pet.id}
+          petName={pet.name}
+          open={transferOpen}
+          onOpenChange={setTransferOpen}
         />
       )}
     </AppLayout>

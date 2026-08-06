@@ -55,3 +55,23 @@ class PetWeightRead(BaseModel):
     weight_kg: float
     recorded_at: datetime
     consultation_id: uuid.UUID | None
+
+
+class OwnerLinkRead(BaseModel):
+    owner_id: uuid.UUID
+    phone: str | None
+    email: str | None
+    linked_at: datetime
+    is_active: bool
+
+
+class OwnerTransferRequest(BaseModel):
+    contact_phone: str | None = Field(default=None, max_length=30)
+    contact_email: str | None = Field(default=None, max_length=200)
+
+
+class OwnerTransferResponse(BaseModel):
+    owner_id: uuid.UUID
+    reused: bool
+    links_revoked: int
+    invitation: dict

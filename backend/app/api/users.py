@@ -1,15 +1,25 @@
-"""CRUD de personal de la clínica — por-tenant, solo admin para mutar."""
+"""CRUD de personal de la clínica — por-tenant, solo admin para mutar.
+
+Incluye los endpoints de perfil propio (`/users/me`), accesibles para todo
+el staff de la clínica.
+"""
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.deps import CurrentClinic, get_current_clinic, require_clinic_roles
-from app.core.security import hash_password
+from app.api.deps import (
+    CurrentClinic,
+    CurrentUser,
+    get_current_clinic,
+    require_clinic_roles,
+    require_staff,
+)
+from app.core.security import hash_password, verify_password
 from app.db.session import get_db
 from app.models import ClinicBranch, User
-from app.schemas.staff import UserCreate, UserRead, UserUpdate
+from app.schemas.staff import ProfileUpdate, UserCreate, UserRead, UserUpdate
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -50,6 +60,47 @@ def list_users(
         .offset(offset)
     )
     return _with_branch_names(db, list(db.scalars(stmt)))
+
+
+@router.get("/me", response_model=UserRead, summary="Perfil propio del staff")
+def my_profile(
+    me: CurrentUser = Depends(require_staff),
+    db: Session = Depends(get_db),
+) -> dict:
+    user = db.get(User, me.sub)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado")
+    return _with_branch_names(db, [user])[0]
+
+
+@router.patch("/me", response_model=UserRead, summary="Actualiza tu perfil / contraseña")
+def update_my_profile(
+    body: ProfileUpdate,
+    me: CurrentUser = Depends(require_staff),
+    db: Session = Depends(get_db),
+) -> dict:
+    user = db.get(User, me.sub)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado")
+
+    if body.new_password is not None:
+        if not body.current_password or not verify_password(
+            body.current_password, user.password_hash
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="La contraseña actual no es correcta",
+            )
+        user.password_hash = hash_password(body.new_password)
+
+    if body.full_name is not None:
+        user.full_name = body.full_name
+    if body.phone is not None:
+        user.phone = body.phone
+
+    db.commit()
+    db.refresh(user)
+    return _with_branch_names(db, [user])[0]
 
 
 def _get_user_or_404(db: Session, clinic_id: str, user_id: str) -> User:

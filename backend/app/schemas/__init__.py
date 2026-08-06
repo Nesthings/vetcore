@@ -38,9 +38,18 @@ from app.schemas.inventory import (
     InventoryProductUpdate,
     StockEntryCreate,
 )
-from app.schemas.pet import PetCreate, PetRead, PetUpdate, PetWeightCreate, PetWeightRead
+from app.schemas.pet import (
+    OwnerLinkRead,
+    OwnerTransferRequest,
+    OwnerTransferResponse,
+    PetCreate,
+    PetRead,
+    PetUpdate,
+    PetWeightCreate,
+    PetWeightRead,
+)
 from app.schemas.services import ServiceCreate, ServiceRead, ServiceUpdate
-from app.schemas.staff import UserCreate, UserRead, UserUpdate
+from app.schemas.staff import ProfileUpdate, UserCreate, UserRead, UserUpdate
 
 __all__ = [
     "AppointmentCreate",
@@ -70,11 +79,15 @@ __all__ = [
     "InvoiceItemRead",
     "InvoiceRead",
     "InvoiceUpdate",
+    "OwnerLinkRead",
+    "OwnerTransferRequest",
+    "OwnerTransferResponse",
     "PetCreate",
     "PetRead",
     "PetUpdate",
     "PetWeightCreate",
     "PetWeightRead",
+    "ProfileUpdate",
     "ScheduleBlockCreate",
     "ScheduleBlockRead",
     "ServiceCreate",

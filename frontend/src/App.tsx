@@ -16,9 +16,11 @@ import { OwnerPetDetail } from '@/pages/owner/OwnerPetDetail'
 import { OwnerPortal } from '@/pages/owner/OwnerPortal'
 import { PetDetail } from '@/pages/PetDetail'
 import { Pets } from '@/pages/Pets'
+import { Profile } from '@/pages/Profile'
 import { Services } from '@/pages/Services'
 import { Settings } from '@/pages/Settings'
 import { SuperAdminPanel } from '@/pages/superadmin/SuperAdminPanel'
+import { Templates } from '@/pages/Templates'
 
 function App() {
   return (
@@ -76,6 +78,22 @@ function App() {
             element={
               <ProtectedRoute>
                 <Inventory />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/templates"
+            element={
+              <ProtectedRoute roles={['admin', 'veterinario']}>
+                <Templates />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <Profile />
               </ProtectedRoute>
             }
           />

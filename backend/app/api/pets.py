@@ -24,7 +24,16 @@ from app.core.storage import (
 )
 from app.db.session import get_db
 from app.models import Appointment, Consultation, Pet, PetWeightRecord, User
-from app.schemas.pet import PetCreate, PetRead, PetUpdate, PetWeightCreate, PetWeightRead
+from app.schemas.pet import (
+    OwnerLinkRead,
+    OwnerTransferRequest,
+    OwnerTransferResponse,
+    PetCreate,
+    PetRead,
+    PetUpdate,
+    PetWeightCreate,
+    PetWeightRead,
+)
 
 router = APIRouter(prefix="/pets", tags=["pets"])
 
@@ -310,4 +319,118 @@ def create_invitation(
         token=token,
         activation_url=f"/activate?token={token}",
         expires_at=expires_at,
+    )
+
+
+@router.get(
+    "/{pet_id}/owner-links",
+    response_model=list[OwnerLinkRead],
+    summary="Dueños vinculados a la mascota",
+)
+def pet_owner_links(
+    pet_id: str,
+    ctx: CurrentClinic = Depends(get_current_clinic),
+    db: Session = Depends(get_db),
+) -> list[OwnerLinkRead]:
+    _get_pet_or_404(db, ctx.clinic["id"], pet_id)
+    rows = (
+        db.execute(
+            text(
+                "SELECT o.id AS owner_id, o.phone, o.email, l.linked_at, l.is_active "
+                "FROM owner_pet_links l JOIN owners o ON o.id = l.owner_id "
+                "WHERE l.pet_id = :pid AND l.clinic_id = :cid "
+                "ORDER BY l.linked_at DESC"
+            ),
+            {"pid": pet_id, "cid": ctx.clinic["id"]},
+        )
+        .mappings()
+        .all()
+    )
+    return [OwnerLinkRead(**dict(r)) for r in rows]
+
+
+@router.post(
+    "/{pet_id}/owner-transfer",
+    response_model=OwnerTransferResponse,
+    summary="Transfiere la mascota a otro dueño (reutiliza o crea owner)",
+)
+def transfer_owner(
+    pet_id: str,
+    body: OwnerTransferRequest,
+    ctx: CurrentClinic = Depends(require_clinic_roles(*PET_MUTATORS)),
+    db: Session = Depends(get_db),
+) -> OwnerTransferResponse:
+    """Cambia el dueño de la mascota. Regla global: si ya existe un `owner`
+    con ese teléfono/correo, se reutiliza (nunca se duplica). Los links
+    anteriores quedan revocados y el nuevo dueño recibe una invitación."""
+    _get_pet_or_404(db, ctx.clinic["id"], pet_id)
+
+    if not body.contact_phone and not body.contact_email:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Se necesita al menos un teléfono o correo del nuevo dueño",
+        )
+
+    if body.contact_email:
+        owner = db.execute(
+            text("SELECT id FROM owners WHERE email = :email"), {"email": body.contact_email}
+        ).scalar()
+    elif body.contact_phone:
+        owner = db.execute(
+            text("SELECT id FROM owners WHERE phone = :phone"), {"phone": body.contact_phone}
+        ).scalar()
+
+    reused = owner is not None
+    if owner is None:
+        owner = db.execute(
+            text("INSERT INTO owners (phone, email) VALUES (:phone, :email) RETURNING id"),
+            {"phone": body.contact_phone, "email": body.contact_email},
+        ).scalar()
+
+    revoked = db.execute(
+        text(
+            "UPDATE owner_pet_links SET is_active = false, revoked_at = now() "
+            "WHERE pet_id = :pid AND clinic_id = :cid AND is_active = true"
+        ),
+        {"pid": pet_id, "cid": ctx.clinic["id"]},
+    ).rowcount
+
+    db.execute(
+        text(
+            "INSERT INTO owner_pet_links (owner_id, pet_id, clinic_id, is_active) "
+            "VALUES (:oid, :pid, :cid, true)"
+        ),
+        {"oid": owner, "pid": pet_id, "cid": ctx.clinic["id"]},
+    )
+
+    token = secrets.token_urlsafe(32)
+    expires_at = datetime.now(UTC) + timedelta(days=7)
+    db.execute(
+        text(
+            "INSERT INTO owner_invitations "
+            "(clinic_id, pet_id, contact_phone, contact_email, token, status, "
+            "expires_at, created_by) "
+            "VALUES (:c, :p, :phone, :email, :token, 'pending', :expires, :by)"
+        ),
+        {
+            "c": ctx.clinic["id"],
+            "p": pet_id,
+            "phone": body.contact_phone,
+            "email": body.contact_email,
+            "token": token,
+            "expires": expires_at,
+            "by": ctx.user.sub,
+        },
+    )
+    db.commit()
+
+    return OwnerTransferResponse(
+        owner_id=owner,
+        reused=reused,
+        links_revoked=revoked,
+        invitation={
+            "token": token,
+            "activation_url": f"/activate?token={token}",
+            "expires_at": expires_at.isoformat(),
+        },
     )

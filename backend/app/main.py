@@ -19,6 +19,7 @@ from app.api import (
     pets,
     schedule_blocks,
     services,
+    templates,
     users,
 )
 from app.core.config import settings
@@ -51,6 +52,7 @@ app.include_router(dashboard.router, prefix="/api/v1")
 app.include_router(inventory.router, prefix="/api/v1")
 app.include_router(invoices.router, prefix="/api/v1")
 app.include_router(services.router, prefix="/api/v1")
+app.include_router(templates.router, prefix="/api/v1")
 app.include_router(dose.router, prefix="/api/v1")
 app.include_router(owner.router, prefix="/api/v1")
 

@@ -20,6 +20,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import type { Pet } from '@/pages/Pets'
+import type { ConsultationTemplate } from '@/pages/Templates'
 import { apiFetch } from '@/lib/api'
 
 interface DoseResult {
@@ -37,6 +38,7 @@ interface ConsultaBody {
   branch_id: string
   pet_id: string
   vet_user_id: string
+  template_id?: string | null
   reason: string
   diagnosis: string
   treatment: string
@@ -51,6 +53,8 @@ export function NewConsultation() {
   const [branches, setBranches] = useState<Branch[]>([])
   const [branchId, setBranchId] = useState('')
   const [vetUserId, setVetUserId] = useState('')
+  const [templates, setTemplates] = useState<ConsultationTemplate[]>([])
+  const [templateId, setTemplateId] = useState('')
 
   const [reason, setReason] = useState('')
   const [diagnosis, setDiagnosis] = useState('')
@@ -78,13 +82,15 @@ export function NewConsultation() {
   const load = useCallback(async () => {
     if (!petId) return
     try {
-      const [p, br, users] = await Promise.all([
+      const [p, br, users, tmpl] = await Promise.all([
         apiFetch<Pet>(`/pets/${petId}`),
         apiFetch<Branch[]>('/branches'),
         apiFetch<{ id: string; full_name: string }[]>('/users'),
+        apiFetch<ConsultationTemplate[]>('/templates'),
       ])
       setPet(p)
       setBranches(br)
+      setTemplates(tmpl)
       setWeight(p.latest_weight_kg ? String(p.latest_weight_kg) : '')
       if (br.length > 0) setBranchId(br[0].id)
       // el propio usuario (staff) es quien registra la consulta
@@ -132,6 +138,7 @@ export function NewConsultation() {
         branch_id: branchId,
         pet_id: petId!,
         vet_user_id: vetUserId,
+        template_id: templateId || null,
         reason,
         diagnosis,
         treatment,
@@ -240,6 +247,35 @@ export function NewConsultation() {
                 ))}
               </select>
             </div>
+            {templates.length > 0 && (
+              <div className="space-y-2">
+                <Label>Plantilla</Label>
+                <select
+                  value={templateId}
+                  onChange={(e) => {
+                    const t = templates.find((x) => x.id === e.target.value)
+                    setTemplateId(e.target.value)
+                    if (t) {
+                      const guide = t.fields
+                        .map(
+                          (f) =>
+                            `${f.required ? '* ' : ''}${f.label}${f.type === 'select' && f.options?.length ? ` (${f.options.join('/')})` : ''}`,
+                        )
+                        .join('\n')
+                      setReason((prev) => prev || `${t.name}:\n${guide}`)
+                    }
+                  }}
+                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm sm:max-w-xs"
+                >
+                  <option value="">Sin plantilla</option>
+                  {templates.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="space-y-2">
               <Label>Motivo de consulta *</Label>
               <Textarea

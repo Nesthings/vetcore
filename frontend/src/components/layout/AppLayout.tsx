@@ -7,6 +7,7 @@ import {
   PawPrint,
   Receipt,
   Settings2,
+  UserRound,
   Users,
 } from 'lucide-react'
 import { NavLink, useNavigate } from 'react-router-dom'
@@ -18,17 +19,30 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
 
-  const isAdmin = user?.role === 'admin'
+  const role = user?.role
 
-  const NAV_ITEMS = [
-    { to: '/', label: 'Dashboard del día', icon: LayoutDashboard, end: true, adminOnly: false },
-    { to: '/agenda', label: 'Agenda', icon: CalendarDays, end: false, adminOnly: false },
-    { to: '/pets', label: 'Pacientes', icon: Users, end: false, adminOnly: false },
-    { to: '/inventory', label: 'Inventario', icon: Package, end: false, adminOnly: false },
-    { to: '/services', label: 'Servicios', icon: FileText, end: false, adminOnly: true },
-    { to: '/invoices', label: 'Facturación', icon: Receipt, end: false, adminOnly: true },
-    { to: '/settings', label: 'Configuración', icon: Settings2, end: false, adminOnly: true },
-  ].filter((i) => !i.adminOnly || isAdmin)
+  const NAV_ITEMS: {
+    to: string
+    label: string
+    icon: React.ElementType
+    end: boolean
+    roles?: string[]
+  }[] = [
+    { to: '/', label: 'Dashboard del día', icon: LayoutDashboard, end: true },
+    { to: '/agenda', label: 'Agenda', icon: CalendarDays, end: false },
+    { to: '/pets', label: 'Pacientes', icon: Users, end: false },
+    { to: '/inventory', label: 'Inventario', icon: Package, end: false },
+    {
+      to: '/templates',
+      label: 'Plantillas',
+      icon: FileText,
+      end: false,
+      roles: ['admin', 'veterinario'],
+    },
+    { to: '/services', label: 'Servicios', icon: Settings2, end: false, roles: ['admin'] },
+    { to: '/invoices', label: 'Facturación', icon: Receipt, end: false, roles: ['admin'] },
+    { to: '/settings', label: 'Configuración', icon: Settings2, end: false, roles: ['admin'] },
+  ].filter((i) => !i.roles || (role && i.roles.includes(role)))
 
   const handleLogout = () => {
     logout()
@@ -81,6 +95,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               </p>
             </div>
           </div>
+          <NavLink
+            to="/profile"
+            className="mb-1 flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+          >
+            <UserRound className="size-4" aria-hidden="true" />
+            Mi perfil
+          </NavLink>
           <button
             type="button"
             onClick={handleLogout}

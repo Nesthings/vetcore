@@ -105,6 +105,7 @@ def create_consultation(
         branch_id=body.branch_id,
         pet_id=body.pet_id,
         vet_user_id=body.vet_user_id,
+        template_id=body.template_id,
         reason=body.reason,
         diagnosis=body.diagnosis,
         treatment=body.treatment,

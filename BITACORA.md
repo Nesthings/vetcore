@@ -486,4 +486,41 @@ Las verificaciones de frontend deben ejercitar el código JS real (no solo el ba
 
 ---
 
-**Siguiente subfase:** 1.9 — Pantallas de cierre del MVP (Perfil/configuración de cuenta propia del staff, Transferir/cambiar dueño de una mascota, y confirmar si se adelanta el editor de plantillas de consulta — Fase 2).
+## Subfase 1.9 — Cierre del MVP (Perfil, Transferencia, Plantillas) ✅
+
+**Fecha:** 2026-08-05
+
+### Qué se hizo
+**Backend:**
+- `GET /users/me` y `PATCH /users/me` — perfil propio del staff (nombre, teléfono, **cambio de contraseña con verificación de la actual**).
+- `GET /pets/{id}/owner-links` — dueños vinculados a la mascota (activos/revocados).
+- `POST /pets/{id}/owner-transfer` — transferencia: reutiliza `owner` por phone/email (regla global) o crea uno nuevo; revoca links activos; crea el nuevo link; **genera invitación** para el nuevo dueño.
+- Modelo `ConsultationTemplate` (ya no registro Core) + CRUD `/templates` (admin/veterinario) con `fields_json` tipado (`TemplateField`).
+- `template_id` agregado a `ConsultationCreate` y `ConsultationRead`.
+
+**Frontend:**
+- `Profile` (`/profile`, todo staff): editar nombre/teléfono y cambiar contraseña. Enlace "Mi perfil" en el sidebar.
+- `TransferOwnerDialog` en `PetDetail` ("Transferir dueño"): muestra dueños actuales, transfiere y copia el link de invitación.
+- `Templates` (`/templates`, admin/vet): editor de plantillas con campos dinámicos (clave, etiqueta, tipo, opciones, obligatorio).
+- `NewConsultation`: **selector de plantilla** que rellena el motivo con la guía de campos y adjunta `template_id`.
+- Nav con roles por ítem (Plantillas admin/vet; Servicios/Facturación/Configuración admin).
+
+### Decisiones técnicas y por qué
+- **Plantillas adelantadas de Fase 2 (decisión del usuario):** se construyeron en 1.9 como pedía el documento (confirmado). El `fields_json` se modela con un schema tipado (`TemplateField`), y la consulta referencia `template_id`.
+- **Verificación de contraseña actual** para el cambio de perfil (el reset por email sigue existiendo para "la olvidé").
+- **Transferencia sin tocar el expediente:** solo se revocan/crean `owner_pet_links`; mascota, consultas y pesos quedan intactos.
+- **Bug detectado y corregido:** `/users/me` estaba registrado después de `/users/{user_id}`, que lo capturaba (error UUID "me"). Se reordenó. También `TemplateRead.fields` mapea `fields_json` con `validation_alias`.
+
+### Verificado
+- Perfil: GET/PATCH OK; password incorrecta rechazada; nombre actualizado ✓
+- Transferencia: 3 links → nuevo dueño activo + 2 revocados + invitación ✓
+- Plantillas: CRUD + consulta con `template_id` ✓
+- Ruff + lint 0 errores + build OK ✓
+
+### Notas / pendientes
+- ⚠️ Estado de los datos de prueba: Firulais ahora pertenece a `nuevodueno@test.com` (transferencia de prueba); el admin se llama "Dr. Test Actualizado".
+- Con esta subfase se cierra la **FASE 1 (MVP)**. Queda la Fase 2 (secundarias): plantillas ya adelantadas, alertas clínicas, inventario avanzado, agenda avanzada, CRM, reportes financieros, notificaciones, auditoría.
+
+---
+
+**Siguiente subfase:** 2.1 — Plantillas de consulta (ya adelantadas en 1.9) + Alertas clínicas visuales en la ficha de paciente.
