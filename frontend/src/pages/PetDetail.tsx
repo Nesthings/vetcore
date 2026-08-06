@@ -4,10 +4,13 @@ import {
   ArrowLeft,
   Camera,
   ClipboardPlus,
+  Loader2,
   MailPlus,
   PawPrint,
+  Plus,
   TriangleAlert,
   UserRoundCog,
+  X,
 } from 'lucide-react'
 import {
   CartesianGrid,
@@ -48,29 +51,51 @@ interface WeightRecord {
   recorded_at: string
 }
 
+interface ClinicalAlert {
+  id: string
+  pet_id: string
+  type: string
+  description: string
+  created_at: string
+}
+
+const ALERT_TYPES = [
+  'Alergia',
+  'Enfermedad crónica',
+  'Comportamiento',
+  'Medidas especiales',
+  'Otra',
+]
+
 export function PetDetail() {
   const { id } = useParams<{ id: string }>()
   const [pet, setPet] = useState<Pet | null>(null)
   const [timeline, setTimeline] = useState<TimelineEvent[]>([])
   const [weights, setWeights] = useState<WeightRecord[]>([])
+  const [alerts, setAlerts] = useState<ClinicalAlert[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [inviteOpen, setInviteOpen] = useState(false)
   const [transferOpen, setTransferOpen] = useState(false)
+  const [alertType, setAlertType] = useState(ALERT_TYPES[0])
+  const [alertDesc, setAlertDesc] = useState('')
+  const [alertBusy, setAlertBusy] = useState(false)
 
   const load = useCallback(async () => {
     if (!id) return
     setLoading(true)
     setError(null)
     try {
-      const [p, tl, w] = await Promise.all([
+      const [p, tl, w, al] = await Promise.all([
         apiFetch<Pet>(`/pets/${id}`),
         apiFetch<TimelineEvent[]>(`/pets/${id}/timeline`),
         apiFetch<WeightRecord[]>(`/pets/${id}/weights`),
+        apiFetch<ClinicalAlert[]>(`/pets/${id}/alerts`),
       ])
       setPet(p)
       setTimeline(tl)
       setWeights(w)
+      setAlerts(al)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo cargar el paciente')
     } finally {
@@ -81,6 +106,35 @@ export function PetDetail() {
   useEffect(() => {
     load()
   }, [load])
+
+  const addAlert = async () => {
+    if (!alertDesc.trim()) return
+    setAlertBusy(true)
+    setError(null)
+    try {
+      await apiFetch(`/pets/${id}/alerts`, {
+        method: 'POST',
+        body: JSON.stringify({ type: alertType, description: alertDesc }),
+      })
+      setAlertDesc('')
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo crear la alerta')
+    } finally {
+      setAlertBusy(false)
+    }
+  }
+
+  const removeAlert = async (alertId: string) => {
+    if (!confirm('¿Eliminar (resolver) esta alerta?')) return
+    setError(null)
+    try {
+      await apiFetch(`/pets/${id}/alerts/${alertId}`, { method: 'DELETE' })
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo eliminar la alerta')
+    }
+  }
 
   const weightChart = [...weights].reverse().map((w) => ({
     fecha: new Date(w.recorded_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' }),
@@ -167,6 +221,71 @@ export function PetDetail() {
                   <Camera className="size-4" aria-hidden="true" />
                   Foto clínica del expediente (la de la Cartilla del dueño llega en 1.7)
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-warning/40 shadow-card">
+            <CardContent className="space-y-3 p-5">
+              <div className="flex items-center justify-between">
+                <p className="flex items-center gap-2 text-sm font-semibold">
+                  <TriangleAlert className="size-4 text-warning" aria-hidden="true" />
+                  Alertas clínicas
+                </p>
+              </div>
+              {alerts.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Sin alertas registradas.</p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {alerts.map((a) => (
+                    <span
+                      key={a.id}
+                      className="inline-flex items-center gap-2 rounded-full border border-warning/40 bg-warning/10 px-3 py-1.5 text-sm font-medium text-warning"
+                    >
+                      <TriangleAlert className="size-3.5" aria-hidden="true" />
+                      <span>
+                        <b>{a.type}:</b> {a.description}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeAlert(a.id)}
+                        aria-label="Resolver alerta"
+                        className="text-warning/70 hover:text-warning"
+                      >
+                        <X className="size-3.5" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  value={alertType}
+                  onChange={(e) => setAlertType(e.target.value)}
+                  className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+                >
+                  {ALERT_TYPES.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  value={alertDesc}
+                  onChange={(e) => setAlertDesc(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && addAlert()}
+                  placeholder="Describe la alerta…"
+                  className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={addAlert}
+                  disabled={alertBusy}
+                >
+                  {alertBusy ? <Loader2 className="animate-spin" /> : <Plus />} Agregar
+                </Button>
               </div>
             </CardContent>
           </Card>

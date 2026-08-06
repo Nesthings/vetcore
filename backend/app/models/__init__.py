@@ -10,7 +10,7 @@ from app.models.consultation import (
     ConsultationTemplate,
 )
 from app.models.inventory import InventoryLot, InventoryMovement, InventoryProduct
-from app.models.pet import Pet, PetWeightRecord
+from app.models.pet import ClinicalAlert, Pet, PetWeightRecord
 from app.models.staff import User
 
 __all__ = [
@@ -18,6 +18,7 @@ __all__ = [
     "Clinic",
     "ClinicBranch",
     "ClinicSubscriptionEvent",
+    "ClinicalAlert",
     "Consultation",
     "ConsultationAttachment",
     "ConsultationItem",

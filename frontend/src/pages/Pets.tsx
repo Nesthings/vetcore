@@ -36,8 +36,12 @@ export interface Pet {
   latest_weight_kg?: number | null
 }
 
+interface PetWithAlerts extends Pet {
+  alert_count?: number
+}
+
 export function Pets() {
-  const [pets, setPets] = useState<Pet[]>([])
+  const [pets, setPets] = useState<PetWithAlerts[]>([])
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -49,7 +53,7 @@ export function Pets() {
     try {
       const params = new URLSearchParams()
       if (q) params.set('search', q)
-      const res = await apiFetch<Pet[]>(`/pets?${params}`)
+      const res = await apiFetch<PetWithAlerts[]>(`/pets?${params}`)
       setPets(res)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudieron cargar los pacientes')
@@ -134,8 +138,10 @@ export function Pets() {
                   <TableCell>{p.sex ?? '—'}</TableCell>
                   <TableCell>{p.latest_weight_kg ? `${p.latest_weight_kg} kg` : '—'}</TableCell>
                   <TableCell>
-                    {p.clinical_alert_text ? (
-                      <Badge variant="destructive">Alerta</Badge>
+                    {p.clinical_alert_text || (p.alert_count && p.alert_count > 0) ? (
+                      <Badge variant="destructive">
+                        Alerta{p.alert_count && p.alert_count > 0 ? ` ×${p.alert_count}` : ''}
+                      </Badge>
                     ) : (
                       <span className="text-muted-foreground">—</span>
                     )}

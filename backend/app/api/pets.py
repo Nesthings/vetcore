@@ -12,7 +12,7 @@ from decimal import Decimal
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from pydantic import BaseModel, Field
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from app.api.deps import CurrentClinic, get_current_clinic, require_clinic_roles
@@ -23,8 +23,11 @@ from app.core.storage import (
     validate_extension,
 )
 from app.db.session import get_db
-from app.models import Appointment, Consultation, Pet, PetWeightRecord, User
+from app.models import Appointment, ClinicalAlert, Consultation, Pet, PetWeightRecord, User
 from app.schemas.pet import (
+    ClinicalAlertCreate,
+    ClinicalAlertRead,
+    ClinicalAlertUpdate,
     OwnerLinkRead,
     OwnerTransferRequest,
     OwnerTransferResponse,
@@ -70,6 +73,17 @@ def list_pets(
         stmt = stmt.where(Pet.name.ilike(f"%{search}%"))
     stmt = stmt.order_by(Pet.name).limit(limit).offset(offset)
     pets = list(db.scalars(stmt))
+    if pets:
+        pet_ids = [p.id for p in pets]
+        counts = dict(
+            db.execute(
+                select(ClinicalAlert.pet_id, func.count())
+                .where(ClinicalAlert.pet_id.in_(pet_ids))
+                .group_by(ClinicalAlert.pet_id)
+            ).all()
+        )
+        for pet in pets:
+            pet.alert_count = counts.get(pet.id, 0)
     return [_pet_with_latest_weight(db, pet) for pet in pets]
 
 
@@ -434,3 +448,92 @@ def transfer_owner(
             "expires_at": expires_at.isoformat(),
         },
     )
+
+
+@router.get(
+    "/{pet_id}/alerts",
+    response_model=list[ClinicalAlertRead],
+    summary="Alertas clínicas del paciente",
+)
+def pet_alerts(
+    pet_id: str,
+    ctx: CurrentClinic = Depends(get_current_clinic),
+    db: Session = Depends(get_db),
+) -> list[ClinicalAlert]:
+    _get_pet_or_404(db, ctx.clinic["id"], pet_id)
+    return list(
+        db.scalars(
+            select(ClinicalAlert)
+            .where(ClinicalAlert.pet_id == pet_id)
+            .order_by(ClinicalAlert.created_at.desc())
+        )
+    )
+
+
+@router.post(
+    "/{pet_id}/alerts",
+    response_model=ClinicalAlertRead,
+    status_code=status.HTTP_201_CREATED,
+    summary="Crea una alerta clínica del paciente",
+)
+def create_alert(
+    pet_id: str,
+    body: ClinicalAlertCreate,
+    ctx: CurrentClinic = Depends(require_clinic_roles(*PET_MUTATORS)),
+    db: Session = Depends(get_db),
+) -> ClinicalAlert:
+    _get_pet_or_404(db, ctx.clinic["id"], pet_id)
+    alert = ClinicalAlert(pet_id=pet_id, type=body.type, description=body.description)
+    db.add(alert)
+    db.commit()
+    db.refresh(alert)
+    return alert
+
+
+@router.patch(
+    "/{pet_id}/alerts/{alert_id}",
+    response_model=ClinicalAlertRead,
+    summary="Edita una alerta clínica",
+)
+def update_alert(
+    pet_id: str,
+    alert_id: str,
+    body: ClinicalAlertUpdate,
+    ctx: CurrentClinic = Depends(require_clinic_roles(*PET_MUTATORS)),
+    db: Session = Depends(get_db),
+) -> ClinicalAlert:
+    _get_pet_or_404(db, ctx.clinic["id"], pet_id)
+    alert = _get_alert_or_404(db, pet_id, alert_id)
+    if body.type is not None:
+        alert.type = body.type
+    if body.description is not None:
+        alert.description = body.description
+    db.commit()
+    db.refresh(alert)
+    return alert
+
+
+@router.delete(
+    "/{pet_id}/alerts/{alert_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Elimina (resuelve) una alerta clínica",
+)
+def delete_alert(
+    pet_id: str,
+    alert_id: str,
+    ctx: CurrentClinic = Depends(require_clinic_roles(*PET_MUTATORS)),
+    db: Session = Depends(get_db),
+) -> None:
+    _get_pet_or_404(db, ctx.clinic["id"], pet_id)
+    alert = _get_alert_or_404(db, pet_id, alert_id)
+    db.delete(alert)
+    db.commit()
+
+
+def _get_alert_or_404(db: Session, pet_id: str, alert_id: str) -> ClinicalAlert:
+    alert = db.scalar(
+        select(ClinicalAlert).where(ClinicalAlert.id == alert_id, ClinicalAlert.pet_id == pet_id)
+    )
+    if alert is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alerta no encontrada")
+    return alert

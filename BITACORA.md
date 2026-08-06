@@ -523,4 +523,35 @@ Las verificaciones de frontend deben ejercitar el código JS real (no solo el ba
 
 ---
 
-**Siguiente subfase:** 2.1 — Plantillas de consulta (ya adelantadas en 1.9) + Alertas clínicas visuales en la ficha de paciente.
+## Subfase 2.1 — Alertas clínicas visuales (Plantillas ya adelantadas en 1.9) ✅
+
+**Fecha:** 2026-08-05
+
+### Qué se hizo
+**Backend:**
+- Modelo `ClinicalAlert` (la tabla existía desde 0001).
+- Endpoints en `pets.py`: `GET /pets/{id}/alerts`, `POST /pets/{id}/alerts`, `PATCH /pets/{id}/alerts/{alert_id}`, `DELETE /pets/{id}/alerts/{alert_id}` (admin/veterinario).
+- `PetRead.alert_count` en el listado de mascotas (una consulta agregada).
+
+**Frontend:**
+- `PetDetail`: sección **"Alertas clínicas"** con badges visuales (tipo + descripción), alta inline (tipo select + descripción) y resolución (X).
+- Lista de `Pets`: badge "Alerta ×N" si hay alertas (o `clinical_alert_text`).
+
+### Decisiones técnicas y por qué
+- **Aislamiento vía el paciente:** `clinical_alerts` no tiene `clinic_id` en el esquema; se resuelve el `pet` dentro de la clínica del staff antes de tocar las alertas (404 si no pertenece).
+- **"Resolver" = eliminar la fila:** el esquema no tiene estado activa/inactiva; la alerta existe mientras está en la tabla.
+- **Tipos libres en BD**, con sugerencias en la UI (Alergia, Enfermedad crónica, Comportamiento, Medidas especiales, Otra).
+- Las plantillas ya estaban listas desde 1.9 (decisión del usuario), así que 2.1 solo aportó las alertas.
+
+### Verificado
+- CRUD completo de alertas (crear 2, listar, editar, eliminar 204) ✓
+- Aislamiento: staff de clínica B → 404 sobre alertas de clínica A ✓
+- `alert_count` en la lista de mascotas (Firulais = 1) ✓
+- Ruff + lint 0 errores + build OK ✓
+
+### Notas / pendientes
+- Las alertas clínicas podrían disparar notificaciones internas (2.7) o avisos al abrir una consulta; se puede conectar después.
+
+---
+
+**Siguiente subfase:** 2.2 — Inventario avanzado (lotes FIFO por caducidad, kits con descuento, predicción de agotamiento, órdenes de compra).

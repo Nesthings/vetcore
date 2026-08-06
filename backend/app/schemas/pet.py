@@ -39,6 +39,7 @@ class PetRead(PetBase):
     is_active: bool
     created_at: datetime
     latest_weight_kg: float | None = None
+    alert_count: int | None = None
 
 
 class PetWeightCreate(BaseModel):
@@ -75,3 +76,23 @@ class OwnerTransferResponse(BaseModel):
     reused: bool
     links_revoked: int
     invitation: dict
+
+
+class ClinicalAlertCreate(BaseModel):
+    type: str = Field(min_length=1, max_length=30)
+    description: str = Field(min_length=1)
+
+
+class ClinicalAlertUpdate(BaseModel):
+    type: str | None = Field(default=None, min_length=1, max_length=30)
+    description: str | None = Field(default=None, min_length=1)
+
+
+class ClinicalAlertRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    pet_id: uuid.UUID
+    type: str
+    description: str
+    created_at: datetime

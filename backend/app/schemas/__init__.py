@@ -39,6 +39,9 @@ from app.schemas.inventory import (
     StockEntryCreate,
 )
 from app.schemas.pet import (
+    ClinicalAlertCreate,
+    ClinicalAlertRead,
+    ClinicalAlertUpdate,
     OwnerLinkRead,
     OwnerTransferRequest,
     OwnerTransferResponse,
@@ -64,6 +67,9 @@ __all__ = [
     "ClinicSubscriptionEventRead",
     "ClinicSummaryRead",
     "ClinicUpdate",
+    "ClinicalAlertCreate",
+    "ClinicalAlertRead",
+    "ClinicalAlertUpdate",
     "ConsultationCreate",
     "ConsultationItemCreate",
     "ConsultationItemRead",

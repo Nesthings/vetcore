@@ -1,4 +1,4 @@
-"""Modelos de pacientes (mascotas) y sus registros de peso."""
+"""Modelos de pacientes (mascotas), pesos y alertas clínicas."""
 
 import uuid
 from datetime import date, datetime
@@ -57,3 +57,22 @@ class PetWeightRecord(UUIDPkMixin, Base):
     )
 
     pet: Mapped[Pet] = relationship(back_populates="weight_records")
+
+
+class ClinicalAlert(UUIDPkMixin, Base):
+    """Alerta clínica del paciente.
+
+    La tabla NO tiene clinic_id en el esquema del documento: el aislamiento
+    multi-tenant se resuelve vía el `pet` (pet → clínica del staff).
+    """
+
+    __tablename__ = "clinical_alerts"
+
+    pet_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("pets.id"), nullable=False, index=True
+    )
+    type: Mapped[str] = mapped_column(String(30), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
