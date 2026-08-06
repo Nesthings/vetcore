@@ -18,7 +18,7 @@ export const NAV_ROUTES: NavRoute[] = [
   { to: '/vaccination-plans', label: 'Planes de vacunación', component: 'vaccination_plans' },
   { to: '/purchase-orders', label: 'Compras', component: 'purchase_orders' },
   { to: '/automation', label: 'Automatización', component: 'automation' },
-  { to: '/reports', label: 'Reportes', component: 'reports' },
+  { to: '/reports', label: 'Reportes', component: 'reports', end: true },
   { to: '/audit', label: 'Bitácora', component: 'audit' },
   { to: '/reports/financial', label: 'Financiero', component: 'financial' },
   { to: '/templates', label: 'Plantillas', component: 'templates' },
