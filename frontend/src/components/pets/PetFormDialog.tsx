@@ -22,6 +22,27 @@ interface BreedsCatalog {
   markings: Record<string, string[]>
 }
 
+function toDateInput(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+function dateFromAge(years: number, months: number): Date {
+  const d = new Date()
+  d.setFullYear(d.getFullYear() - years)
+  d.setMonth(d.getMonth() - months)
+  return d
+}
+
+function ageFromDate(birth: string): { years: number; months: number } {
+  const b = new Date(birth)
+  const now = new Date()
+  let months = (now.getFullYear() - b.getFullYear()) * 12 + (now.getMonth() - b.getMonth())
+  if (now.getDate() < b.getDate()) months -= 1
+  if (months < 0) months = 0
+  return { years: Math.floor(months / 12), months: months % 12 }
+}
+
 export interface PetFormValue {
   id: string
   name: string
@@ -60,6 +81,8 @@ export function PetFormDialog({
   const [markings, setMarkings] = useState('')
   const [sex, setSex] = useState('')
   const [birthDate, setBirthDate] = useState('')
+  const [ageYears, setAgeYears] = useState('')
+  const [ageMonths, setAgeMonths] = useState('')
   const [allergies, setAllergies] = useState('')
   const [alertText, setAlertText] = useState('')
 
@@ -126,6 +149,14 @@ export function PetFormDialog({
       setMarkings(pet.markings ?? '')
       setSex(pet.sex ?? '')
       setBirthDate(pet.birth_date ?? '')
+      if (pet.birth_date) {
+        const { years, months } = ageFromDate(pet.birth_date)
+        setAgeYears(String(years))
+        setAgeMonths(String(months))
+      } else {
+        setAgeYears('')
+        setAgeMonths('')
+      }
       setAllergies(pet.allergies ?? '')
       setAlertText(pet.clinical_alert_text ?? '')
     } else {
@@ -138,6 +169,8 @@ export function PetFormDialog({
       setMarkings('')
       setSex('')
       setBirthDate('')
+      setAgeYears('')
+      setAgeMonths('')
       setAllergies('')
       setAlertText('')
     }
@@ -160,6 +193,24 @@ export function PetFormDialog({
   const allBreeds = catalog?.breeds[species] ?? ['Mestizo']
   const allColors = catalog?.colors[species] ?? []
   const allMarkings = catalog?.markings[species] ?? []
+
+  const onAgeChange = (years: string, months: string) => {
+    const y = Number(years) || 0
+    const m = Number(months) || 0
+    setBirthDate(y || m ? toDateInput(dateFromAge(y, m)) : '')
+  }
+
+  const onBirthDateChange = (value: string) => {
+    setBirthDate(value)
+    if (value) {
+      const { years, months } = ageFromDate(value)
+      setAgeYears(String(years))
+      setAgeMonths(String(months))
+    } else {
+      setAgeYears('')
+      setAgeMonths('')
+    }
+  }
 
   const filteredBreeds = useMemo(() => {
     const q = breedQuery.trim().toLowerCase()
@@ -401,12 +452,40 @@ export function PetFormDialog({
               </select>
             </div>
             <div className="space-y-2">
+              <Label htmlFor="age-years">Edad (años)</Label>
+              <Input
+                id="age-years"
+                type="number"
+                min={0}
+                max={60}
+                value={ageYears}
+                onChange={(e) => {
+                  setAgeYears(e.target.value)
+                  onAgeChange(e.target.value, ageMonths)
+                }}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="age-months">Edad (meses)</Label>
+              <Input
+                id="age-months"
+                type="number"
+                min={0}
+                max={11}
+                value={ageMonths}
+                onChange={(e) => {
+                  setAgeMonths(e.target.value)
+                  onAgeChange(ageYears, e.target.value)
+                }}
+              />
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="birth">Nacimiento</Label>
               <Input
                 id="birth"
                 type="date"
                 value={birthDate}
-                onChange={(e) => setBirthDate(e.target.value)}
+                onChange={(e) => onBirthDateChange(e.target.value)}
               />
             </div>
           </div>
