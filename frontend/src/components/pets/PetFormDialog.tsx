@@ -452,34 +452,6 @@ export function PetFormDialog({
               </select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="age-years">Edad (años)</Label>
-              <Input
-                id="age-years"
-                type="number"
-                min={0}
-                max={60}
-                value={ageYears}
-                onChange={(e) => {
-                  setAgeYears(e.target.value)
-                  onAgeChange(e.target.value, ageMonths)
-                }}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="age-months">Edad (meses)</Label>
-              <Input
-                id="age-months"
-                type="number"
-                min={0}
-                max={11}
-                value={ageMonths}
-                onChange={(e) => {
-                  setAgeMonths(e.target.value)
-                  onAgeChange(ageYears, e.target.value)
-                }}
-              />
-            </div>
-            <div className="space-y-2">
               <Label htmlFor="birth">Nacimiento</Label>
               <Input
                 id="birth"
@@ -487,6 +459,37 @@ export function PetFormDialog({
                 value={birthDate}
                 onChange={(e) => onBirthDateChange(e.target.value)}
               />
+            </div>
+            <div className="col-span-2 space-y-2">
+              <Label htmlFor="age-years">Edad</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="age-years"
+                  type="number"
+                  min={0}
+                  max={60}
+                  value={ageYears}
+                  onChange={(e) => {
+                    setAgeYears(e.target.value)
+                    onAgeChange(e.target.value, ageMonths)
+                  }}
+                  className="w-24"
+                />
+                <span className="text-sm text-muted-foreground">años</span>
+                <Input
+                  id="age-months"
+                  type="number"
+                  min={0}
+                  max={11}
+                  value={ageMonths}
+                  onChange={(e) => {
+                    setAgeMonths(e.target.value)
+                    onAgeChange(ageYears, e.target.value)
+                  }}
+                  className="w-24"
+                />
+                <span className="text-sm text-muted-foreground">meses</span>
+              </div>
             </div>
           </div>
 
