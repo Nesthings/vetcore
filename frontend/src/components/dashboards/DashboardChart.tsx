@@ -39,7 +39,7 @@ interface NameValue {
 
 function Donut({ data }: { data: NameValue[] }) {
   return (
-    <ResponsiveContainer width="100%" height="100%">
+    <ResponsiveContainer width="100%" height="100%" debounce={100}>
       <PieChart>
         <Pie
           data={data}
@@ -64,7 +64,7 @@ function Donut({ data }: { data: NameValue[] }) {
 
 function PieChartCard({ data }: { data: NameValue[] }) {
   return (
-    <ResponsiveContainer width="100%" height="100%">
+    <ResponsiveContainer width="100%" height="100%" debounce={100}>
       <PieChart>
         <Pie
           data={data}
@@ -87,7 +87,7 @@ function PieChartCard({ data }: { data: NameValue[] }) {
 
 function BarsH({ data }: { data: NameValue[] }) {
   return (
-    <ResponsiveContainer width="100%" height="100%">
+    <ResponsiveContainer width="100%" height="100%" debounce={100}>
       <BarChart data={data} layout="vertical" margin={{ top: 4, right: 16, left: 8, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
         <XAxis
@@ -120,7 +120,7 @@ function BarsH({ data }: { data: NameValue[] }) {
 
 function AreaChartCard({ data }: { data: { label: string; value: number }[] }) {
   return (
-    <ResponsiveContainer width="100%" height="100%">
+    <ResponsiveContainer width="100%" height="100%" debounce={100}>
       <AreaChart data={data} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
         <defs>
           <linearGradient id="dashArea" x1="0" y1="0" x2="0" y2="1">
@@ -197,7 +197,7 @@ function Heatmap({
 
 function FunnelCard({ data }: { data: NameValue[] }) {
   return (
-    <ResponsiveContainer width="100%" height="100%">
+    <ResponsiveContainer width="100%" height="100%" debounce={100}>
       <FunnelChart>
         <Funnel dataKey="value" data={data} isAnimationActive={false}>
           <LabelList position="right" fill="var(--foreground)" stroke="none" dataKey="name" />
@@ -214,7 +214,7 @@ function RadarCard({
   data: { vets: string[]; data: Record<string, number | string>[] }
 }) {
   return (
-    <ResponsiveContainer width="100%" height="100%">
+    <ResponsiveContainer width="100%" height="100%" debounce={100}>
       <RadarChart data={data.data}>
         <PolarGrid stroke="var(--border)" />
         <PolarAngleAxis dataKey="metric" tick={AXIS_TICK} />
@@ -238,7 +238,7 @@ function RadarCard({
 
 function LineChartCard({ data }: { data: { label: string; value: number }[] }) {
   return (
-    <ResponsiveContainer width="100%" height="100%">
+    <ResponsiveContainer width="100%" height="100%" debounce={100}>
       <LineChart data={data} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
         <XAxis dataKey="label" tick={AXIS_TICK} tickLine={false} axisLine={false} />
@@ -259,7 +259,7 @@ function LineChartCard({ data }: { data: { label: string; value: number }[] }) {
 
 function RadialCard({ data }: { data: NameValue[] }) {
   return (
-    <ResponsiveContainer width="100%" height="100%">
+    <ResponsiveContainer width="100%" height="100%" debounce={100}>
       <RadialBarChart
         data={data}
         innerRadius="35%"
@@ -288,7 +288,7 @@ function RadialCard({ data }: { data: NameValue[] }) {
 
 function StackedBars({ data }: { data: { label: string; in: number; out: number }[] }) {
   return (
-    <ResponsiveContainer width="100%" height="100%">
+    <ResponsiveContainer width="100%" height="100%" debounce={100}>
       <BarChart data={data} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
         <XAxis dataKey="label" tick={AXIS_TICK} tickLine={false} axisLine={false} />

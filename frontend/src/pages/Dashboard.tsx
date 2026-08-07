@@ -122,7 +122,7 @@ const CitasBarChart = memo(function CitasBarChart({
   data: { label: string; count: number }[]
 }) {
   return (
-    <ResponsiveContainer width="100%" height="100%">
+    <ResponsiveContainer width="100%" height="100%" debounce={100}>
       <BarChart data={data} margin={{ top: 4, right: 8, left: -24, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
         <XAxis
