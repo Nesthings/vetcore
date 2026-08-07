@@ -110,6 +110,20 @@ function calcAge(birth: string): string {
     : `${years} año${years === 1 ? '' : 's'}`
 }
 
+function isMale(sex?: string | null): boolean {
+  return sex === 'M' || sex === 'macho' || sex === 'Macho'
+}
+
+function isFemale(sex?: string | null): boolean {
+  return sex === 'H' || sex === 'hembra' || sex === 'Hembra'
+}
+
+function sexLabel(sex?: string | null): string | null {
+  if (isMale(sex)) return 'Macho'
+  if (isFemale(sex)) return 'Hembra'
+  return null
+}
+
 function Stat({
   icon: Icon,
   label,
@@ -238,42 +252,70 @@ export function PetDetail() {
       {pet && !error && (
         <div className="space-y-6">
           <div className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-card">
-            <div
-              className="pointer-events-none absolute inset-0 bg-gradient-to-br from-sky-500/[0.12] via-primary/[0.04] to-transparent"
-              aria-hidden="true"
-            />
-            <CardContent className="relative p-6">
-              <div className="flex flex-col gap-6 lg:flex-row lg:items-center">
-                <div className="flex items-center gap-5">
-                  <div className="relative shrink-0">
-                    <div className="flex size-28 items-center justify-center overflow-hidden rounded-2xl border border-primary/10 bg-secondary/60 shadow-elevated">
-                      {pet.clinical_photo_url ? (
-                        <img
-                          src={pet.clinical_photo_url}
-                          alt={pet.name}
-                          className="size-full object-cover"
+            {(() => {
+              const male = isMale(pet.sex)
+              const female = isFemale(pet.sex)
+              const accent = male
+                ? {
+                    gradient: 'from-sky-500/[0.16] via-primary/[0.03] to-transparent',
+                    ring: 'border-sky-400/70',
+                    speciesBg: 'bg-sky-500',
+                    chip: 'bg-sky-500/10 text-sky-700 hover:bg-sky-500/10 dark:text-sky-300',
+                    glow: 'shadow-[0_0_30px_-4px_rgba(14,165,233,0.55)]',
+                  }
+                : female
+                  ? {
+                      gradient: 'from-pink-500/[0.16] via-primary/[0.03] to-transparent',
+                      ring: 'border-pink-400/70',
+                      speciesBg: 'bg-pink-500',
+                      chip: 'bg-pink-500/10 text-pink-700 hover:bg-pink-500/10 dark:text-pink-300',
+                      glow: 'shadow-[0_0_30px_-4px_rgba(236,72,153,0.55)]',
+                    }
+                  : {
+                      gradient: 'from-slate-500/[0.12] via-primary/[0.03] to-transparent',
+                      ring: 'border-primary/20',
+                      speciesBg: 'bg-primary',
+                      chip: 'bg-primary/10 text-primary hover:bg-primary/10',
+                      glow: 'shadow-glow',
+                    }
+              return (
+                <>
+                  <div
+                    className={`pointer-events-none absolute inset-0 bg-gradient-to-b ${accent.gradient}`}
+                    aria-hidden="true"
+                  />
+                  <CardContent className="relative flex flex-col items-center p-8 text-center">
+                    <div className="relative">
+                      <div
+                        className={`flex size-44 items-center justify-center overflow-hidden rounded-[2rem] border-4 ${accent.ring} bg-secondary/60 shadow-elevated ${accent.glow}`}
+                      >
+                        {pet.clinical_photo_url ? (
+                          <img
+                            src={pet.clinical_photo_url}
+                            alt={pet.name}
+                            className="size-full object-cover"
+                          />
+                        ) : (
+                          <PawPrint className="size-16 text-primary" aria-hidden="true" />
+                        )}
+                      </div>
+                      <span
+                        className={`absolute -bottom-2 -right-2 flex size-10 items-center justify-center rounded-full border-4 border-card ${accent.speciesBg} text-white shadow-glow`}
+                        title={speciesLabel(pet.species)}
+                      >
+                        <MDIIcon
+                          path={SPECIES_ICONS[pet.species] ?? mdiPaw}
+                          size={0.7}
+                          aria-hidden="true"
                         />
-                      ) : (
-                        <PawPrint className="size-10 text-primary" aria-hidden="true" />
-                      )}
+                      </span>
                     </div>
-                    <span
-                      className="absolute -bottom-1.5 -right-1.5 flex size-8 items-center justify-center rounded-full border-4 border-card bg-sky-500 text-white shadow-glow"
-                      title={speciesLabel(pet.species)}
-                    >
-                      <MDIIcon
-                        path={SPECIES_ICONS[pet.species] ?? mdiPaw}
-                        size={0.6}
-                        aria-hidden="true"
-                      />
-                    </span>
-                  </div>
-                  <div className="min-w-0">
-                    <h1 className="text-3xl font-bold tracking-tight text-foreground">
+
+                    <h1 className="mt-5 text-3xl font-bold tracking-tight text-foreground">
                       {pet.name}
                     </h1>
-                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                      <Badge className="gap-1.5 bg-sky-500/10 text-sky-700 hover:bg-sky-500/10 dark:text-sky-300">
+                    <div className="mt-2.5 flex flex-wrap items-center justify-center gap-1.5">
+                      <Badge className={`gap-1.5 ${accent.chip}`}>
                         <MDIIcon
                           path={SPECIES_ICONS[pet.species] ?? mdiPaw}
                           size={0.6}
@@ -282,8 +324,8 @@ export function PetDetail() {
                         {speciesLabel(pet.species)}
                       </Badge>
                       {pet.breed && <Badge variant="secondary">{pet.breed}</Badge>}
-                      {pet.sex && (
-                        <Badge variant="outline">{pet.sex === 'M' ? 'Macho' : 'Hembra'}</Badge>
+                      {sexLabel(pet.sex) && (
+                        <Badge className={accent.chip}>{sexLabel(pet.sex)}</Badge>
                       )}
                       {pet.markings && (
                         <Badge variant="outline" className="text-muted-foreground">
@@ -297,58 +339,58 @@ export function PetDetail() {
                         {pet.allergies}
                       </p>
                     )}
-                  </div>
-                </div>
 
-                <div className="grid flex-1 grid-cols-2 gap-3 sm:grid-cols-4">
-                  <Stat
-                    icon={Cake}
-                    label="Edad"
-                    value={pet.birth_date ? calcAge(pet.birth_date) : '—'}
-                  />
-                  <Stat
-                    icon={CalendarDays}
-                    label="Nacimiento"
-                    value={
-                      pet.birth_date
-                        ? new Date(pet.birth_date).toLocaleDateString('es-MX', {
-                            day: 'numeric',
-                            month: 'short',
-                            year: 'numeric',
-                          })
-                        : '—'
-                    }
-                  />
-                  <Stat
-                    icon={Weight}
-                    label="Último peso"
-                    value={pet.latest_weight_kg ? `${pet.latest_weight_kg} kg` : '—'}
-                  />
-                  <Stat
-                    icon={UserRound}
-                    label="Dueño"
-                    value={pet.owners?.find((o) => o.is_active)?.full_name ?? '—'}
-                  />
-                </div>
-              </div>
+                    <div className="mt-7 grid w-full max-w-2xl grid-cols-2 gap-3 sm:grid-cols-4">
+                      <Stat
+                        icon={Cake}
+                        label="Edad"
+                        value={pet.birth_date ? calcAge(pet.birth_date) : '—'}
+                      />
+                      <Stat
+                        icon={CalendarDays}
+                        label="Nacimiento"
+                        value={
+                          pet.birth_date
+                            ? new Date(pet.birth_date).toLocaleDateString('es-MX', {
+                                day: 'numeric',
+                                month: 'short',
+                                year: 'numeric',
+                              })
+                            : '—'
+                        }
+                      />
+                      <Stat
+                        icon={Weight}
+                        label="Último peso"
+                        value={pet.latest_weight_kg ? `${pet.latest_weight_kg} kg` : '—'}
+                      />
+                      <Stat
+                        icon={UserRound}
+                        label="Dueño"
+                        value={pet.owners?.find((o) => o.is_active)?.full_name ?? '—'}
+                      />
+                    </div>
 
-              <div className="mt-6 flex flex-wrap gap-2">
-                <Button asChild size="sm">
-                  <Link to={`/consultas/nueva?pet=${id}`}>
-                    <ClipboardPlus /> Nueva consulta
-                  </Link>
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => setConsentOpen(true)}>
-                  <FileSignature /> Consentimiento
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => setInviteOpen(true)}>
-                  <MailPlus /> Invitar dueño
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => setTransferOpen(true)}>
-                  <UserRoundCog /> Transferir dueño
-                </Button>
-              </div>
-            </CardContent>
+                    <div className="mt-7 flex flex-wrap justify-center gap-2">
+                      <Button asChild size="sm">
+                        <Link to={`/consultas/nueva?pet=${id}`}>
+                          <ClipboardPlus /> Nueva consulta
+                        </Link>
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => setConsentOpen(true)}>
+                        <FileSignature /> Consentimiento
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => setInviteOpen(true)}>
+                        <MailPlus /> Invitar dueño
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => setTransferOpen(true)}>
+                        <UserRoundCog /> Transferir dueño
+                      </Button>
+                    </div>
+                  </CardContent>
+                </>
+              )
+            })()}
           </div>
 
           {pet.clinical_alert_text && (
