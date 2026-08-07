@@ -1,4 +1,4 @@
-import { History, LogOut, PawPrint, Settings2, UserRound } from 'lucide-react'
+import { History, LogOut, PawPrint, Receipt, Settings2, UserRound } from 'lucide-react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
 
@@ -193,6 +193,16 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                     >
                       <History className="size-4" aria-hidden="true" />
                       Bitácora
+                    </NavLink>
+                  )}
+                  {hasComponent('invoices') && (
+                    <NavLink
+                      to="/invoices"
+                      onClick={() => setProfileOpen(false)}
+                      className="flex items-center gap-3 border-t border-border px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                    >
+                      <Receipt className="size-4" aria-hidden="true" />
+                      Facturación
                     </NavLink>
                   )}
                   <button

@@ -11,22 +11,6 @@ from app.db.session import Base
 from app.models.base import UUIDPkMixin
 
 
-class ConsultationTemplate(UUIDPkMixin, Base):
-    """Plantilla de consulta: define campos reutilizables (fields_json)."""
-
-    __tablename__ = "consultation_templates"
-
-    clinic_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("clinics.id"), nullable=False, index=True
-    )
-    name: Mapped[str] = mapped_column(String(150), nullable=False)
-    species: Mapped[str | None] = mapped_column(String(50))
-    fields_json: Mapped[list] = mapped_column(JSONB, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
-
-
 class Consultation(UUIDPkMixin, Base):
     __tablename__ = "consultations"
 
@@ -41,9 +25,6 @@ class Consultation(UUIDPkMixin, Base):
     )
     vet_user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
-    )
-    template_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("consultation_templates.id")
     )
     reason: Mapped[str | None] = mapped_column(Text)
     diagnosis: Mapped[str | None] = mapped_column(Text)

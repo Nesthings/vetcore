@@ -28,7 +28,6 @@ from app.api import (
     sales,
     schedule_blocks,
     services,
-    templates,
     users,
     vaccination_plans,
     waitlist,
@@ -67,7 +66,6 @@ app.include_router(products.router, prefix="/api/v1")
 app.include_router(sales.router, prefix="/api/v1")
 app.include_router(purchase_orders.router, prefix="/api/v1")
 app.include_router(services.router, prefix="/api/v1")
-app.include_router(templates.router, prefix="/api/v1")
 app.include_router(dose.router, prefix="/api/v1")
 app.include_router(owner.router, prefix="/api/v1")
 app.include_router(consents.router, prefix="/api/v1")

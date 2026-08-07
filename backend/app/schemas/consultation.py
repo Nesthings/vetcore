@@ -23,7 +23,6 @@ class ConsultationCreate(BaseModel):
     branch_id: uuid.UUID | None = None
     pet_id: uuid.UUID
     vet_user_id: uuid.UUID
-    template_id: uuid.UUID | None = None
     reason: str | None = None
     diagnosis: str | None = None
     treatment: str | None = None
@@ -49,7 +48,6 @@ class ConsultationRead(BaseModel):
     branch_id: uuid.UUID | None
     pet_id: uuid.UUID
     vet_user_id: uuid.UUID
-    template_id: uuid.UUID | None
     reason: str | None
     diagnosis: str | None
     treatment: str | None

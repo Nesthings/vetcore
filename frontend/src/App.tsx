@@ -31,7 +31,6 @@ import { PurchaseOrders } from '@/pages/PurchaseOrders'
 import { Services } from '@/pages/Services'
 import { Settings } from '@/pages/Settings'
 import { SetupWizard } from '@/pages/SetupWizard'
-import { Templates } from '@/pages/Templates'
 import { VaccinationPlans } from '@/pages/VaccinationPlans'
 import { Waitlist } from '@/pages/Waitlist'
 
@@ -159,14 +158,6 @@ function App() {
                     element={
                       <ProtectedRoute roles={['admin']} component="purchase_orders">
                         <PurchaseOrders />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/templates"
-                    element={
-                      <ProtectedRoute roles={['admin', 'veterinario']} component="templates">
-                        <Templates />
                       </ProtectedRoute>
                     }
                   />

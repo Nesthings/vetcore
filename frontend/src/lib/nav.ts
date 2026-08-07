@@ -1,7 +1,6 @@
 import {
   BellRing,
   CalendarDays,
-  FileText,
   History,
   Home,
   Package,
@@ -46,9 +45,7 @@ export const NAV_ROUTES: NavRoute[] = [
   { to: '/purchase-orders', label: 'Compras', component: 'purchase_orders' },
   { to: '/automation', label: 'Recordatorios', component: 'automation' },
   { to: '/reports/financial', label: 'Finanzas', component: 'financial' },
-  { to: '/templates', label: 'Plantillas', component: 'templates' },
   { to: '/services', label: 'Servicios', component: 'services' },
-  { to: '/invoices', label: 'Facturación', component: 'invoices' },
 ]
 
 export const MODULE_META: Record<string, ModuleMeta> = {
@@ -139,12 +136,6 @@ export const MODULE_META: Record<string, ModuleMeta> = {
     img: '/module_pics/finanzas.jpeg',
     tint: 'bg-amber-100 dark:bg-amber-500/15',
     glow: 'hover:shadow-[0_10px_30px_-6px_rgba(245,158,11,0.5)]',
-  },
-  templates: {
-    icon: FileText,
-    desc: 'Plantillas',
-    text: 'text-lime-700 dark:text-lime-300',
-    iconBg: 'bg-lime-500/15',
   },
   services: {
     icon: Settings2,

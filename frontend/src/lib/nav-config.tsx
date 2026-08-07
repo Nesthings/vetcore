@@ -10,9 +10,7 @@ const DEFAULT_PINNED = [
   'automation',
   'audit',
   'financial',
-  'templates',
   'services',
-  'invoices',
 ]
 
 interface NavConfigValue {

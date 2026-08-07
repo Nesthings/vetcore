@@ -9,7 +9,6 @@ from app.models.consultation import (
     ConsultationAttachment,
     ConsultationItem,
     ConsultationSummaryPdf,
-    ConsultationTemplate,
 )
 from app.models.expense import FinancialExpense
 from app.models.inventory import (
@@ -42,7 +41,6 @@ __all__ = [
     "ConsultationAttachment",
     "ConsultationItem",
     "ConsultationSummaryPdf",
-    "ConsultationTemplate",
     "DigitalConsent",
     "CustomBreed",
     "FinancialExpense",
