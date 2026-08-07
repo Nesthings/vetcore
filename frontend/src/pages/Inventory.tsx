@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { CalendarX2, PackagePlus, Plus, Search, TriangleAlert } from 'lucide-react'
+import { CalendarX2, PackageMinus, PackagePlus, PackageX, Plus, TriangleAlert } from 'lucide-react'
 
 import { AppLayout } from '@/components/layout/AppLayout'
 import { LotFormDialog } from '@/components/inventory/LotFormDialog'
@@ -9,8 +9,8 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState } from '@/components/ui/error-state'
-import { Input } from '@/components/ui/input'
 import { LoadingState } from '@/components/ui/loading-state'
+import { SearchInput } from '@/components/ui/search-input'
 import {
   Select,
   SelectContent,
@@ -26,6 +26,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { apiFetch } from '@/lib/api'
 
 export interface InventoryProduct {
@@ -50,6 +51,30 @@ function stockBadge(stock: number) {
   if (stock <= 0) return <Badge variant="destructive">Agotado</Badge>
   if (stock < 5) return <Badge variant="warning">Bajo</Badge>
   return <Badge variant="success">{stock} en stock</Badge>
+}
+
+function SummaryChip({
+  label,
+  value,
+  icon: Icon,
+  tint,
+}: {
+  label: string
+  value: number
+  icon: React.ElementType
+  tint: string
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-border bg-card p-3 shadow-card">
+      <span className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${tint}`}>
+        <Icon className="size-4" aria-hidden="true" />
+      </span>
+      <div className="min-w-0">
+        <p className="text-lg font-bold leading-none text-foreground">{value}</p>
+        <p className="mt-0.5 truncate text-xs text-muted-foreground">{label}</p>
+      </div>
+    </div>
+  )
 }
 
 export function Inventory() {
@@ -86,8 +111,16 @@ export function Inventory() {
   }, [search, branchId])
 
   useEffect(() => {
-    load()
-  }, [load])
+    const t = setTimeout(() => load(), search ? 250 : 0)
+    return () => clearTimeout(t)
+  }, [search, branchId, load])
+
+  const summary = {
+    agotados: products.filter((p) => p.stock <= 0).length,
+    bajos: products.filter((p) => p.stock > 0 && p.stock < 5).length,
+    vencidos: products.filter((p) => p.expired).length,
+    porVencer: products.filter((p) => p.expiring_soon).length,
+  }
 
   return (
     <AppLayout>
@@ -102,16 +135,13 @@ export function Inventory() {
       </div>
 
       <div className="mb-4 flex max-w-lg gap-3">
-        <div className="relative flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && load()}
-            placeholder="Buscar producto…"
-            className="pl-9"
-          />
-        </div>
+        <SearchInput
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          onClear={() => setSearch('')}
+          placeholder="Buscar producto…"
+          className="flex-1"
+        />
         <Select value={branchId} onValueChange={setBranchId}>
           <SelectTrigger className="w-48">
             <SelectValue placeholder="Sucursal" />
@@ -125,6 +155,35 @@ export function Inventory() {
           </SelectContent>
         </Select>
       </div>
+
+      {!loading && !error && products.length > 0 && (
+        <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <SummaryChip
+            label="Agotados"
+            value={summary.agotados}
+            icon={PackageX}
+            tint="bg-destructive/10 text-destructive"
+          />
+          <SummaryChip
+            label="Stock bajo"
+            value={summary.bajos}
+            icon={PackageMinus}
+            tint="bg-warning/10 text-warning"
+          />
+          <SummaryChip
+            label="Vencidos"
+            value={summary.vencidos}
+            icon={CalendarX2}
+            tint="bg-destructive/10 text-destructive"
+          />
+          <SummaryChip
+            label="Por vencer"
+            value={summary.porVencer}
+            icon={TriangleAlert}
+            tint="bg-warning/10 text-warning"
+          />
+        </div>
+      )}
 
       {error && <ErrorState description={error} onRetry={() => load()} className="mb-6" />}
       {loading && <LoadingState label="Cargando inventario…" />}
@@ -148,11 +207,24 @@ export function Inventory() {
             <TableHeader>
               <TableRow>
                 <TableHead>Producto</TableHead>
-                <TableHead>Categoría</TableHead>
-                <TableHead>Unidad</TableHead>
+                <TableHead className="hidden lg:table-cell">Categoría</TableHead>
+                <TableHead className="hidden md:table-cell">Unidad</TableHead>
                 <TableHead>Stock</TableHead>
                 <TableHead>Caducidad</TableHead>
-                <TableHead>Predicción</TableHead>
+                <TableHead className="hidden lg:table-cell">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="cursor-help underline decoration-dotted underline-offset-4">
+                          Predicción
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        Días estimados antes de agotar el stock actual
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
@@ -160,8 +232,8 @@ export function Inventory() {
               {products.map((p) => (
                 <TableRow key={p.id}>
                   <TableCell className="font-medium">{p.name}</TableCell>
-                  <TableCell>{p.category ?? '—'}</TableCell>
-                  <TableCell>{p.unit ?? '—'}</TableCell>
+                  <TableCell className="hidden lg:table-cell">{p.category ?? '—'}</TableCell>
+                  <TableCell className="hidden md:table-cell">{p.unit ?? '—'}</TableCell>
                   <TableCell>{stockBadge(p.stock)}</TableCell>
                   <TableCell>
                     {p.expired ? (
@@ -175,7 +247,7 @@ export function Inventory() {
                       <span className="text-muted-foreground">—</span>
                     )}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="hidden lg:table-cell">
                     {p.days_remaining !== null && p.days_remaining !== undefined ? (
                       <span className="text-sm text-muted-foreground">
                         {p.days_remaining < 7 ? (
