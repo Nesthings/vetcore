@@ -1,5 +1,6 @@
 import {
   History,
+  Home,
   LogOut,
   PanelLeftClose,
   PanelLeftOpen,
@@ -8,7 +9,7 @@ import {
   Settings2,
   UserRound,
 } from 'lucide-react'
-import { NavLink, useNavigate } from 'react-router-dom'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
 
 import { useAuth } from '@/lib/auth'
@@ -26,6 +27,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth()
   const { hasComponent } = usePermissions()
   const { pinned, pin } = useNavConfig()
+  const { pathname } = useLocation()
   const navigate = useNavigate()
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [fullName, setFullName] = useState<string | null>(null)
@@ -197,6 +199,16 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 <PanelLeftClose className="size-4" aria-hidden="true" />
               )}
             </button>
+            {pathname !== '/' && (
+              <NavLink
+                to="/"
+                className="flex size-9 items-center justify-center rounded-md border border-border bg-card text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                title="Volver al inicio"
+                aria-label="Volver al inicio"
+              >
+                <Home className="size-4" aria-hidden="true" />
+              </NavLink>
+            )}
             <p className="text-sm text-muted-foreground">
               Hola, <span className="font-medium text-foreground">{displayName}</span>
             </p>
