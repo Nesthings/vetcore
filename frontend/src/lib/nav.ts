@@ -29,6 +29,8 @@ export interface ModuleMeta {
   iconBg: string
   img?: string
   imgGif?: string
+  tint?: string
+  glow?: string
 }
 
 // Catálogo completo de módulos del panel clínico.
@@ -57,6 +59,8 @@ export const MODULE_META: Record<string, ModuleMeta> = {
     text: 'text-teal-700 dark:text-teal-300',
     iconBg: 'bg-teal-500/15',
     img: '/module_pics/agenda.png',
+    tint: 'bg-red-100 dark:bg-red-500/15',
+    glow: 'hover:shadow-[0_10px_30px_-6px_rgba(239,68,68,0.5)]',
   },
   waitlist: {
     icon: Timer,
@@ -64,6 +68,8 @@ export const MODULE_META: Record<string, ModuleMeta> = {
     text: 'text-amber-700 dark:text-amber-300',
     iconBg: 'bg-amber-500/15',
     img: '/module_pics/lista_espera.jpeg',
+    tint: 'bg-orange-100 dark:bg-orange-500/15',
+    glow: 'hover:shadow-[0_10px_30px_-6px_rgba(249,115,22,0.5)]',
   },
   pets: {
     icon: Users,
@@ -71,6 +77,8 @@ export const MODULE_META: Record<string, ModuleMeta> = {
     text: 'text-sky-700 dark:text-sky-300',
     iconBg: 'bg-sky-500/15',
     img: '/module_pics/pacientes.jpeg',
+    tint: 'bg-sky-100 dark:bg-sky-500/15',
+    glow: 'hover:shadow-[0_10px_30px_-6px_rgba(14,165,233,0.5)]',
   },
   inventory: {
     icon: Package,
@@ -78,6 +86,8 @@ export const MODULE_META: Record<string, ModuleMeta> = {
     text: 'text-violet-700 dark:text-violet-300',
     iconBg: 'bg-violet-500/15',
     img: '/module_pics/insumos.jpeg',
+    tint: 'bg-violet-100 dark:bg-violet-500/15',
+    glow: 'hover:shadow-[0_10px_30px_-6px_rgba(168,85,247,0.5)]',
   },
   products: {
     icon: ShoppingBag,
@@ -85,6 +95,8 @@ export const MODULE_META: Record<string, ModuleMeta> = {
     text: 'text-rose-700 dark:text-rose-300',
     iconBg: 'bg-rose-500/15',
     img: '/module_pics/tienda.png',
+    tint: 'bg-emerald-100 dark:bg-emerald-500/15',
+    glow: 'hover:shadow-[0_10px_30px_-6px_rgba(16,185,129,0.5)]',
   },
   vaccination_plans: {
     icon: Syringe,
@@ -92,6 +104,8 @@ export const MODULE_META: Record<string, ModuleMeta> = {
     text: 'text-emerald-700 dark:text-emerald-300',
     iconBg: 'bg-emerald-500/15',
     img: '/module_pics/planes_de_vac.jpeg',
+    tint: 'bg-pink-100 dark:bg-pink-500/15',
+    glow: 'hover:shadow-[0_10px_30px_-6px_rgba(236,72,153,0.5)]',
   },
   purchase_orders: {
     icon: ShoppingCart,
@@ -99,6 +113,8 @@ export const MODULE_META: Record<string, ModuleMeta> = {
     text: 'text-orange-700 dark:text-orange-300',
     iconBg: 'bg-orange-500/15',
     img: '/module_pics/compras.png',
+    tint: 'bg-emerald-100 dark:bg-emerald-500/15',
+    glow: 'hover:shadow-[0_10px_30px_-6px_rgba(16,185,129,0.5)]',
   },
   automation: {
     icon: BellRing,
@@ -106,6 +122,8 @@ export const MODULE_META: Record<string, ModuleMeta> = {
     text: 'text-indigo-700 dark:text-indigo-300',
     iconBg: 'bg-indigo-500/15',
     img: '/module_pics/recordatorios.jpeg',
+    tint: 'bg-emerald-100 dark:bg-emerald-500/15',
+    glow: 'hover:shadow-[0_10px_30px_-6px_rgba(16,185,129,0.5)]',
   },
   audit: {
     icon: History,
@@ -119,6 +137,8 @@ export const MODULE_META: Record<string, ModuleMeta> = {
     text: 'text-cyan-700 dark:text-cyan-300',
     iconBg: 'bg-cyan-500/15',
     img: '/module_pics/finanzas.jpeg',
+    tint: 'bg-amber-100 dark:bg-amber-500/15',
+    glow: 'hover:shadow-[0_10px_30px_-6px_rgba(245,158,11,0.5)]',
   },
   templates: {
     icon: FileText,
@@ -132,6 +152,8 @@ export const MODULE_META: Record<string, ModuleMeta> = {
     text: 'text-fuchsia-700 dark:text-fuchsia-300',
     iconBg: 'bg-fuchsia-500/15',
     img: '/module_pics/servicios.jpeg',
+    tint: 'bg-[#ffe3d3] dark:bg-[#ffb59c]/20',
+    glow: 'hover:shadow-[0_10px_30px_-6px_rgba(255,160,122,0.55)]',
   },
   invoices: {
     icon: Receipt,

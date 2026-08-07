@@ -195,7 +195,7 @@ export function Dashboard() {
           onDragLeave={() => setModulesDragOver(false)}
           onDrop={handleModulesDrop}
           className={cn(
-            'grid grid-cols-2 gap-4 rounded-xl sm:grid-cols-3 lg:grid-cols-5',
+            'grid grid-cols-2 gap-4 rounded-xl sm:grid-cols-3 lg:grid-cols-4',
             modulesDragOver && 'outline-2 outline-dashed outline-primary/40',
           )}
         >
@@ -211,7 +211,11 @@ export function Dashboard() {
                   e.dataTransfer.effectAllowed = 'move'
                 }}
                 title="Arrastra a la barra lateral para fijarlo"
-                className="group flex cursor-grab flex-col overflow-hidden rounded-xl border border-border/60 bg-card/80 shadow-sm backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-glow active:cursor-grabbing"
+                className={cn(
+                  'group flex cursor-grab flex-col overflow-hidden rounded-xl border border-border/60 shadow-sm backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 active:cursor-grabbing',
+                  meta.tint ?? 'bg-card/80',
+                  meta.glow ?? 'hover:shadow-glow',
+                )}
               >
                 <div className="relative aspect-[4/3] w-full overflow-hidden bg-secondary/40">
                   {meta.img ? (
