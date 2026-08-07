@@ -80,7 +80,7 @@ export function Automation() {
     <AppLayout>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Automatización</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Recordatorios</h1>
           <p className="text-sm text-muted-foreground">
             Recordatorios escalonados WhatsApp 48h / 24h / 2h (respeta el opt-in del dueño)
           </p>

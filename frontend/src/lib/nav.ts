@@ -40,7 +40,7 @@ export const NAV_ROUTES: NavRoute[] = [
   { to: '/products', label: 'Productos', component: 'products' },
   { to: '/vaccination-plans', label: 'Planes de vacunación', component: 'vaccination_plans' },
   { to: '/purchase-orders', label: 'Compras', component: 'purchase_orders' },
-  { to: '/automation', label: 'Automatización', component: 'automation' },
+  { to: '/automation', label: 'Recordatorios', component: 'automation' },
   { to: '/reports/financial', label: 'Financiero', component: 'financial' },
   { to: '/templates', label: 'Plantillas', component: 'templates' },
   { to: '/services', label: 'Servicios', component: 'services' },

@@ -24,7 +24,7 @@ COMPONENTS: dict[str, str] = {
     "services": "Servicios",
     "templates": "Plantillas",
     "vaccination_plans": "Planes de vacunación",
-    "automation": "Automatización",
+    "automation": "Recordatorios",
     "financial": "Financiero",
     "audit": "Bitácora",
     "settings": "Configuración",
