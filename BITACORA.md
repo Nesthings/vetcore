@@ -1305,4 +1305,66 @@ De las asignaciones (`pet_vaccination_plans`) enriquecidas:
 
 ---
 
+## Rediseño completo de la interfaz (Fases A–I)
+
+**Fecha:** 2026-08-07
+
+Rediseño UI/UX sobre la aplicación existente **sin tocar backend, endpoints, datos,
+permisos ni rutas** (reglas de preservación). Dirección visual: *"papel clínico cálido"* +
+verde clínico profundo, tipografía Plus Jakarta Sans (display) / Geist (UI) / Geist Mono.
+
+### Fase A — App Shell
+- Tokens nuevos en `styles/index.css`: paleta cálida (`--primary #1E6F5E`), semánticos
+  afinados, sombras difusas, `--font-display/sans/mono`; se elimina el degradado de fondo
+  por módulo y del body.
+- `AppLayout`: sidebar 256px colapsable a 64px (solo iconos) en desktop, overlay en móvil;
+  navegación agrupada (Principal / Módulos); item activo como píldora verde tintada;
+  header limpio con blur; menú de perfil seccionado.
+
+### Fase B — Design System (primitivas)
+- Refactor: `Button` (pills, `soft-*`, `active:scale`), `Badge` (`soft-*`), `Input/Select/
+  Textarea` (`rounded-lg` + fondo).
+- Nuevos en `components/ui/`: `IconButton`, `Avatar`, `SearchInput`, `Checkbox`, `Switch`,
+  `Tooltip`, `DropdownMenu` (Radix), `Drawer`, `ConfirmDialog`, `DatePicker`, `Toast`
+  (provider + `Toaster` montado en el root) y `StatChip` (indicador compacto).
+
+### Fase C — Dashboard
+- Jerarquía "Hoy → Módulos → Dashboards": h1 Inicio, acciones rápidas con jerarquía
+  (Nueva consulta dominante), KPIs "Resumen del día" arriba, gráfica + alertas + citas,
+  drag&drop y bandeja intactos.
+
+### Fase D — Expedientes
+- `Avatar` en Dueño y Familia; `ConfirmDialog` para resolver alerta y eliminar aplicación
+  del carnet (adopción de primitivas).
+
+### Fase E — Agenda
+- Tira de resumen del rango (Por atender / Pendientes / Completadas / Canceladas) calculada
+  en frontend; selector Día/Semana en pills; botón "Atender (Nueva consulta)" en el detalle.
+
+### Fase F — Pacientes
+- Columna "Dueño" con `Avatar` en la lista; `SearchInput` con limpiar; columnas
+  "Características" (xl+) y "Sexo" (lg+) ocultas en pantallas menores.
+
+### Fase G — Inventario
+- `SearchInput` con debounce; resumen Agotados/Stock bajo/Vencidos/Por vencer; tooltip
+  explicando "Predicción"; columnas ocultas en pantallas menores.
+
+### Fase H — Ventas / Facturación
+- `StatChip` compartido (refactor de Agenda/Insumos); Facturación con Total cobrado /
+  Pendientes por cobrar / Canceladas y badges soft; Servicios con resumen de catálogo.
+
+### Fase I — Configuración / Admin
+- Tabs en estilo pill; rol y estado como badges soft; columnas ocultas en pantallas menores.
+
+### Pulido final (confirmado por el usuario)
+- Migrados TODOS los `window.confirm` a `ConfirmDialog` (Waitlist, Vacunación, Productos,
+  Configuración, Modo veterinario y Cartilla compartida). Ya no quedan confirmaciones
+  nativas en el frontend.
+
+### Verificación
+- `lint` y `build` en verde; pruebas headless por fase (navegación, estados, modales,
+  desktop/móvil). Sin errores de consola.
+
+---
+
 **Siguiente subfase:** por decidir (Fase 3 en hold).

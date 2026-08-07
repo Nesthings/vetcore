@@ -17,6 +17,7 @@ import {
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { apiFetch } from '@/lib/api'
@@ -84,6 +85,7 @@ export function Movil() {
   const [label, setLabel] = useState('')
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [confirm, setConfirm] = useState<{ title: string; onConfirm: () => void } | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const runSearch = useCallback(async (q: string) => {
@@ -188,18 +190,22 @@ export function Movil() {
 
   const removePhoto = async (p: PhotoItem) => {
     if (!session) return
-    if (!confirm('¿Eliminar esta foto?')) return
-    setError(null)
-    try {
-      if (session.kind === 'pet') {
-        await apiFetch(`/pets/${session.petId}/photos/${p.id}`, { method: 'DELETE' })
-      } else {
-        await apiFetch(`/pets/photos/walkin/${p.id}`, { method: 'DELETE' })
-      }
-      await loadPhotos(session)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo eliminar la foto')
-    }
+    setConfirm({
+      title: '¿Eliminar esta foto?',
+      onConfirm: async () => {
+        try {
+          if (session.kind === 'pet') {
+            await apiFetch(`/pets/${session.petId}/photos/${p.id}`, { method: 'DELETE' })
+          } else {
+            await apiFetch(`/pets/photos/walkin/${p.id}`, { method: 'DELETE' })
+          }
+          await loadPhotos(session)
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'No se pudo eliminar la foto')
+        }
+        setConfirm(null)
+      },
+    })
   }
 
   if (session) {
@@ -311,6 +317,15 @@ export function Movil() {
             )}
           </div>
         </main>
+
+        <ConfirmDialog
+          open={Boolean(confirm)}
+          onOpenChange={(open) => !open && setConfirm(null)}
+          title={confirm?.title ?? ''}
+          confirmLabel="Eliminar"
+          variant="destructive"
+          onConfirm={() => confirm?.onConfirm()}
+        />
       </div>
     )
   }
@@ -514,6 +529,15 @@ export function Movil() {
           </div>
         )}
       </main>
+
+      <ConfirmDialog
+        open={Boolean(confirm)}
+        onOpenChange={(open) => !open && setConfirm(null)}
+        title={confirm?.title ?? ''}
+        confirmLabel="Eliminar"
+        variant="destructive"
+        onConfirm={() => confirm?.onConfirm()}
+      />
     </div>
   )
 }

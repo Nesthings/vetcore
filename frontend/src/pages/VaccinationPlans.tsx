@@ -4,6 +4,7 @@ import { Pencil, Plus, Syringe, Trash2 } from 'lucide-react'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState } from '@/components/ui/error-state'
 import { LoadingState } from '@/components/ui/loading-state'
@@ -46,6 +47,7 @@ export function VaccinationPlans() {
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<VaccinationPlan | null>(null)
   const [viewing, setViewing] = useState<VaccinationPlan | null>(null)
+  const [confirm, setConfirm] = useState<{ title: string; onConfirm: () => void } | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -67,13 +69,18 @@ export function VaccinationPlans() {
   }, [load])
 
   const remove = async (p: VaccinationPlan) => {
-    if (!confirm(`¿Eliminar el plan "${p.name}"?`)) return
-    try {
-      await apiFetch(`/vaccination-plans/${p.id}`, { method: 'DELETE' })
-      load()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo eliminar el plan')
-    }
+    setConfirm({
+      title: `¿Eliminar el plan "${p.name}"?`,
+      onConfirm: async () => {
+        try {
+          await apiFetch(`/vaccination-plans/${p.id}`, { method: 'DELETE' })
+          load()
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'No se pudo eliminar el plan')
+        }
+        setConfirm(null)
+      },
+    })
   }
 
   const speciesInPlans = [
@@ -247,6 +254,15 @@ export function VaccinationPlans() {
           setViewing(null)
           setFormOpen(true)
         }}
+      />
+
+      <ConfirmDialog
+        open={Boolean(confirm)}
+        onOpenChange={(open) => !open && setConfirm(null)}
+        title={confirm?.title ?? ''}
+        confirmLabel="Eliminar"
+        variant="destructive"
+        onConfirm={() => confirm?.onConfirm()}
       />
     </AppLayout>
   )

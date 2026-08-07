@@ -8,6 +8,7 @@ import { UserFormDialog, type StaffUser } from '@/components/settings/UserFormDi
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState } from '@/components/ui/error-state'
 import { Input } from '@/components/ui/input'
@@ -55,6 +56,7 @@ export function Settings() {
   const [branches, setBranches] = useState<Branch[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [confirm, setConfirm] = useState<{ title: string; onConfirm: () => void } | null>(null)
 
   const [userFormOpen, setUserFormOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<StaffUser | null>(null)
@@ -123,13 +125,18 @@ export function Settings() {
   }
 
   const deleteBranch = async (branch: Branch) => {
-    if (!confirm(`¿Eliminar la sucursal "${branch.name}"?`)) return
-    try {
-      await apiFetch(`/branches/${branch.id}`, { method: 'DELETE' })
-      load()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo eliminar la sucursal')
-    }
+    setConfirm({
+      title: `¿Eliminar la sucursal "${branch.name}"?`,
+      onConfirm: async () => {
+        try {
+          await apiFetch(`/branches/${branch.id}`, { method: 'DELETE' })
+          load()
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'No se pudo eliminar la sucursal')
+        }
+        setConfirm(null)
+      },
+    })
   }
 
   const saveClinic = async (e: React.FormEvent) => {
@@ -518,6 +525,15 @@ export function Settings() {
           setEditingBranch(null)
           load()
         }}
+      />
+
+      <ConfirmDialog
+        open={Boolean(confirm)}
+        onOpenChange={(open) => !open && setConfirm(null)}
+        title={confirm?.title ?? ''}
+        confirmLabel="Eliminar"
+        variant="destructive"
+        onConfirm={() => confirm?.onConfirm()}
       />
     </AppLayout>
   )

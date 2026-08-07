@@ -5,6 +5,7 @@ import { AppLayout } from '@/components/layout/AppLayout'
 import { WaitlistFormDialog } from '@/components/waitlist/WaitlistFormDialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState } from '@/components/ui/error-state'
 import { LoadingState } from '@/components/ui/loading-state'
@@ -44,6 +45,7 @@ export function Waitlist() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [formOpen, setFormOpen] = useState(false)
+  const [confirm, setConfirm] = useState<{ title: string; onConfirm: () => void } | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -73,13 +75,18 @@ export function Waitlist() {
   }
 
   const remove = async (id: string) => {
-    if (!confirm('¿Eliminar de la lista de espera?')) return
-    try {
-      await apiFetch(`/waitlist/${id}`, { method: 'DELETE' })
-      load()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo eliminar')
-    }
+    setConfirm({
+      title: '¿Eliminar de la lista de espera?',
+      onConfirm: async () => {
+        try {
+          await apiFetch(`/waitlist/${id}`, { method: 'DELETE' })
+          load()
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'No se pudo eliminar')
+        }
+        setConfirm(null)
+      },
+    })
   }
 
   return (
@@ -202,6 +209,15 @@ export function Waitlist() {
           setFormOpen(false)
           load()
         }}
+      />
+
+      <ConfirmDialog
+        open={Boolean(confirm)}
+        onOpenChange={(open) => !open && setConfirm(null)}
+        title={confirm?.title ?? ''}
+        confirmLabel="Eliminar"
+        variant="destructive"
+        onConfirm={() => confirm?.onConfirm()}
       />
     </AppLayout>
   )

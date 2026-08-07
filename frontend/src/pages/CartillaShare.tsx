@@ -36,6 +36,7 @@ import { SignaturePad } from '@/components/pets/SignaturePad'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { EmptyState } from '@/components/ui/empty-state'
 import {
   Table,
@@ -223,6 +224,7 @@ export function CartillaShare() {
   const [signing, setSigning] = useState<ShareConsent | null>(null)
   const [signature, setSignature] = useState<string | null>(null)
   const [signBusy, setSignBusy] = useState(false)
+  const [confirm, setConfirm] = useState<{ title: string; onConfirm: () => void } | null>(null)
 
   const load = useCallback(async () => {
     if (!token) {
@@ -298,16 +300,20 @@ export function CartillaShare() {
   }
 
   const removeAlert = async (id: string) => {
-    if (!confirm('¿Eliminar esta alerta?')) return
-    setError(null)
-    try {
-      await apiFetch(`/share/cartilla/alerts/${id}?token=${encodeURIComponent(token)}`, {
-        method: 'DELETE',
-      })
-      await load()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo eliminar la alerta')
-    }
+    setConfirm({
+      title: '¿Eliminar esta alerta?',
+      onConfirm: async () => {
+        try {
+          await apiFetch(`/share/cartilla/alerts/${id}?token=${encodeURIComponent(token)}`, {
+            method: 'DELETE',
+          })
+          await load()
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'No se pudo eliminar la alerta')
+        }
+        setConfirm(null)
+      },
+    })
   }
 
   const submitSignature = async () => {
@@ -1138,6 +1144,15 @@ export function CartillaShare() {
           )}
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={Boolean(confirm)}
+        onOpenChange={(open) => !open && setConfirm(null)}
+        title={confirm?.title ?? ''}
+        confirmLabel="Eliminar"
+        variant="destructive"
+        onConfirm={() => confirm?.onConfirm()}
+      />
     </div>
   )
 }

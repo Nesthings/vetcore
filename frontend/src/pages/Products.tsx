@@ -5,6 +5,7 @@ import { AppLayout } from '@/components/layout/AppLayout'
 import { ProductFormDialog } from '@/components/products/ProductFormDialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState } from '@/components/ui/error-state'
 import { LoadingState } from '@/components/ui/loading-state'
@@ -13,6 +14,7 @@ import type { SaleProduct } from '@/lib/product'
 
 export function Products() {
   const [products, setProducts] = useState<SaleProduct[]>([])
+  const [confirm, setConfirm] = useState<{ title: string; onConfirm: () => void } | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [formOpen, setFormOpen] = useState(false)
@@ -36,13 +38,18 @@ export function Products() {
   }, [load])
 
   const remove = async (p: SaleProduct) => {
-    if (!confirm(`¿Eliminar el producto "${p.name}"?`)) return
-    try {
-      await apiFetch(`/products/${p.id}`, { method: 'DELETE' })
-      load()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo eliminar el producto')
-    }
+    setConfirm({
+      title: `¿Eliminar el producto "${p.name}"?`,
+      onConfirm: async () => {
+        try {
+          await apiFetch(`/products/${p.id}`, { method: 'DELETE' })
+          load()
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'No se pudo eliminar el producto')
+        }
+        setConfirm(null)
+      },
+    })
   }
 
   return (
@@ -161,6 +168,15 @@ export function Products() {
           setEditing(null)
           load()
         }}
+      />
+
+      <ConfirmDialog
+        open={Boolean(confirm)}
+        onOpenChange={(open) => !open && setConfirm(null)}
+        title={confirm?.title ?? ''}
+        confirmLabel="Eliminar"
+        variant="destructive"
+        onConfirm={() => confirm?.onConfirm()}
       />
     </AppLayout>
   )
