@@ -7,7 +7,8 @@ principio 5) y la línea de tiempo que fusiona consultas y citas.
 """
 
 import secrets
-from datetime import UTC, datetime, timedelta
+import uuid
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
@@ -31,6 +32,7 @@ from app.data.breeds import (
     markings_for,
     species_options,
 )
+from app.data.vaccine_carnet import carnet_for_species
 from app.db.session import get_db
 from app.models import (
     Appointment,
@@ -39,6 +41,7 @@ from app.models import (
     ConsultationAttachment,
     CustomBreed,
     Pet,
+    PetCarnetRecord,
     PetWeightRecord,
     User,
 )
@@ -79,6 +82,14 @@ class InvitationResponse(BaseModel):
     token: str
     activation_url: str
     expires_at: datetime
+
+
+class CarnetCreate(BaseModel):
+    vaccine: str = Field(min_length=1, max_length=150)
+    date_applied: date
+    lot: str | None = Field(default=None, max_length=100)
+    vet_user_id: uuid.UUID | None = None
+    notes: str | None = Field(default=None, max_length=255)
 
 
 @router.get(
@@ -521,6 +532,130 @@ def upload_owner_photo(
     )
     db.commit()
     return {"profile_photo_url": public_url(rel), "revertible": bool(row.profile_photo_url)}
+
+
+@router.get(
+    "/{pet_id}/carnet",
+    summary="Carnet de vacunación (esquema estándar + aplicaciones)",
+)
+def pet_carnet(
+    pet_id: str,
+    ctx: CurrentClinic = Depends(get_current_clinic),
+    db: Session = Depends(get_db),
+) -> dict:
+    pet = _get_pet_or_404(db, ctx.clinic["id"], pet_id)
+
+    rows = db.execute(
+        text(
+            "SELECT r.id, r.vaccine, r.date_applied, r.lot, r.notes, "
+            "r.vet_user_id, u.full_name AS vet_name "
+            "FROM pet_carnet_records r LEFT JOIN users u ON u.id = r.vet_user_id "
+            "WHERE r.pet_id = :pid ORDER BY r.date_applied DESC"
+        ),
+        {"pid": pet.id},
+    ).mappings().all()
+
+    by_vaccine: dict[str, list[dict]] = {}
+    for row in rows:
+        by_vaccine.setdefault(row["vaccine"], []).append(
+            {
+                "id": str(row["id"]),
+                "date_applied": row["date_applied"].isoformat(),
+                "lot": row["lot"],
+                "notes": row["notes"],
+                "vet_name": row["vet_name"],
+            }
+        )
+
+    vaccines = [
+        {
+            "name": v["name"],
+            "prevents": v["prevents"],
+            "schedule": v["schedule"],
+            "applications": by_vaccine.get(v["name"], []),
+        }
+        for v in carnet_for_species(pet.species)
+    ]
+    # Aplicaciones de vacunas no incluidas en el esquema estándar
+    for vaccine, apps in by_vaccine.items():
+        if vaccine not in {v["name"] for v in vaccines}:
+            vaccines.append(
+                {
+                    "name": vaccine,
+                    "prevents": None,
+                    "schedule": None,
+                    "applications": apps,
+                }
+            )
+
+    return {"species": pet.species, "vaccines": vaccines}
+
+
+@router.post(
+    "/{pet_id}/carnet",
+    response_model=None,
+    status_code=status.HTTP_201_CREATED,
+    summary="Registra una aplicación de vacuna en el carnet",
+)
+def create_carnet_record(
+    pet_id: str,
+    body: CarnetCreate,
+    ctx: CurrentClinic = Depends(require_clinic_roles(*PET_MUTATORS)),
+    db: Session = Depends(get_db),
+) -> dict:
+    pet = _get_pet_or_404(db, ctx.clinic["id"], pet_id)
+    record = PetCarnetRecord(
+        clinic_id=ctx.clinic["id"],
+        pet_id=pet.id,
+        vaccine=body.vaccine,
+        date_applied=body.date_applied,
+        lot=body.lot,
+        vet_user_id=body.vet_user_id,
+        notes=body.notes,
+    )
+    db.add(record)
+    db.flush()
+    record_audit(
+        db,
+        clinic_id=ctx.clinic["id"],
+        actor_type="user",
+        actor_id=ctx.user.sub,
+        action="carnet_record_created",
+        entity_type="carnet_record",
+        entity_id=record.id,
+        metadata={"pet_id": str(pet.id), "vaccine": body.vaccine},
+    )
+    db.commit()
+    vet_name = None
+    if record.vet_user_id:
+        vet_name = db.scalar(select(User.full_name).where(User.id == record.vet_user_id))
+    return {
+        "id": str(record.id),
+        "vaccine": record.vaccine,
+        "date_applied": record.date_applied.isoformat(),
+        "lot": record.lot,
+        "notes": record.notes,
+        "vet_name": vet_name,
+    }
+
+
+@router.delete("/{pet_id}/carnet/{record_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_carnet_record(
+    pet_id: str,
+    record_id: str,
+    ctx: CurrentClinic = Depends(require_clinic_roles(*PET_MUTATORS)),
+    db: Session = Depends(get_db),
+) -> None:
+    pet = _get_pet_or_404(db, ctx.clinic["id"], pet_id)
+    record = db.scalar(
+        select(PetCarnetRecord).where(
+            PetCarnetRecord.id == record_id, PetCarnetRecord.pet_id == pet.id
+        )
+    )
+    if record is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro no encontrado")
+    db.delete(record)
+    db.commit()
 
 
 @router.get(

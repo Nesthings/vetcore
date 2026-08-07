@@ -108,3 +108,26 @@ class PetVaccinationDose(UUIDPkMixin, Base):
     )
 
     vaccination_plan: Mapped[PetVaccinationPlan] = relationship(back_populates="doses")
+
+
+class PetCarnetRecord(UUIDPkMixin, Base):
+    """Aplicación de vacuna registrada en el carnet del paciente."""
+
+    __tablename__ = "pet_carnet_records"
+
+    clinic_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("clinics.id"), nullable=False, index=True
+    )
+    pet_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("pets.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    vaccine: Mapped[str] = mapped_column(String(150), nullable=False)
+    date_applied: Mapped[date] = mapped_column(Date, nullable=False)
+    lot: Mapped[str | None] = mapped_column(String(100))
+    vet_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id")
+    )
+    notes: Mapped[str | None] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )

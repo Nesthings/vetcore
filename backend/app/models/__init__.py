@@ -23,6 +23,7 @@ from app.models.pet import ClinicalAlert, CustomBreed, Pet, PetWeightRecord
 from app.models.product import SaleProduct
 from app.models.staff import User, UserComponentPermission
 from app.models.vaccination import (
+    PetCarnetRecord,
     PetVaccinationDose,
     PetVaccinationPlan,
     VaccinationPlan,
@@ -52,6 +53,7 @@ __all__ = [
     "InternalNotification",
     "OutboundNotification",
     "Pet",
+    "PetCarnetRecord",
     "PetVaccinationDose",
     "PetVaccinationPlan",
     "PetWeightRecord",

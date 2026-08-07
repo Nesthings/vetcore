@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { Fragment, useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Icon as MDIIcon } from '@mdi/react'
 import { mdiPaw } from '@mdi/js'
@@ -42,8 +42,18 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState } from '@/components/ui/error-state'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { LoadingState } from '@/components/ui/loading-state'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import type { Pet } from '@/pages/Pets'
 import { apiFetch } from '@/lib/api'
 import { SPECIES_ICONS, speciesLabel } from '@/lib/species'
@@ -88,6 +98,21 @@ interface Consent {
   signature_url: string
   pdf_url: string
   signed_at: string
+}
+
+interface CarnetApp {
+  id: string
+  date_applied: string
+  lot?: string | null
+  notes?: string | null
+  vet_name?: string | null
+}
+
+interface CarnetVaccine {
+  name: string
+  prevents?: string | null
+  schedule?: string | null
+  applications: CarnetApp[]
 }
 
 const ALERT_TYPES = [
@@ -163,6 +188,14 @@ export function PetDetail() {
   const [photos, setPhotos] = useState<PhotoEvolutionItem[]>([])
   const [consents, setConsents] = useState<Consent[]>([])
   const [vaccination, setVaccination] = useState<PetVaccinationPlan[]>([])
+  const [carnet, setCarnet] = useState<CarnetVaccine[]>([])
+  const [carnetSpecies, setCarnetSpecies] = useState('')
+  const [vets, setVets] = useState<{ id: string; full_name: string }[]>([])
+  const [addingFor, setAddingFor] = useState<string | null>(null)
+  const [appDate, setAppDate] = useState('')
+  const [appLot, setAppLot] = useState('')
+  const [appVet, setAppVet] = useState('')
+  const [carnetBusy, setCarnetBusy] = useState(false)
   const [compareIdx, setCompareIdx] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -179,7 +212,7 @@ export function PetDetail() {
     setLoading(true)
     setError(null)
     try {
-      const [p, tl, w, al, ph, cs, vp] = await Promise.all([
+      const [p, tl, w, al, ph, cs, vp, ca, us] = await Promise.all([
         apiFetch<Pet>(`/pets/${id}`),
         apiFetch<TimelineEvent[]>(`/pets/${id}/timeline`),
         apiFetch<WeightRecord[]>(`/pets/${id}/weights`),
@@ -187,6 +220,8 @@ export function PetDetail() {
         apiFetch<PhotoEvolutionItem[]>(`/pets/${id}/photo-evolution`),
         apiFetch<Consent[]>(`/consents/pets/${id}`),
         apiFetch<PetVaccinationPlan[]>(`/vaccination-plans/pets/${id}`),
+        apiFetch<{ species: string; vaccines: CarnetVaccine[] }>(`/pets/${id}/carnet`),
+        apiFetch<{ id: string; full_name: string; role: string }[]>('/users'),
       ])
       setPet(p)
       setTimeline(tl)
@@ -195,6 +230,9 @@ export function PetDetail() {
       setPhotos(ph)
       setConsents(cs)
       setVaccination(vp)
+      setCarnet(ca.vaccines)
+      setCarnetSpecies(ca.species)
+      setVets(us.filter((u) => u.role === 'admin' || u.role === 'veterinario'))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo cargar el paciente')
     } finally {
@@ -248,6 +286,43 @@ export function PetDetail() {
       setError(err instanceof Error ? err.message : 'No se pudo subir la foto del dueño')
     } finally {
       setOwnerPhotoBusy(false)
+    }
+  }
+
+  const saveCarnetApp = async (vaccine: string) => {
+    if (!appDate) return
+    setCarnetBusy(true)
+    setError(null)
+    try {
+      await apiFetch(`/pets/${id}/carnet`, {
+        method: 'POST',
+        body: JSON.stringify({
+          vaccine,
+          date_applied: appDate,
+          lot: appLot || null,
+          vet_user_id: appVet || null,
+        }),
+      })
+      setAddingFor(null)
+      setAppDate('')
+      setAppLot('')
+      setAppVet('')
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo registrar la aplicación')
+    } finally {
+      setCarnetBusy(false)
+    }
+  }
+
+  const removeCarnetApp = async (recordId: string) => {
+    if (!confirm('¿Eliminar esta aplicación del carnet?')) return
+    setError(null)
+    try {
+      await apiFetch(`/pets/${id}/carnet/${recordId}`, { method: 'DELETE' })
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo eliminar la aplicación')
     }
   }
 
@@ -623,6 +698,168 @@ export function PetDetail() {
               </CardContent>
             </Card>
           </div>
+
+          <Card className="shadow-card">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Syringe className="size-4 text-primary" aria-hidden="true" />
+                Carnet de vacunación
+              </CardTitle>
+              <CardDescription>
+                {carnet.length > 0
+                  ? `Esquema estándar para ${speciesLabel(carnetSpecies)} · Cartilla Nacional de Vacunación (México)`
+                  : 'Sin esquema estándar definido para esta especie'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {carnet.length === 0 ? (
+                <EmptyState
+                  title="Sin esquema de vacunación"
+                  description={`No hay un esquema estándar registrado para la especie «${speciesLabel(carnetSpecies)}».`}
+                  icon={Syringe}
+                />
+              ) : (
+                <div className="overflow-hidden rounded-lg border border-border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Vacuna</TableHead>
+                        <TableHead className="min-w-40">Enfermedades que previene</TableHead>
+                        <TableHead className="min-w-48">Esquema recomendado</TableHead>
+                        <TableHead className="min-w-48">Aplicaciones</TableHead>
+                        <TableHead className="text-right">Registrar</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {carnet.map((v) => (
+                        <Fragment key={v.name}>
+                          <TableRow>
+                            <TableCell className="font-medium">{v.name}</TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {v.prevents ?? '—'}
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">
+                              {v.schedule ?? '—'}
+                            </TableCell>
+                            <TableCell>
+                              {v.applications.length === 0 ? (
+                                <span className="text-sm text-muted-foreground">—</span>
+                              ) : (
+                                <div className="space-y-1">
+                                  {v.applications.map((app) => (
+                                    <div key={app.id} className="flex items-center gap-1.5 text-xs">
+                                      <span className="font-medium">
+                                        {new Date(app.date_applied).toLocaleDateString('es-MX')}
+                                      </span>
+                                      {app.lot && (
+                                        <span className="text-muted-foreground">
+                                          · Lote {app.lot}
+                                        </span>
+                                      )}
+                                      {app.vet_name && (
+                                        <span className="text-muted-foreground">
+                                          · {app.vet_name}
+                                        </span>
+                                      )}
+                                      <button
+                                        type="button"
+                                        onClick={() => removeCarnetApp(app.id)}
+                                        aria-label={`Eliminar aplicación ${new Date(
+                                          app.date_applied,
+                                        ).toLocaleDateString('es-MX')}`}
+                                        className="text-muted-foreground hover:text-destructive"
+                                      >
+                                        <X className="size-3" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setAddingFor(addingFor === v.name ? null : v.name)
+                                  setAppDate('')
+                                  setAppLot('')
+                                  setAppVet('')
+                                }}
+                              >
+                                <Plus /> Añadir
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                          {addingFor === v.name && (
+                            <TableRow>
+                              <TableCell colSpan={5} className="bg-muted/30">
+                                <div className="flex flex-wrap items-end gap-3 py-1">
+                                  <div className="space-y-1.5">
+                                    <Label>Fecha</Label>
+                                    <Input
+                                      type="date"
+                                      value={appDate}
+                                      onChange={(e) => setAppDate(e.target.value)}
+                                      className="w-40"
+                                    />
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <Label>Lote</Label>
+                                    <Input
+                                      value={appLot}
+                                      onChange={(e) => setAppLot(e.target.value)}
+                                      placeholder="Ej. RAB-2026-01"
+                                      className="w-40"
+                                    />
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <Label>Veterinario</Label>
+                                    <select
+                                      value={appVet}
+                                      onChange={(e) => setAppVet(e.target.value)}
+                                      className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                                    >
+                                      <option value="">—</option>
+                                      {vets.map((u) => (
+                                        <option key={u.id} value={u.id}>
+                                          {u.full_name}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <Button
+                                      size="sm"
+                                      onClick={() => saveCarnetApp(v.name)}
+                                      disabled={carnetBusy || !appDate}
+                                    >
+                                      {carnetBusy ? (
+                                        <Loader2 className="animate-spin" />
+                                      ) : (
+                                        'Guardar'
+                                      )}
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => setAddingFor(null)}
+                                    >
+                                      Cancelar
+                                    </Button>
+                                  </div>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </Fragment>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           <Tabs defaultValue="timeline">
             <TabsList>
