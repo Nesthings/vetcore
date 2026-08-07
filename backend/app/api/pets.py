@@ -151,6 +151,7 @@ def list_pets(
     db: Session = Depends(get_db),
     active_only: bool = Query(default=True),
     search: str | None = Query(default=None, max_length=150),
+    species: str | None = Query(default=None, max_length=50),
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
 ) -> list[Pet]:
@@ -159,6 +160,8 @@ def list_pets(
         stmt = stmt.where(Pet.is_active.is_(True))
     if search:
         stmt = stmt.where(Pet.name.ilike(f"%{search}%"))
+    if species:
+        stmt = stmt.where(Pet.species == species)
     stmt = stmt.order_by(Pet.name).limit(limit).offset(offset)
     pets = list(db.scalars(stmt))
     if pets:
@@ -173,6 +176,20 @@ def list_pets(
         for pet in pets:
             pet.alert_count = counts.get(pet.id, 0)
     return [_with_owners(db, _pet_with_latest_weight(db, pet)) for pet in pets]
+
+
+@router.get("/species", summary="Especies presentes en la clínica (con conteo)")
+def pet_species(
+    ctx: CurrentClinic = Depends(get_current_clinic),
+    db: Session = Depends(get_db),
+) -> list[dict]:
+    rows = db.execute(
+        select(Pet.species, func.count().label("count"))
+        .where(Pet.clinic_id == ctx.clinic["id"], Pet.is_active.is_(True))
+        .group_by(Pet.species)
+        .order_by(func.count().desc())
+    ).all()
+    return [{"species": r.species, "count": r.count} for r in rows]
 
 
 def _pet_with_latest_weight(db: Session, pet: Pet) -> Pet:

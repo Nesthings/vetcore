@@ -1,5 +1,18 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import MDIIcon from '@mdi/react'
+import {
+  mdiBird,
+  mdiCat,
+  mdiDog,
+  mdiFish,
+  mdiHorse,
+  mdiPaw,
+  mdiRabbit,
+  mdiRodent,
+  mdiSnake,
+  mdiTurtle,
+} from '@mdi/js'
 import { Pencil, Plus, Search, Users } from 'lucide-react'
 
 import { AppLayout } from '@/components/layout/AppLayout'
@@ -19,6 +32,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { apiFetch } from '@/lib/api'
+import { cn } from '@/lib/utils'
 
 export interface PetOwner {
   owner_id: string
@@ -55,14 +69,47 @@ interface PetWithAlerts extends Pet {
   alert_count?: number
 }
 
+const SPECIES_ICONS: Record<string, string> = {
+  perro: mdiDog,
+  gato: mdiCat,
+  ave: mdiBird,
+  conejo: mdiRabbit,
+  reptil: mdiSnake,
+  roedor: mdiRodent,
+  hurones: mdiPaw,
+  peces: mdiFish,
+  anfibio: mdiTurtle,
+  equino: mdiHorse,
+  otro: mdiPaw,
+}
+
+interface SpeciesOption {
+  species: string
+  count: number
+}
+
 export function Pets() {
   const [pets, setPets] = useState<PetWithAlerts[]>([])
   const [search, setSearch] = useState('')
+  const [speciesFilter, setSpeciesFilter] = useState<string | null>(null)
+  const [speciesOptions, setSpeciesOptions] = useState<SpeciesOption[]>([])
   const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<PetWithAlerts | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
+
+  useEffect(() => {
+    let cancelled = false
+    apiFetch<SpeciesOption[]>('/pets/species')
+      .then((res) => {
+        if (!cancelled) setSpeciesOptions(res)
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [refreshKey])
 
   useEffect(() => {
     let cancelled = false
@@ -72,6 +119,8 @@ export function Pets() {
           try {
             const params = new URLSearchParams()
             if (search.trim()) params.set('search', search.trim())
+            if (speciesFilter) params.set('species', speciesFilter)
+            params.set('limit', '100')
             const res = await apiFetch<PetWithAlerts[]>(`/pets?${params}`)
             if (!cancelled) {
               setPets(res)
@@ -84,13 +133,13 @@ export function Pets() {
           }
         })()
       },
-      search.trim() ? 250 : 0,
+      search.trim() || speciesFilter ? 250 : 0,
     )
     return () => {
       cancelled = true
       clearTimeout(t)
     }
-  }, [search, refreshKey])
+  }, [search, speciesFilter, refreshKey])
 
   const refresh = useCallback(() => setRefreshKey((k) => k + 1), [])
 
@@ -112,17 +161,71 @@ export function Pets() {
         </Button>
       </div>
 
-      <div className="mb-4 max-w-md">
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por nombre…"
-            className="pl-9"
-            autoComplete="off"
-          />
+      <div className="mb-4 flex flex-col gap-3">
+        <div className="max-w-md">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar por nombre…"
+              className="pl-9"
+              autoComplete="off"
+            />
+          </div>
         </div>
+        {speciesOptions.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Especie
+            </span>
+            <button
+              type="button"
+              onClick={() => setSpeciesFilter(null)}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors',
+                !speciesFilter
+                  ? 'border-primary bg-primary text-primary-foreground shadow-glow'
+                  : 'border-border bg-card text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+              )}
+            >
+              Todas
+            </button>
+            {speciesOptions.map((s) => {
+              const active = speciesFilter === s.species
+              return (
+                <button
+                  key={s.species}
+                  type="button"
+                  onClick={() => setSpeciesFilter(active ? null : s.species)}
+                  title={s.species}
+                  className={cn(
+                    'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium capitalize transition-colors',
+                    active
+                      ? 'border-primary bg-primary text-primary-foreground shadow-glow'
+                      : 'border-border bg-card text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                  )}
+                >
+                  <MDIIcon
+                    path={SPECIES_ICONS[s.species] ?? mdiPaw}
+                    size={0.85}
+                    className="shrink-0"
+                    aria-hidden="true"
+                  />
+                  {s.species}
+                  <span
+                    className={cn(
+                      'text-xs',
+                      active ? 'text-primary-foreground/70' : 'text-muted-foreground',
+                    )}
+                  >
+                    {s.count}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       {error && <ErrorState description={error} onRetry={refresh} className="mb-6" />}
