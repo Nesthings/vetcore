@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Loader2 } from 'lucide-react'
+import { Info, Loader2 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -95,6 +95,15 @@ export function WaitlistFormDialog({
           <DialogDescription>Define la ventana de horario deseada.</DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="grid gap-4">
+          <div className="flex items-start gap-2.5 rounded-md border border-border bg-muted/40 px-3 py-2.5 text-xs leading-relaxed text-muted-foreground">
+            <Info className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
+            <p>
+              Cuando no hay hueco en la agenda, apunta aquí al paciente con la ventana de horario
+              que le conviene. Al liberarse un espacio, contacta al dueño, agenda la cita y marca el
+              estado en la lista (<b>ofrecer hueco</b> → <b>cumplida</b>); si ya no le interesa,
+              <b> expírala</b>.
+            </p>
+          </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Paciente *</Label>
