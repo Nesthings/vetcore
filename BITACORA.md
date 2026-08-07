@@ -1365,6 +1365,27 @@ verde clínico profundo, tipografía Plus Jakarta Sans (display) / Geist (UI) / 
 - `lint` y `build` en verde; pruebas headless por fase (navegación, estados, modales,
   desktop/móvil). Sin errores de consola.
 
+### Firma del médico veterinario (reutilizable)
+- Migración `0029`: `users.signature_url` + `digital_consents.vet_user_id`.
+- `POST/DELETE /users/me/signature`: guarda la firma dibujada del doctor (PNG) y la
+  reutiliza en todos los consentimientos que emita.
+- `Mi perfil` → tarjeta "Firma del médico": dibujar una vez, previsualizar, cambiar y
+  eliminar; no requiere volver a firmar en cada documento.
+- PDF de consentimiento ahora muestra **dos firmas lado a lado**: dueño y médico
+  veterinario; la del doctor se incrusta tanto en el flujo en consulta (`/consents`)
+  como en la firma remota de la cartilla compartida (`/share/cartilla/consents`).
+- Fix de fondo: el flowable `Image(ImageReader(...))` de reportlab **siempre lanzaba
+  TypeError** y la firma del dueño nunca se incrustaba (se ocultaba con try/except).
+  Se corrigió usando `Image(io.BytesIO(...))`; verificado con `pdfimages` (2 imágenes
+  RGBA por PDF) y `pdftotext`.
+
+### Verificación (firma)
+- Backend: `alembic upgrade head` + `ruff` en verde.
+- E2E por API: subir firma → crear consentimiento en consulta → PDF con ambas firmas;
+  flujo remoto (pending → firma del dueño) también incrusta la firma del vet.
+- Frontend: `build` en verde; headless: tarjeta "Firma del médico" con firma guardada
+  visible sin errores de consola.
+
 ---
 
 **Siguiente subfase:** por decidir (Fase 3 en hold).

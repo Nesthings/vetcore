@@ -40,6 +40,24 @@ def public_url(relative_path: str) -> str:
     return f"/media/{relative_path}"
 
 
+def media_path_from_url(url: str | None) -> Path | None:
+    """Resuelve una URL pública `/media/...` al Path local, si existe."""
+    if not url or not url.startswith("/media/"):
+        return None
+    p = media_root_path() / url[len("/media/") :]
+    return p if p.is_file() else None
+
+
+def read_media_bytes(url: str | None) -> bytes | None:
+    p = media_path_from_url(url)
+    if p is None:
+        return None
+    try:
+        return p.read_bytes()
+    except OSError:
+        return None
+
+
 def validate_extension(filename: str, allowed: set[str]) -> None:
     suffix = Path(filename).suffix.lower()
     if suffix not in allowed:

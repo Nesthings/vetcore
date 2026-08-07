@@ -229,10 +229,9 @@ def build_invoice_receipt_pdf(data: dict) -> bytes:
 def build_consent_pdf(data: dict) -> bytes:
     """PDF del consentimiento informado firmado (subfase 3.2).
 
-    Incluye el texto del consentimiento y la imagen de la firma del dueño.
+    Incluye el texto del consentimiento y las imágenes de las firmas del
+    dueño y del médico veterinario (esta última reutilizada de su perfil).
     """
-    from reportlab.lib.utils import ImageReader
-
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=letter, rightMargin=0.75 * inch, leftMargin=0.75 * inch)
 
@@ -286,16 +285,36 @@ def build_consent_pdf(data: dict) -> bytes:
     story.append(Paragraph(data.get("body", "—"), styles["VetBody"]))
     story.append(Spacer(1, 0.3 * inch))
 
-    story.append(Paragraph("Firma del dueño", styles["VetH2"]))
-    signature_bytes = data.get("signature_bytes")
-    if signature_bytes:
-        try:
-            signature_img = ImageReader(io.BytesIO(signature_bytes))
-            story.append(
-                Image(signature_img, width=3.2 * inch, height=1.6 * inch)
-            )
-        except Exception:
-            story.append(Paragraph("(firma no disponible)", styles["VetBody"]))
+    story.append(Paragraph("Firmas", styles["VetH2"]))
+    sig_cells: list = []
+
+    def _sig_cell(title: str, bytes_data: bytes | None, fallback: str = "(pendiente)") -> list:
+        if bytes_data:
+            try:
+                return [
+                    Paragraph(f"<b>{title}</b>", styles["VetBody"]),
+                    Image(io.BytesIO(bytes_data), width=3.1 * inch, height=1.5 * inch),
+                ]
+            except Exception:
+                pass
+        return [
+            Paragraph(f"<b>{title}</b>", styles["VetBody"]),
+            Paragraph(fallback, styles["VetBody"]),
+        ]
+
+    sig_cells.append(_sig_cell("Firma del dueño", data.get("signature_bytes")))
+    sig_cells.append(_sig_cell("Firma del médico veterinario", data.get("vet_signature_bytes")))
+
+    sig_table = Table([sig_cells], colWidths=[3.55 * inch, 3.55 * inch])
+    sig_table.setStyle(
+        TableStyle(
+            [
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ]
+        )
+    )
+    story.append(sig_table)
     story.append(Spacer(1, 0.2 * inch))
     story.append(
         Paragraph(

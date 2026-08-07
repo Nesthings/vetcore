@@ -15,9 +15,9 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import CurrentClinic, get_current_clinic, require_clinic_roles
 from app.core.events import record_audit
-from app.core.storage import public_url, save_media
+from app.core.storage import public_url, read_media_bytes, save_media
 from app.db.session import get_db
-from app.models import Clinic, DigitalConsent, Pet
+from app.models import Clinic, DigitalConsent, Pet, User
 from app.schemas.consent import ConsentCreate, ConsentRead, PendingConsentCreate
 from app.services.pdf import build_consent_pdf
 
@@ -46,6 +46,7 @@ def create_pending_consent(
     consent = DigitalConsent(
         clinic_id=ctx.clinic["id"],
         pet_id=pet.id,
+        vet_user_id=ctx.user.sub,
         title=body.title,
         body=body.body,
         status="pending",
@@ -101,6 +102,11 @@ def create_consent(
         [x for x in [body.owner_name, body.owner_phone, body.owner_email] if x]
     ) or "Dueño"
 
+    vet = db.get(User, ctx.user.sub)
+    vet_signature_bytes = (
+        read_media_bytes(vet.signature_url) if vet is not None and vet.signature_url else None
+    )
+
     pdf_bytes = build_consent_pdf(
         {
             "clinic_name": clinic.name,
@@ -110,6 +116,8 @@ def create_consent(
             "body": body.body,
             "date_str": datetime.now().astimezone().strftime("%d/%m/%Y %H:%M"),
             "signature_bytes": signature_bytes,
+            "vet_signature_bytes": vet_signature_bytes,
+            "vet_name": vet.full_name if vet is not None else None,
         }
     )
     pdf_rel = save_media(
@@ -122,6 +130,7 @@ def create_consent(
     consent = DigitalConsent(
         clinic_id=ctx.clinic["id"],
         pet_id=pet.id,
+        vet_user_id=ctx.user.sub,
         title=body.title,
         body=body.body,
         signature_url=signature_url,

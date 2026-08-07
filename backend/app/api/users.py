@@ -134,6 +134,59 @@ def update_my_profile(
     return _with_branch_names(db, [user])[0]
 
 
+@router.post(
+    "/me/signature",
+    summary="Guarda tu firma (se reutiliza en los consentimientos)",
+)
+def upload_my_signature(
+    file: UploadFile = File(...),
+    me: CurrentUser = Depends(require_staff),
+    db: Session = Depends(get_db),
+) -> dict:
+    user = db.get(User, me.sub)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado")
+    validate_extension(file.filename or "", ALLOWED_IMAGE_EXTENSIONS)
+    content = file.file.read()
+    if len(content) > 5 * 1024 * 1024:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="La imagen supera el límite de 5 MB",
+        )
+    import io
+
+    from PIL import Image
+
+    try:
+        with Image.open(io.BytesIO(content)) as img:
+            img.verify()
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="El archivo no es una imagen válida"
+        ) from exc
+
+    rel = save_media(f"users/{user.id}", "firma.png", content)
+    user.signature_url = public_url(rel)
+    db.commit()
+    return {"signature_url": user.signature_url}
+
+
+@router.delete(
+    "/me/signature",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Elimina tu firma guardada",
+)
+def delete_my_signature(
+    me: CurrentUser = Depends(require_staff),
+    db: Session = Depends(get_db),
+) -> None:
+    user = db.get(User, me.sub)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado")
+    user.signature_url = None
+    db.commit()
+
+
 def _get_user_or_404(db: Session, clinic_id: str, user_id: str) -> User:
     user = db.scalar(select(User).where(User.id == user_id, User.clinic_id == clinic_id))
     if user is None:

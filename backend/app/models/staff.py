@@ -31,6 +31,7 @@ class User(UUIDPkMixin, Base):
         Boolean, nullable=False, default=True, server_default="true"
     )
     photo_url: Mapped[str | None] = mapped_column(String(255))
+    signature_url: Mapped[str | None] = mapped_column(Text)
     professional_title: Mapped[str | None] = mapped_column(String(150))
     cedula: Mapped[str | None] = mapped_column(String(50))
     job_title: Mapped[str | None] = mapped_column(String(150))

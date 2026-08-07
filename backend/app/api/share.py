@@ -26,7 +26,13 @@ from app.core.events import record_audit
 from app.core.images import process_cartilla_photo
 from app.core.security import InvalidTokenError, decode_share_token
 from app.core.seed_vaccination_plans import ensure_standard_plans
-from app.core.storage import ALLOWED_IMAGE_EXTENSIONS, public_url, save_media, validate_extension
+from app.core.storage import (
+    ALLOWED_IMAGE_EXTENSIONS,
+    public_url,
+    read_media_bytes,
+    save_media,
+    validate_extension,
+)
 from app.data.vaccine_brands import brands_for_species
 from app.db.session import get_db
 from app.models import (
@@ -569,6 +575,14 @@ def share_sign_consent(
     ).scalar()
     owner_display = owner_row or "Dueño"
 
+    vet_signature_bytes = None
+    vet_name = None
+    if consent.vet_user_id:
+        vet_user = db.get(User, consent.vet_user_id)
+        if vet_user is not None:
+            vet_name = vet_user.full_name
+            vet_signature_bytes = read_media_bytes(vet_user.signature_url)
+
     pdf_bytes = build_consent_pdf(
         {
             "clinic_name": clinic.name,
@@ -578,6 +592,8 @@ def share_sign_consent(
             "body": consent.body,
             "date_str": datetime.now(UTC).astimezone().strftime("%d/%m/%Y %H:%M"),
             "signature_bytes": signature_bytes,
+            "vet_signature_bytes": vet_signature_bytes,
+            "vet_name": vet_name,
         }
     )
     pdf_rel = save_media(f"consents/{pet.id}", f"consentimiento_{consent.id}.pdf", pdf_bytes)

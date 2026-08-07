@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Camera, Loader2, Save, UserRound } from 'lucide-react'
+import { Camera, Loader2, PenLine, Save, Trash2, UserRound } from 'lucide-react'
 
 import { AppLayout } from '@/components/layout/AppLayout'
+import { SignaturePad } from '@/components/pets/SignaturePad'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -17,6 +18,7 @@ interface Me {
   phone?: string | null
   branch_name?: string | null
   photo_url?: string | null
+  signature_url?: string | null
   professional_title?: string | null
   cedula?: string | null
   job_title?: string | null
@@ -37,6 +39,8 @@ export function Profile() {
   const [newPassword, setNewPassword] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null)
+  const [savingSignature, setSavingSignature] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
 
@@ -72,6 +76,37 @@ export function Profile() {
       setError(err instanceof Error ? err.message : 'No se pudo subir la foto')
     } finally {
       setUploading(false)
+    }
+  }
+
+  const saveSignature = async () => {
+    if (!signatureDataUrl) return
+    setError(null)
+    setSuccess(false)
+    setSavingSignature(true)
+    try {
+      const blob = await (await fetch(signatureDataUrl)).blob()
+      const form = new FormData()
+      form.append('file', new File([blob], 'firma.png', { type: 'image/png' }))
+      await apiFetch('/users/me/signature', { method: 'POST', body: form })
+      setSignatureDataUrl(null)
+      setSuccess(true)
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo guardar la firma')
+    } finally {
+      setSavingSignature(false)
+    }
+  }
+
+  const deleteSignature = async () => {
+    setError(null)
+    setSuccess(false)
+    try {
+      await apiFetch('/users/me/signature', { method: 'DELETE' })
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo eliminar la firma')
     }
   }
 
@@ -255,6 +290,62 @@ export function Profile() {
                 {submitting ? <Loader2 className="animate-spin" /> : <Save />} Guardar cambios
               </Button>
             </form>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-card">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <PenLine className="size-5 text-primary" /> Firma del médico
+            </CardTitle>
+            <CardDescription>
+              Dibuja tu firma una sola vez; se reutilizará automáticamente en los consentimientos
+              que emitas.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {me?.signature_url ? (
+              <>
+                <div className="flex items-center justify-center rounded-md border border-border bg-white p-4">
+                  <img
+                    src={me.signature_url}
+                    alt="Tu firma guardada"
+                    className="h-32 w-full max-w-md object-contain"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setSignatureDataUrl('')}
+                    disabled={savingSignature}
+                  >
+                    Cambiar firma
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={deleteSignature}
+                    disabled={savingSignature}
+                  >
+                    <Trash2 /> Eliminar firma
+                  </Button>
+                </div>
+              </>
+            ) : null}
+
+            {!me?.signature_url || signatureDataUrl !== null ? (
+              <>
+                <SignaturePad onDataUrl={setSignatureDataUrl} />
+                <Button
+                  type="button"
+                  onClick={saveSignature}
+                  disabled={!signatureDataUrl || savingSignature}
+                >
+                  {savingSignature ? <Loader2 className="animate-spin" /> : <Save />} Guardar firma
+                </Button>
+              </>
+            ) : null}
           </CardContent>
         </Card>
       </div>

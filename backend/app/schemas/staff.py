@@ -50,6 +50,7 @@ class UserRead(BaseModel):
     email: str
     phone: str | None
     photo_url: str | None = None
+    signature_url: str | None = None
     professional_title: str | None = None
     cedula: str | None = None
     job_title: str | None = None
