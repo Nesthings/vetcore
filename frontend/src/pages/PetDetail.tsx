@@ -752,16 +752,6 @@ export function PetDetail() {
             })()}
           </div>
 
-          {pet.clinical_alert_text && (
-            <div className="flex items-start gap-3 border-t border-border bg-destructive/5 px-5 py-3 text-sm text-destructive sm:px-6">
-              <TriangleAlert className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
-              <div>
-                <p className="font-semibold">Alerta clínica</p>
-                <p>{pet.clinical_alert_text}</p>
-              </div>
-            </div>
-          )}
-
           <div className="grid border-t border-border lg:grid-cols-2 lg:divide-x lg:divide-border">
             <div className="p-5 sm:p-6">
               <SectionHeading icon={UserRound} title="Dueño" />
