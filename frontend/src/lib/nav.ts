@@ -116,11 +116,11 @@ export const MODULE_META: Record<string, ModuleMeta> = {
   automation: {
     icon: BellRing,
     desc: 'Recordatorios',
-    text: 'text-emerald-700 dark:text-emerald-300',
-    iconBg: 'bg-emerald-500/15',
+    text: 'text-purple-700 dark:text-purple-300',
+    iconBg: 'bg-purple-500/15',
     img: '/module_pics/recordatorios.jpeg',
-    tint: 'bg-emerald-100 dark:bg-emerald-500/15',
-    glow: 'hover:shadow-[0_10px_30px_-6px_rgba(16,185,129,0.5)]',
+    tint: 'bg-purple-100 dark:bg-purple-500/15',
+    glow: 'hover:shadow-[0_10px_30px_-6px_rgba(168,85,247,0.5)]',
   },
   audit: {
     icon: History,

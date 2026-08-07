@@ -1,4 +1,13 @@
-import { History, LogOut, PawPrint, Receipt, Settings2, UserRound } from 'lucide-react'
+import {
+  History,
+  LogOut,
+  PanelLeftClose,
+  PanelLeftOpen,
+  PawPrint,
+  Receipt,
+  Settings2,
+  UserRound,
+} from 'lucide-react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
 
@@ -11,6 +20,8 @@ import { MODULE_META, NAV_ROUTES } from '@/lib/nav'
 import { NotificationBell } from '@/components/layout/NotificationBell'
 import { ThemeToggle } from '@/components/layout/ThemeToggle'
 
+const SIDEBAR_KEY = 'vetcore_sidebar_collapsed'
+
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth()
   const { hasComponent } = usePermissions()
@@ -22,7 +33,33 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const [clinicLogoUrl, setClinicLogoUrl] = useState<string | null>(null)
   const [profileOpen, setProfileOpen] = useState(false)
   const [navDragOver, setNavDragOver] = useState(false)
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem(SIDEBAR_KEY) === '1'
+    } catch {
+      return false
+    }
+  })
   const profileRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SIDEBAR_KEY, collapsed ? '1' : '0')
+    } catch {
+      // sin almacenamiento
+    }
+  }, [collapsed])
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'b') {
+        e.preventDefault()
+        setCollapsed((c) => !c)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   useEffect(() => {
     if (!user?.clinic_id) return
@@ -78,7 +115,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen bg-background">
-      <aside className="sticky top-0 flex h-screen w-60 flex-col border-r border-border bg-card bg-gradient-to-b from-primary/10 via-transparent to-transparent">
+      <aside
+        className={cn(
+          'sticky top-0 flex h-screen flex-col overflow-hidden border-r border-border bg-card bg-gradient-to-b from-primary/10 via-transparent to-transparent transition-[width] duration-300',
+          collapsed ? 'w-0' : 'w-60',
+        )}
+      >
         <div className="flex items-center gap-2 border-b border-border px-4 py-4">
           <div className="bg-brand-gradient flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-lg text-primary-foreground shadow-glow">
             {clinicLogoUrl ? (
@@ -140,10 +182,25 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       </aside>
 
       <main className="min-w-0 flex-1">
-        <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b border-border/70 bg-background/80 bg-gradient-to-b from-primary/[0.06] via-transparent to-transparent px-6 backdrop-blur">
-          <p className="text-sm text-muted-foreground">
-            Hola, <span className="font-medium text-foreground">{displayName}</span>
-          </p>
+        <header className="sticky top-0 z-10 flex h-14 items-center justify-between gap-3 border-b border-border/70 bg-background/80 bg-gradient-to-b from-primary/[0.06] via-transparent to-transparent px-6 backdrop-blur">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setCollapsed((c) => !c)}
+              title={collapsed ? 'Expandir menú (Ctrl+Shift+B)' : 'Colapsar menú (Ctrl+Shift+B)'}
+              aria-label={collapsed ? 'Expandir menú' : 'Colapsar menú'}
+              className="flex size-9 items-center justify-center rounded-md border border-border bg-card text-muted-foreground transition-colors hover:bg-accent"
+            >
+              {collapsed ? (
+                <PanelLeftOpen className="size-4" aria-hidden="true" />
+              ) : (
+                <PanelLeftClose className="size-4" aria-hidden="true" />
+              )}
+            </button>
+            <p className="text-sm text-muted-foreground">
+              Hola, <span className="font-medium text-foreground">{displayName}</span>
+            </p>
+          </div>
           <div className="flex items-center gap-2">
             <ThemeToggle />
             <NotificationBell />
