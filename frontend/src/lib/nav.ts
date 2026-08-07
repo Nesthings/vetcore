@@ -30,6 +30,7 @@ export interface ModuleMeta {
   imgGif?: string
   tint?: string
   glow?: string
+  pageBg?: string
 }
 
 // Catálogo completo de módulos del panel clínico.
@@ -58,6 +59,7 @@ export const MODULE_META: Record<string, ModuleMeta> = {
     img: '/module_pics/agenda.png',
     tint: 'bg-red-100 dark:bg-red-500/15',
     glow: 'hover:shadow-[0_10px_30px_-6px_rgba(239,68,68,0.5)]',
+    pageBg: 'from-red-100/80 dark:from-red-500/[0.12]',
   },
   waitlist: {
     icon: Timer,
@@ -67,6 +69,7 @@ export const MODULE_META: Record<string, ModuleMeta> = {
     img: '/module_pics/lista_espera.jpeg',
     tint: 'bg-orange-100 dark:bg-orange-500/15',
     glow: 'hover:shadow-[0_10px_30px_-6px_rgba(249,115,22,0.5)]',
+    pageBg: 'from-orange-100/80 dark:from-orange-500/[0.12]',
   },
   pets: {
     icon: Users,
@@ -76,6 +79,7 @@ export const MODULE_META: Record<string, ModuleMeta> = {
     img: '/module_pics/pacientes.jpeg',
     tint: 'bg-sky-100 dark:bg-sky-500/15',
     glow: 'hover:shadow-[0_10px_30px_-6px_rgba(14,165,233,0.5)]',
+    pageBg: 'from-sky-100/80 dark:from-sky-500/[0.12]',
   },
   inventory: {
     icon: Package,
@@ -85,6 +89,7 @@ export const MODULE_META: Record<string, ModuleMeta> = {
     img: '/module_pics/insumos.jpeg',
     tint: 'bg-violet-100 dark:bg-violet-500/15',
     glow: 'hover:shadow-[0_10px_30px_-6px_rgba(168,85,247,0.5)]',
+    pageBg: 'from-violet-100/80 dark:from-violet-500/[0.12]',
   },
   products: {
     icon: ShoppingBag,
@@ -94,6 +99,7 @@ export const MODULE_META: Record<string, ModuleMeta> = {
     img: '/module_pics/tienda.jpeg',
     tint: 'bg-emerald-100 dark:bg-emerald-500/15',
     glow: 'hover:shadow-[0_10px_30px_-6px_rgba(16,185,129,0.5)]',
+    pageBg: 'from-emerald-100/80 dark:from-emerald-500/[0.12]',
   },
   vaccination_plans: {
     icon: Syringe,
@@ -103,6 +109,7 @@ export const MODULE_META: Record<string, ModuleMeta> = {
     img: '/module_pics/planes_de_vac.jpeg',
     tint: 'bg-pink-100 dark:bg-pink-500/15',
     glow: 'hover:shadow-[0_10px_30px_-6px_rgba(236,72,153,0.5)]',
+    pageBg: 'from-pink-100/80 dark:from-pink-500/[0.12]',
   },
   purchase_orders: {
     icon: ShoppingCart,
@@ -112,6 +119,7 @@ export const MODULE_META: Record<string, ModuleMeta> = {
     img: '/module_pics/compras.jpeg',
     tint: 'bg-emerald-100 dark:bg-emerald-500/15',
     glow: 'hover:shadow-[0_10px_30px_-6px_rgba(16,185,129,0.5)]',
+    pageBg: 'from-emerald-100/80 dark:from-emerald-500/[0.12]',
   },
   automation: {
     icon: BellRing,
@@ -121,12 +129,14 @@ export const MODULE_META: Record<string, ModuleMeta> = {
     img: '/module_pics/recordatorios.jpeg',
     tint: 'bg-purple-100 dark:bg-purple-500/15',
     glow: 'hover:shadow-[0_10px_30px_-6px_rgba(168,85,247,0.5)]',
+    pageBg: 'from-purple-100/80 dark:from-purple-500/[0.12]',
   },
   audit: {
     icon: History,
     desc: 'Bitácora',
     text: 'text-slate-700 dark:text-slate-300',
     iconBg: 'bg-slate-500/15',
+    pageBg: 'from-slate-100/80 dark:from-slate-500/[0.12]',
   },
   financial: {
     icon: Receipt,
@@ -136,6 +146,7 @@ export const MODULE_META: Record<string, ModuleMeta> = {
     img: '/module_pics/finanzas.jpeg',
     tint: 'bg-amber-100 dark:bg-amber-500/15',
     glow: 'hover:shadow-[0_10px_30px_-6px_rgba(245,158,11,0.5)]',
+    pageBg: 'from-amber-100/80 dark:from-amber-500/[0.12]',
   },
   services: {
     icon: Settings2,
@@ -145,12 +156,14 @@ export const MODULE_META: Record<string, ModuleMeta> = {
     img: '/module_pics/servicios.jpeg',
     tint: 'bg-[#ffe3d3] dark:bg-[#ffb59c]/20',
     glow: 'hover:shadow-[0_10px_30px_-6px_rgba(255,160,122,0.55)]',
+    pageBg: 'from-[#ffe3d3]/80 dark:from-[#ffb59c]/20',
   },
   invoices: {
     icon: Receipt,
     desc: 'Facturación',
     text: 'text-pink-700 dark:text-pink-300',
     iconBg: 'bg-pink-500/15',
+    pageBg: 'from-pink-100/80 dark:from-pink-500/[0.12]',
   },
 }
 
@@ -158,6 +171,16 @@ export function routeForPath(pathname: string): NavRoute | undefined {
   return NAV_ROUTES.find((r) =>
     r.end ? pathname === r.to : pathname === r.to || pathname.startsWith(`${r.to}/`),
   )
+}
+
+// Color de fondo de página según el módulo activo (mismo color que su tarjeta).
+// Las sub-páginas (consulta/venta) heredan el color del módulo relacionado.
+export function pageBgForPath(pathname: string): string | undefined {
+  if (pathname === '/consultas/nueva') return MODULE_META.pets.pageBg
+  if (pathname === '/ventas/nueva') return MODULE_META.products.pageBg
+  if (pathname.startsWith('/pets/')) return MODULE_META.pets.pageBg
+  const route = routeForPath(pathname)
+  return route ? MODULE_META[route.component]?.pageBg : undefined
 }
 
 export function firstAllowedRoute(hasComponent: (c: string) => boolean): string {

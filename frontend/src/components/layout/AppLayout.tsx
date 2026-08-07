@@ -17,7 +17,7 @@ import { cn } from '@/lib/utils'
 import { apiFetch } from '@/lib/api'
 import { usePermissions } from '@/lib/permissions'
 import { useNavConfig } from '@/lib/nav-config'
-import { MODULE_META, NAV_ROUTES } from '@/lib/nav'
+import { MODULE_META, NAV_ROUTES, pageBgForPath } from '@/lib/nav'
 import { NotificationBell } from '@/components/layout/NotificationBell'
 import { ThemeToggle } from '@/components/layout/ThemeToggle'
 
@@ -29,6 +29,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const { pinned, pin } = useNavConfig()
   const { pathname } = useLocation()
   const navigate = useNavigate()
+  const pageBg = pageBgForPath(pathname)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [fullName, setFullName] = useState<string | null>(null)
   const [clinicName, setClinicName] = useState<string>('')
@@ -287,7 +288,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
           </div>
         </header>
-        <div className="p-6">{children}</div>
+        <div
+          className={cn('p-6', pageBg && 'bg-gradient-to-b via-transparent to-transparent', pageBg)}
+        >
+          {children}
+        </div>
       </main>
     </div>
   )
