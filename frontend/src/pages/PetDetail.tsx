@@ -9,12 +9,15 @@ import {
   Camera,
   ClipboardPlus,
   FileSignature,
+  FileText,
+  History,
   Loader2,
   Mail,
   MailPlus,
   PawPrint,
   Phone,
   Plus,
+  Stethoscope,
   Syringe,
   TriangleAlert,
   UserRound,
@@ -57,6 +60,7 @@ import {
 import type { Pet } from '@/pages/Pets'
 import { apiFetch } from '@/lib/api'
 import { SPECIES_ICONS, speciesLabel } from '@/lib/species'
+import { cn } from '@/lib/utils'
 import type { PetVaccinationPlan } from '@/lib/vaccination'
 
 interface TimelineEvent {
@@ -130,6 +134,17 @@ const ALERT_STYLES: Record<string, string> = {
   Comportamiento: 'border-violet-500/40 bg-violet-500/10 text-violet-700 dark:text-violet-300',
   'Medidas especiales': 'border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-300',
   Otra: 'border-slate-500/40 bg-slate-500/10 text-slate-700 dark:text-slate-300',
+}
+
+const CITA_STATUS: Record<
+  string,
+  { label: string; variant: 'success' | 'info' | 'warning' | 'destructive' | 'secondary' }
+> = {
+  scheduled: { label: 'Agendada', variant: 'warning' },
+  confirmed: { label: 'Confirmada', variant: 'info' },
+  completed: { label: 'Completada', variant: 'success' },
+  cancelled: { label: 'Cancelada', variant: 'destructive' },
+  no_show: { label: 'No asistió', variant: 'secondary' },
 }
 
 function calcAge(birth: string): string {
@@ -342,6 +357,10 @@ export function PetDetail() {
     fecha: new Date(w.recorded_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' }),
     peso: Number(w.weight_kg),
   }))
+
+  const latestWeight = weights.length > 0 ? Number(weights[0].weight_kg) : null
+  const prevWeight = weights.length > 1 ? Number(weights[1].weight_kg) : null
+  const weightDelta = latestWeight != null && prevWeight != null ? latestWeight - prevWeight : null
 
   const filteredBrands = carnetBrands.filter((b) =>
     b.toLowerCase().includes(appBrandQuery.trim().toLowerCase()),
@@ -958,74 +977,134 @@ export function PetDetail() {
             </CardContent>
           </Card>
 
-          <Tabs defaultValue="timeline">
-            <TabsList>
-              <TabsTrigger value="timeline">Línea de tiempo</TabsTrigger>
-              <TabsTrigger value="peso">Peso histórico</TabsTrigger>
-              <TabsTrigger value="fotos">Fotos de evolución</TabsTrigger>
-              <TabsTrigger value="consents">Consentimientos</TabsTrigger>
-              <TabsTrigger value="vacunacion">Vacunación</TabsTrigger>
+          <Tabs defaultValue="timeline" className="space-y-5">
+            <TabsList className="w-full flex-wrap justify-start gap-1 rounded-xl border border-border bg-card p-1 sm:w-auto">
+              <TabsTrigger value="timeline" className="gap-1.5">
+                <History className="size-4" aria-hidden="true" />
+                Línea de tiempo
+              </TabsTrigger>
+              <TabsTrigger value="peso" className="gap-1.5">
+                <Weight className="size-4" aria-hidden="true" />
+                Peso
+              </TabsTrigger>
+              <TabsTrigger value="fotos" className="gap-1.5">
+                <Camera className="size-4" aria-hidden="true" />
+                Fotos
+              </TabsTrigger>
+              <TabsTrigger value="consents" className="gap-1.5">
+                <FileSignature className="size-4" aria-hidden="true" />
+                Consentimientos
+              </TabsTrigger>
+              <TabsTrigger value="vacunacion" className="gap-1.5">
+                <Syringe className="size-4" aria-hidden="true" />
+                Vacunación
+              </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="timeline" className="space-y-4">
+            <TabsContent value="timeline">
               {timeline.length === 0 ? (
                 <EmptyState
                   title="Sin actividad"
                   description="Aún no hay consultas ni citas para este paciente."
+                  icon={History}
                 />
               ) : (
-                <div className="relative space-y-4 pl-6">
-                  <div className="absolute bottom-0 left-2 top-0 w-px bg-border" />
-                  {timeline.map((e) => (
-                    <div key={`${e.type}-${e.id}`} className="relative">
-                      <span
-                        className={`absolute -left-6 top-1.5 size-3 rounded-full border-2 border-background ${
-                          e.type === 'consulta' ? 'bg-primary' : 'bg-info'
-                        }`}
-                      />
-                      <Card className="shadow-card">
-                        <CardContent className="flex flex-wrap items-center justify-between gap-2 p-4">
-                          <div>
-                            <p className="text-sm font-medium">{e.title}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {new Date(e.date).toLocaleString('es-MX', {
-                                day: 'numeric',
-                                month: 'short',
-                                year: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })}
-                              {e.author ? ` · ${e.author}` : ''}
-                            </p>
-                            {e.subtitle && (
-                              <p className="mt-1 text-xs text-muted-foreground">{e.subtitle}</p>
-                            )}
-                          </div>
-                          {e.type === 'cita' && e.status && (
-                            <Badge variant="secondary">{e.status}</Badge>
+                <div className="relative space-y-4 pl-10">
+                  <div className="absolute bottom-2 left-4 top-2 w-px bg-gradient-to-b from-primary/40 via-border to-transparent" />
+                  {timeline.map((e) => {
+                    const isConsulta = e.type === 'consulta'
+                    const st = CITA_STATUS[e.status ?? ''] ?? {
+                      label: e.status ?? '',
+                      variant: 'secondary',
+                    }
+                    return (
+                      <div key={`${e.type}-${e.id}`} className="relative">
+                        <span
+                          className={`absolute -left-10 top-1 flex size-8 items-center justify-center rounded-full border-4 border-background shadow-card ${
+                            isConsulta
+                              ? 'bg-sky-500 text-white'
+                              : 'bg-primary text-primary-foreground'
+                          }`}
+                        >
+                          {isConsulta ? (
+                            <Stethoscope className="size-3.5" aria-hidden="true" />
+                          ) : (
+                            <CalendarDays className="size-3.5" aria-hidden="true" />
                           )}
-                          {e.type === 'consulta' && <Badge variant="success">Consulta</Badge>}
-                        </CardContent>
-                      </Card>
-                    </div>
-                  ))}
+                        </span>
+                        <Card className="overflow-hidden shadow-card transition-shadow hover:shadow-elevated">
+                          <CardContent className="p-4">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm font-semibold">{e.title}</p>
+                                {isConsulta ? (
+                                  <Badge variant="success">Consulta</Badge>
+                                ) : (
+                                  st.label && <Badge variant={st.variant}>{st.label}</Badge>
+                                )}
+                              </div>
+                              <span className="rounded-md bg-muted/60 px-2 py-1 text-xs font-medium text-muted-foreground">
+                                {new Date(e.date).toLocaleString('es-MX', {
+                                  day: 'numeric',
+                                  month: 'short',
+                                  year: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                              </span>
+                            </div>
+                            {e.subtitle && (
+                              <p className="mt-2 text-xs text-muted-foreground">{e.subtitle}</p>
+                            )}
+                            {e.author && (
+                              <p className="mt-1.5 text-xs text-muted-foreground/70">{e.author}</p>
+                            )}
+                          </CardContent>
+                        </Card>
+                      </div>
+                    )
+                  })}
                 </div>
               )}
             </TabsContent>
 
             <TabsContent value="peso">
               <Card className="shadow-card">
-                <CardHeader>
-                  <CardTitle>Peso histórico</CardTitle>
-                  <CardDescription>
-                    Serie de tiempo por consulta (el default visual es el último valor)
-                  </CardDescription>
+                <CardHeader className="flex-row items-start justify-between space-y-0">
+                  <div>
+                    <CardTitle>Peso histórico</CardTitle>
+                    <CardDescription>
+                      Serie de tiempo por consulta (el default visual es el último valor)
+                    </CardDescription>
+                  </div>
+                  {latestWeight != null && (
+                    <div className="text-right">
+                      <p className="text-3xl font-bold tracking-tight text-foreground">
+                        {latestWeight} <span className="text-lg font-semibold">kg</span>
+                      </p>
+                      {weightDelta != null && (
+                        <p
+                          className={`text-xs font-medium ${
+                            weightDelta > 0
+                              ? 'text-success'
+                              : weightDelta < 0
+                                ? 'text-destructive'
+                                : 'text-muted-foreground'
+                          }`}
+                        >
+                          {weightDelta > 0 ? '▲ +' : weightDelta < 0 ? '▼ ' : '= '}
+                          {Math.abs(weightDelta).toFixed(2)} kg vs. registro anterior
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </CardHeader>
                 <CardContent className="h-72">
                   {weights.length === 0 ? (
                     <EmptyState
                       title="Sin registros de peso"
                       description="Aún no hay pesajes registrados."
+                      icon={Weight}
                     />
                   ) : (
                     <ResponsiveContainer width="100%" height="100%">
@@ -1055,8 +1134,9 @@ export function PetDetail() {
                           type="monotone"
                           dataKey="peso"
                           stroke="var(--chart-1)"
-                          strokeWidth={2}
+                          strokeWidth={2.5}
                           dot={{ r: 4, fill: 'var(--chart-1)' }}
+                          activeDot={{ r: 6 }}
                         />
                       </LineChart>
                     </ResponsiveContainer>
@@ -1074,7 +1154,10 @@ export function PetDetail() {
                 />
               ) : (
                 <div className="flex flex-col items-center gap-4">
-                  <div className="flex w-full max-w-md items-center justify-between gap-3">
+                  <div className="flex w-full max-w-md items-center gap-3 rounded-xl border border-border bg-card p-3 shadow-sm">
+                    <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Comparar
+                    </span>
                     <select
                       value={compareIdx}
                       onChange={(e) => setCompareIdx(Number(e.target.value))}
@@ -1087,7 +1170,7 @@ export function PetDetail() {
                         </option>
                       ))}
                     </select>
-                    <span className="text-sm text-muted-foreground">
+                    <span className="shrink-0 text-sm font-medium text-foreground">
                       vs.{' '}
                       {new Date(photos[photos.length - 1].consultation_date).toLocaleDateString(
                         'es-MX',
@@ -1112,7 +1195,7 @@ export function PetDetail() {
             </TabsContent>
 
             <TabsContent value="consents" className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-sm text-muted-foreground">
                   Consentimientos informados firmados por el dueño.
                 </p>
@@ -1131,27 +1214,33 @@ export function PetDetail() {
                   {consents.map((c) => (
                     <div
                       key={c.id}
-                      className="flex items-center justify-between gap-3 rounded-md border border-border/60 px-3 py-2"
+                      className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card p-3 shadow-sm"
                     >
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium">{c.title}</p>
-                        <p className="text-xs text-muted-foreground">
-                          Firmado{' '}
-                          {new Date(c.signed_at).toLocaleString('es-MX', {
-                            day: 'numeric',
-                            month: 'short',
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </p>
+                      <div className="flex items-center gap-3">
+                        <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                          <FileSignature className="size-4" aria-hidden="true" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium">{c.title}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Firmado{' '}
+                            {new Date(c.signed_at).toLocaleString('es-MX', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </p>
+                        </div>
                       </div>
                       <a
                         href={c.pdf_url}
                         target="_blank"
                         rel="noreferrer"
-                        className="shrink-0 text-sm font-medium text-primary hover:text-primary-hover"
+                        className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-accent"
                       >
+                        <FileText className="size-3.5" aria-hidden="true" />
                         Ver PDF
                       </a>
                     </div>
@@ -1169,10 +1258,16 @@ export function PetDetail() {
                 />
               ) : (
                 vaccination.map((vp) => (
-                  <div key={vp.id} className="space-y-2 rounded-md border border-border/60 p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div
+                    key={vp.id}
+                    className="space-y-3 rounded-xl border border-border/60 bg-card p-4 shadow-sm"
+                  >
+                    <div className="flex flex-wrap items-center gap-3">
+                      <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-pink-500/10 text-pink-600 dark:text-pink-300">
+                        <Syringe className="size-4" aria-hidden="true" />
+                      </div>
                       <div>
-                        <p className="font-medium">
+                        <p className="text-sm font-semibold">
                           {vp.plan_name}
                           {vp.compound ? ` · ${vp.compound}` : ''}
                         </p>
@@ -1187,19 +1282,40 @@ export function PetDetail() {
                       {vp.doses.map((d) => (
                         <div
                           key={d.id}
-                          className="flex items-center justify-between gap-2 rounded-md border border-border/60 px-3 py-2"
+                          className={cn(
+                            'flex items-center justify-between gap-2 rounded-lg border px-3 py-2.5',
+                            d.status === 'completed'
+                              ? 'border-success/30 bg-success/5'
+                              : 'border-border/60 bg-muted/20',
+                          )}
                         >
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium">{d.label}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {new Date(`${d.due_date}T00:00:00`).toLocaleDateString('es-MX')}
-                              {d.appointment_start
-                                ? ` · ${new Date(d.appointment_start).toLocaleTimeString('es-MX', {
-                                    hour: '2-digit',
-                                    minute: '2-digit',
-                                  })}`
-                                : ''}
-                            </p>
+                          <div className="flex min-w-0 items-center gap-2.5">
+                            <span
+                              className={cn(
+                                'size-2.5 shrink-0 rounded-full',
+                                d.status === 'completed'
+                                  ? 'bg-success'
+                                  : d.status === 'skipped'
+                                    ? 'bg-muted-foreground/50'
+                                    : 'bg-warning',
+                              )}
+                              aria-hidden="true"
+                            />
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-medium">{d.label}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {new Date(`${d.due_date}T00:00:00`).toLocaleDateString('es-MX')}
+                                {d.appointment_start
+                                  ? ` · ${new Date(d.appointment_start).toLocaleTimeString(
+                                      'es-MX',
+                                      {
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                      },
+                                    )}`
+                                  : ''}
+                              </p>
+                            </div>
                           </div>
                           <Badge
                             variant={
