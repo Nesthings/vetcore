@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { memo, useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   CalendarCheck2,
@@ -115,6 +115,40 @@ function KpiCard({
     </div>
   )
 }
+
+const CitasBarChart = memo(function CitasBarChart({
+  data,
+}: {
+  data: { label: string; count: number }[]
+}) {
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={data} margin={{ top: 4, right: 8, left: -24, bottom: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+        <XAxis
+          dataKey="label"
+          tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }}
+          tickLine={false}
+          axisLine={false}
+        />
+        <YAxis
+          allowDecimals={false}
+          tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }}
+          tickLine={false}
+          axisLine={false}
+        />
+        <Tooltip cursor={{ fill: 'var(--muted)' }} formatter={(v) => [`${v} citas`, 'Citas']} />
+        <Bar
+          dataKey="count"
+          fill="var(--chart-1)"
+          radius={[4, 4, 0, 0]}
+          maxBarSize={28}
+          isAnimationActive={false}
+        />
+      </BarChart>
+    </ResponsiveContainer>
+  )
+})
 
 function SectionFrame({
   label,
@@ -439,40 +473,7 @@ export function Dashboard() {
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="h-64">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart
-                            data={data.citas_series}
-                            margin={{ top: 4, right: 8, left: -24, bottom: 0 }}
-                          >
-                            <CartesianGrid
-                              strokeDasharray="3 3"
-                              stroke="var(--border)"
-                              vertical={false}
-                            />
-                            <XAxis
-                              dataKey="label"
-                              tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }}
-                              tickLine={false}
-                              axisLine={false}
-                            />
-                            <YAxis
-                              allowDecimals={false}
-                              tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }}
-                              tickLine={false}
-                              axisLine={false}
-                            />
-                            <Tooltip
-                              cursor={{ fill: 'var(--muted)' }}
-                              formatter={(v) => [`${v} citas`, 'Citas']}
-                            />
-                            <Bar
-                              dataKey="count"
-                              fill="var(--chart-1)"
-                              radius={[4, 4, 0, 0]}
-                              maxBarSize={28}
-                            />
-                          </BarChart>
-                        </ResponsiveContainer>
+                        <CitasBarChart data={data.citas_series} />
                       </CardContent>
                     </Card>
 
@@ -603,7 +604,7 @@ export function Dashboard() {
                           }}
                           title="Arrastra a la barra lateral para fijarlo"
                           className={cn(
-                            'group flex cursor-grab flex-col overflow-hidden rounded-xl border border-border/60 bg-card shadow-card transition-all duration-200 hover:-translate-y-0.5 active:cursor-grabbing',
+                            'group flex cursor-grab flex-col overflow-hidden rounded-xl border border-border/60 bg-card shadow-card transition-transform duration-200 hover:-translate-y-0.5 active:cursor-grabbing',
                             meta.tint ?? 'bg-card',
                             meta.glow ?? 'hover:shadow-elevated',
                           )}

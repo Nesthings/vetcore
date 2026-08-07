@@ -121,7 +121,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   const navLinkClass = ({ isActive }: { isActive: boolean }) =>
     cn(
-      'group flex cursor-grab items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all duration-200 active:cursor-grabbing',
+      'group flex cursor-grab items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors duration-150 active:cursor-grabbing',
       collapsed && 'justify-center px-2',
       isActive
         ? 'bg-primary/10 text-primary'
@@ -166,7 +166,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       )}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-40 flex h-screen flex-col overflow-hidden border-r border-border bg-card transition-[width,transform] duration-300 md:sticky md:top-0 md:translate-x-0',
+          'fixed inset-y-0 left-0 z-40 flex h-screen flex-col overflow-hidden border-r border-border bg-card transition-[width,transform] duration-200 ease-out md:sticky md:top-0 md:translate-x-0',
           collapsed ? 'w-16 -translate-x-full md:w-16 md:translate-x-0' : 'w-64 translate-x-0',
         )}
       >

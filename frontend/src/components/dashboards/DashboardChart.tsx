@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import {
   Area,
   AreaChart,
@@ -48,6 +49,7 @@ function Donut({ data }: { data: NameValue[] }) {
           outerRadius={85}
           paddingAngle={2}
           strokeWidth={0}
+          isAnimationActive={false}
         >
           {data.map((_, i) => (
             <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
@@ -64,7 +66,14 @@ function PieChartCard({ data }: { data: NameValue[] }) {
   return (
     <ResponsiveContainer width="100%" height="100%">
       <PieChart>
-        <Pie data={data} dataKey="value" nameKey="name" outerRadius={85} strokeWidth={0}>
+        <Pie
+          data={data}
+          dataKey="value"
+          nameKey="name"
+          outerRadius={85}
+          strokeWidth={0}
+          isAnimationActive={false}
+        >
           {data.map((_, i) => (
             <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
           ))}
@@ -97,7 +106,13 @@ function BarsH({ data }: { data: NameValue[] }) {
           axisLine={false}
         />
         <Tooltip />
-        <Bar dataKey="value" fill="var(--chart-1)" radius={[0, 4, 4, 0]} maxBarSize={20} />
+        <Bar
+          dataKey="value"
+          fill="var(--chart-1)"
+          radius={[0, 4, 4, 0]}
+          maxBarSize={20}
+          isAnimationActive={false}
+        />
       </BarChart>
     </ResponsiveContainer>
   )
@@ -123,6 +138,7 @@ function AreaChartCard({ data }: { data: { label: string; value: number }[] }) {
           stroke="var(--chart-1)"
           strokeWidth={2}
           fill="url(#dashArea)"
+          isAnimationActive={false}
         />
       </AreaChart>
     </ResponsiveContainer>
@@ -183,7 +199,7 @@ function FunnelCard({ data }: { data: NameValue[] }) {
   return (
     <ResponsiveContainer width="100%" height="100%">
       <FunnelChart>
-        <Funnel dataKey="value" data={data} isAnimationActive>
+        <Funnel dataKey="value" data={data} isAnimationActive={false}>
           <LabelList position="right" fill="var(--foreground)" stroke="none" dataKey="name" />
           <Tooltip />
         </Funnel>
@@ -234,6 +250,7 @@ function LineChartCard({ data }: { data: { label: string; value: number }[] }) {
           stroke="var(--chart-2)"
           strokeWidth={2}
           dot={{ r: 2 }}
+          isAnimationActive={false}
         />
       </LineChart>
     </ResponsiveContainer>
@@ -250,7 +267,7 @@ function RadialCard({ data }: { data: NameValue[] }) {
         startAngle={90}
         endAngle={-270}
       >
-        <RadialBar dataKey="value" background={{ fill: 'var(--muted)' }}>
+        <RadialBar dataKey="value" background={{ fill: 'var(--muted)' }} isAnimationActive={false}>
           {data.map((_, i) => (
             <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
           ))}
@@ -278,20 +295,34 @@ function StackedBars({ data }: { data: { label: string; in: number; out: number 
         <YAxis tick={AXIS_TICK} tickLine={false} axisLine={false} allowDecimals={false} />
         <Tooltip />
         <Legend wrapperStyle={{ fontSize: 12 }} />
-        <Bar dataKey="in" name="Entradas" stackId="a" fill="var(--success)" radius={[0, 0, 0, 0]} />
+        <Bar
+          dataKey="in"
+          name="Entradas"
+          stackId="a"
+          fill="var(--success)"
+          radius={[0, 0, 0, 0]}
+          isAnimationActive={false}
+        />
         <Bar
           dataKey="out"
           name="Salidas"
           stackId="a"
           fill="var(--destructive)"
           radius={[0, 0, 0, 0]}
+          isAnimationActive={false}
         />
       </BarChart>
     </ResponsiveContainer>
   )
 }
 
-export function DashboardChart({ slug, data }: { slug: string; data: unknown }) {
+export const DashboardChart = memo(function DashboardChart({
+  slug,
+  data,
+}: {
+  slug: string
+  data: unknown
+}) {
   switch (slug) {
     case 'species':
     case 'vaccination':
@@ -318,4 +349,4 @@ export function DashboardChart({ slug, data }: { slug: string; data: unknown }) 
     default:
       return <p className={cn('text-sm text-muted-foreground')}>Sin datos.</p>
   }
-}
+})
