@@ -96,6 +96,14 @@ const ALERT_TYPES = [
   'Otra',
 ]
 
+const ALERT_STYLES: Record<string, string> = {
+  Alergia: 'border-destructive/40 bg-destructive/10 text-destructive',
+  'Enfermedad crónica': 'border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300',
+  Comportamiento: 'border-violet-500/40 bg-violet-500/10 text-violet-700 dark:text-violet-300',
+  'Medidas especiales': 'border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-300',
+  Otra: 'border-slate-500/40 bg-slate-500/10 text-slate-700 dark:text-slate-300',
+}
+
 function calcAge(birth: string): string {
   const b = new Date(birth)
   const now = new Date()
@@ -463,7 +471,9 @@ export function PetDetail() {
                     {alerts.map((a) => (
                       <span
                         key={a.id}
-                        className="inline-flex items-center gap-2 rounded-full border border-warning/40 bg-warning/10 px-3 py-1.5 text-sm font-medium text-warning"
+                        className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium ${
+                          ALERT_STYLES[a.type] ?? 'border-warning/40 bg-warning/10 text-warning'
+                        }`}
                       >
                         <TriangleAlert className="size-3.5" aria-hidden="true" />
                         <span>
@@ -473,7 +483,7 @@ export function PetDetail() {
                           type="button"
                           onClick={() => removeAlert(a.id)}
                           aria-label="Resolver alerta"
-                          className="text-warning/70 hover:text-warning"
+                          className="text-current opacity-60 hover:opacity-100"
                         >
                           <X className="size-3.5" />
                         </button>
