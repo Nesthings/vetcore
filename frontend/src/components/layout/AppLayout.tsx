@@ -166,7 +166,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       )}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-40 flex h-screen flex-col overflow-hidden border-r border-border bg-card transition-[width,transform] duration-200 ease-out md:sticky md:top-0 md:translate-x-0',
+          'fixed inset-y-0 left-0 z-40 flex h-screen flex-col overflow-hidden border-r border-border bg-card transition-[width,transform] duration-100 ease-out md:sticky md:top-0 md:translate-x-0',
           collapsed ? 'w-16 -translate-x-full md:w-16 md:translate-x-0' : 'w-64 translate-x-0',
         )}
       >
