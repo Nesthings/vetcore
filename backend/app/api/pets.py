@@ -801,6 +801,7 @@ def create_alert(
     _get_pet_or_404(db, ctx.clinic["id"], pet_id)
     alert = ClinicalAlert(pet_id=pet_id, type=body.type, description=body.description)
     db.add(alert)
+    db.flush()  # asigna alert.id para la auditoría
     record_audit(
         db,
         clinic_id=ctx.clinic["id"],
