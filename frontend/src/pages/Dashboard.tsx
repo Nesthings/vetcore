@@ -211,20 +211,38 @@ export function Dashboard() {
                   e.dataTransfer.effectAllowed = 'move'
                 }}
                 title="Arrastra a la barra lateral para fijarlo"
-                className="group flex cursor-grab flex-col gap-3 rounded-xl border border-border/60 bg-card/80 p-6.5 shadow-sm backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-glow active:cursor-grabbing"
+                className="group relative flex min-h-40 cursor-grab flex-col justify-end overflow-hidden rounded-xl border border-border/60 bg-card/80 shadow-sm backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-glow active:cursor-grabbing"
               >
-                <div
-                  className={cn(
-                    'flex size-17 items-center justify-center rounded-lg transition-transform duration-200 group-hover:scale-105',
-                    meta.iconBg,
-                  )}
-                >
-                  <meta.icon className={cn('size-8', meta.text)} aria-hidden="true" />
-                </div>
-                <div>
-                  <p className="text-xl font-semibold">{m.label}</p>
-                  <p className="text-base text-muted-foreground">{meta.desc}</p>
-                </div>
+                {meta.img ? (
+                  <>
+                    <img
+                      src={meta.img}
+                      alt={m.label}
+                      loading="lazy"
+                      className="absolute inset-0 size-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/30 to-transparent" />
+                    <div className="relative p-4">
+                      <p className="text-lg font-semibold text-white drop-shadow-md">{m.label}</p>
+                      <p className="text-sm text-white/80">{meta.desc}</p>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex flex-col gap-3 p-5.5">
+                    <div
+                      className={cn(
+                        'flex size-17 items-center justify-center rounded-lg transition-transform duration-200 group-hover:scale-105',
+                        meta.iconBg,
+                      )}
+                    >
+                      <meta.icon className={cn('size-8', meta.text)} aria-hidden="true" />
+                    </div>
+                    <div>
+                      <p className="text-xl font-semibold">{m.label}</p>
+                      <p className="text-base text-muted-foreground">{meta.desc}</p>
+                    </div>
+                  </div>
+                )}
               </Link>
             )
           })}
