@@ -28,6 +28,7 @@ export interface ModuleMeta {
   text: string
   iconBg: string
   img?: string
+  imgGif?: string
 }
 
 // Catálogo completo de módulos del panel clínico.

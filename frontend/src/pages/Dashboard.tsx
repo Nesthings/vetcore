@@ -211,38 +211,46 @@ export function Dashboard() {
                   e.dataTransfer.effectAllowed = 'move'
                 }}
                 title="Arrastra a la barra lateral para fijarlo"
-                className="group relative flex min-h-40 cursor-grab flex-col justify-end overflow-hidden rounded-xl border border-border/60 bg-card/80 shadow-sm backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-glow active:cursor-grabbing"
+                className="group flex cursor-grab flex-col overflow-hidden rounded-xl border border-border/60 bg-card/80 shadow-sm backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-glow active:cursor-grabbing"
               >
-                {meta.img ? (
-                  <>
-                    <img
-                      src={meta.img}
-                      alt={m.label}
-                      loading="lazy"
-                      className="absolute inset-0 size-full object-cover transition-transform duration-300 group-hover:scale-105"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/30 to-transparent" />
-                    <div className="relative p-4">
-                      <p className="text-lg font-semibold text-white drop-shadow-md">{m.label}</p>
-                      <p className="text-sm text-white/80">{meta.desc}</p>
-                    </div>
-                  </>
-                ) : (
-                  <div className="flex flex-col gap-3 p-5.5">
-                    <div
-                      className={cn(
-                        'flex size-17 items-center justify-center rounded-lg transition-transform duration-200 group-hover:scale-105',
-                        meta.iconBg,
+                <div className="relative aspect-[4/3] w-full overflow-hidden bg-secondary/40">
+                  {meta.img ? (
+                    <>
+                      <img
+                        src={meta.img}
+                        alt={m.label}
+                        loading="lazy"
+                        className={cn(
+                          'absolute inset-0 size-full object-cover transition-transform duration-300 group-hover:scale-105',
+                          meta.imgGif && 'group-hover:hidden',
+                        )}
+                      />
+                      {meta.imgGif && (
+                        <img
+                          src={meta.imgGif}
+                          alt=""
+                          aria-hidden="true"
+                          className="absolute inset-0 hidden size-full object-cover group-hover:block"
+                        />
                       )}
-                    >
-                      <meta.icon className={cn('size-8', meta.text)} aria-hidden="true" />
+                    </>
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div
+                        className={cn(
+                          'flex size-17 items-center justify-center rounded-lg transition-transform duration-200 group-hover:scale-105',
+                          meta.iconBg,
+                        )}
+                      >
+                        <meta.icon className={cn('size-8', meta.text)} aria-hidden="true" />
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-xl font-semibold">{m.label}</p>
-                      <p className="text-base text-muted-foreground">{meta.desc}</p>
-                    </div>
-                  </div>
-                )}
+                  )}
+                </div>
+                <div className="flex items-center gap-2 border-t border-border/60 px-3 py-2.5">
+                  <meta.icon className={cn('size-4 shrink-0', meta.text)} aria-hidden="true" />
+                  <p className="truncate text-sm font-semibold">{m.label}</p>
+                </div>
               </Link>
             )
           })}
