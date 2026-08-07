@@ -22,6 +22,7 @@ import {
   TriangleAlert,
   UserRound,
   UserRoundCog,
+  Users,
   Weight,
   X,
 } from 'lucide-react'
@@ -119,6 +120,16 @@ interface CarnetVaccine {
   prevents?: string | null
   schedule?: string | null
   applications: CarnetApp[]
+}
+
+interface FamilyMember {
+  id: string
+  name: string
+  species: string
+  breed?: string | null
+  sex?: string | null
+  relation: string
+  photo_url?: string | null
 }
 
 const ALERT_TYPES = [
@@ -367,6 +378,7 @@ export function PetDetail() {
   const [carnet, setCarnet] = useState<CarnetVaccine[]>([])
   const [carnetSpecies, setCarnetSpecies] = useState('')
   const [carnetBrands, setCarnetBrands] = useState<string[]>([])
+  const [family, setFamily] = useState<FamilyMember[]>([])
   const [vets, setVets] = useState<{ id: string; full_name: string }[]>([])
   const [addingFor, setAddingFor] = useState<string | null>(null)
   const [appDate, setAppDate] = useState('')
@@ -393,7 +405,7 @@ export function PetDetail() {
     setLoading(true)
     setError(null)
     try {
-      const [p, tl, w, al, ph, cs, vp, ca, us] = await Promise.all([
+      const [p, tl, w, al, ph, cs, vp, ca, fm, us] = await Promise.all([
         apiFetch<Pet>(`/pets/${id}`),
         apiFetch<TimelineEvent[]>(`/pets/${id}/timeline`),
         apiFetch<WeightRecord[]>(`/pets/${id}/weights`),
@@ -404,6 +416,7 @@ export function PetDetail() {
         apiFetch<{ species: string; vaccines: CarnetVaccine[]; brands: string[] }>(
           `/pets/${id}/carnet`,
         ),
+        apiFetch<FamilyMember[]>(`/pets/${id}/family`),
         apiFetch<{ id: string; full_name: string; role: string }[]>('/users'),
       ])
       setPet(p)
@@ -416,6 +429,7 @@ export function PetDetail() {
       setCarnet(ca.vaccines)
       setCarnetSpecies(ca.species)
       setCarnetBrands(ca.brands)
+      setFamily(fm)
       setVets(us.filter((u) => u.role === 'admin' || u.role === 'veterinario'))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo cargar el paciente')
@@ -1109,6 +1123,10 @@ export function PetDetail() {
                 <Syringe className="size-4" aria-hidden="true" />
                 Vacunación
               </TabsTrigger>
+              <TabsTrigger value="familia" className="gap-1.5">
+                <Users className="size-4" aria-hidden="true" />
+                Familia
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="timeline">
@@ -1466,6 +1484,74 @@ export function PetDetail() {
                     </div>
                   </div>
                 ))
+              )}
+            </TabsContent>
+
+            <TabsContent value="familia">
+              {family.length === 0 ? (
+                <EmptyState
+                  title="Sin familia registrada"
+                  description="Otras mascotas con el mismo nombre de dueño aparecerán aquí como hermano o hermana."
+                  icon={Users}
+                />
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {family.map((m) => {
+                    const esHermano = m.relation === 'hermano'
+                    const initials =
+                      m.name
+                        .split(/\s+/)
+                        .slice(0, 2)
+                        .map((w) => w[0]?.toUpperCase() ?? '')
+                        .join('') || 'P'
+                    return (
+                      <Link
+                        key={m.id}
+                        to={`/pets/${m.id}`}
+                        className="group flex items-center gap-3 rounded-xl border border-border/60 bg-card p-3 shadow-sm transition-colors hover:border-primary/40 hover:bg-accent"
+                      >
+                        <div
+                          className={`flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 ${
+                            esHermano
+                              ? 'border-sky-400/60 bg-sky-500/10 text-sky-600 dark:text-sky-300'
+                              : 'border-pink-400/60 bg-pink-500/10 text-pink-600 dark:text-pink-300'
+                          }`}
+                        >
+                          {m.photo_url ? (
+                            <img
+                              src={m.photo_url}
+                              alt={m.name}
+                              className="size-full object-cover"
+                            />
+                          ) : (
+                            <span className="text-sm font-semibold">{initials}</span>
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold">{m.name}</p>
+                          <p className="truncate text-xs capitalize text-muted-foreground">
+                            {speciesLabel(m.species)}
+                            {m.breed ? ` · ${m.breed}` : ''}
+                          </p>
+                        </div>
+                        <Badge
+                          variant="outline"
+                          className={
+                            esHermano
+                              ? 'bg-sky-500/10 text-sky-700 dark:text-sky-300'
+                              : 'bg-pink-500/10 text-pink-700 dark:text-pink-300'
+                          }
+                        >
+                          {m.relation === 'hermana'
+                            ? 'Hermana'
+                            : m.relation === 'hermano'
+                              ? 'Hermano'
+                              : 'Hermano(a)'}
+                        </Badge>
+                      </Link>
+                    )
+                  })}
+                </div>
               )}
             </TabsContent>
           </Tabs>

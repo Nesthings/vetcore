@@ -730,6 +730,73 @@ def delete_pet_photo(
 
 
 @router.get(
+    "/{pet_id}/family",
+    summary="Familia: otras mascotas con el mismo nombre de dueño",
+)
+def pet_family(
+    pet_id: str,
+    ctx: CurrentClinic = Depends(get_current_clinic),
+    db: Session = Depends(get_db),
+) -> list[dict]:
+    """Devuelve las demás mascotas de la clínica cuyo dueño tiene el MISMO
+    nombre exacto (full_name) que el dueño de esta mascota. La relación se
+    etiqueta como hermano/hermana según el sexo de la otra mascota."""
+    pet = _get_pet_or_404(db, ctx.clinic["id"], pet_id)
+
+    owner_names = list(
+        db.execute(
+            text(
+                "SELECT DISTINCT trim(o.full_name) AS full_name "
+                "FROM owner_pet_links l JOIN owners o ON o.id = l.owner_id "
+                "WHERE l.pet_id = :pid AND l.clinic_id = :cid AND l.is_active = true "
+                "AND o.full_name IS NOT NULL AND trim(o.full_name) <> ''"
+            ),
+            {"pid": pet.id, "cid": ctx.clinic["id"]},
+        ).scalars()
+    )
+    if not owner_names:
+        return []
+
+    placeholders = ",".join(f":nm{i}" for i in range(len(owner_names)))
+    params: dict = {"cid": ctx.clinic["id"], "pid": pet.id}
+    params.update({f"nm{i}": n for i, n in enumerate(owner_names)})
+    rows = db.execute(
+        text(
+            "SELECT DISTINCT p.id, p.name, p.species, p.breed, p.sex, "
+            "p.clinical_photo_url AS photo_url "
+            "FROM owner_pet_links l "
+            "JOIN owners o ON o.id = l.owner_id "
+            "JOIN pets p ON p.id = l.pet_id "
+            "WHERE l.clinic_id = :cid AND l.is_active = true "
+            "AND p.id <> :pid AND p.is_active = true "
+            f"AND trim(coalesce(o.full_name, '')) IN ({placeholders})"
+        ),
+        params,
+    ).mappings().all()
+
+    out = []
+    for r in rows:
+        sex = r["sex"]
+        relation = (
+            "hermano"
+            if sex in ("M", "macho", "Macho")
+            else "hermana" if sex in ("H", "hembra", "Hembra") else "hermano(a)"
+        )
+        out.append(
+            {
+                "id": str(r["id"]),
+                "name": r["name"],
+                "species": r["species"],
+                "breed": r["breed"],
+                "sex": sex,
+                "relation": relation,
+                "photo_url": r["photo_url"],
+            }
+        )
+    return out
+
+
+@router.get(
     "/{pet_id}/carnet",
     summary="Carnet de vacunación (esquema estándar + aplicaciones)",
 )
