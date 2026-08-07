@@ -235,6 +235,7 @@ export function Dashboard() {
                         src={meta.img}
                         alt={m.label}
                         loading="lazy"
+                        decoding="async"
                         className={cn(
                           'absolute inset-0 size-full object-cover transition-transform duration-300 group-hover:scale-105',
                           meta.imgGif && 'group-hover:hidden',
@@ -245,6 +246,7 @@ export function Dashboard() {
                           src={meta.imgGif}
                           alt=""
                           aria-hidden="true"
+                          decoding="async"
                           className="absolute inset-0 hidden size-full object-cover group-hover:block"
                         />
                       )}
