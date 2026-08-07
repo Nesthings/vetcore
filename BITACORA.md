@@ -1258,4 +1258,51 @@ Tras explicar el módulo Automatización, se notó que el dueño **no tenía nin
 
 ---
 
+## Documentación — Origen de los datos de la cartilla (pestañas inferiores)
+
+**Fecha:** 2026-08-07
+
+Referencia de dónde se recupera cada campo de la ficha de paciente
+(`PetDetail.tsx`), pestaña por pestaña.
+
+### Línea de tiempo — `GET /pets/{id}/timeline`
+Mezcla dos tablas y las ordena por fecha descendente:
+
+- **Consultas** (tabla `consultations`):
+  - `type` = fijo `"consulta"`
+  - `title` = `consultations.reason` (o "Consulta" si no hay)
+  - `subtitle` = `"Diagnóstico: " + consultations.diagnosis`
+  - `author` = `users.full_name` (por `consultations.vet_user_id`)
+  - `date` = `consultations.created_at`
+- **Citas** (tabla `appointments`):
+  - `type` = fijo `"cita"`
+  - `title` = `appointments.procedure_type`
+  - `subtitle` / `author` = vacíos
+  - `date` = `appointments.start_time`
+  - `status` = `appointments.status` (`scheduled/confirmed/completed/cancelled/no_show`; el
+    frontend lo traduce a Agendada/Confirmada/Completada/Cancelada/No asistió)
+
+### Peso histórico — `GET /pets/{id}/weights`
+De la tabla `pet_weight_records`:
+- `weight_kg`, `recorded_at` (la API ordena por `recorded_at DESC`)
+- El KPI (último peso + variación ▲/▼) lo calcula el frontend con los 2 registros más recientes
+- Los pesos se crean desde "Nueva consulta" (checkout) o `POST /pets/{id}/weights`
+
+### Fotos de evolución — `GET /pets/{id}/photo-evolution`
+De las consultas con foto adjunta (`consultations` + `consultation_attachments`):
+- `url` = la foto subida; `consultation_date` = `consultations.created_at`; `reason` = motivo
+
+### Consentimientos — `GET /consents/pets/{id}`
+De la tabla `digital_consents`: `title`, `body`, `signature_url`, `pdf_url`, `signed_at`
+
+### Vacunación — `GET /vaccination-plans/pets/{id}`
+De las asignaciones (`pet_vaccination_plans`) enriquecidas:
+- `plan_name`, `compound` ← `vaccination_plans` (el plan asignado)
+- `branch_name` ← `clinic_branches`; `vet_name` ← `users`
+- `start_date`, `start_time` ← la propia asignación
+- `doses` ← `pet_vaccination_doses` (`label`, `due_date`, `status`); `appointment_start` ← la
+  cita agendada vinculada (`appointments.start_time` por `appointment_id`)
+
+---
+
 **Siguiente subfase:** por decidir (Fase 3 en hold).
