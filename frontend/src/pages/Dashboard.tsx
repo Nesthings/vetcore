@@ -85,16 +85,16 @@ function KpiCard({
   hint?: string
 }) {
   return (
-    <Card className="bg-gradient-to-br from-primary/[0.06] via-transparent to-transparent">
-      <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
-        <CardDescription>{label}</CardDescription>
-        <Icon className="size-4 text-primary" aria-hidden="true" />
-      </CardHeader>
-      <CardContent>
-        <p className="text-3xl font-semibold tracking-tight text-foreground">{value}</p>
-        {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
-      </CardContent>
-    </Card>
+    <div className="rounded-xl border border-border bg-card p-3.5 shadow-card">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs font-medium text-muted-foreground">{label}</p>
+        <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <Icon className="size-3.5" aria-hidden="true" />
+        </span>
+      </div>
+      <p className="mt-1.5 text-2xl font-bold tracking-tight text-foreground">{value}</p>
+      {hint && <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>}
+    </div>
   )
 }
 
@@ -171,29 +171,212 @@ export function Dashboard() {
 
   return (
     <AppLayout>
-      <div className="mb-6">
-        <div className="mb-6 flex flex-col gap-3 sm:flex-row">
-          <Button
-            asChild
-            variant="success"
-            size="lg"
-            className="h-12 w-full px-8 text-base sm:w-auto"
-          >
-            <Link to="/consultas/nueva">
-              <ClipboardPlus className="size-6" aria-hidden="true" />
-              Nueva consulta
-            </Link>
-          </Button>
-          <Button asChild size="lg" className="h-12 w-full px-8 text-base sm:w-auto">
-            <Link to="/ventas/nueva">
-              <ShoppingBag className="size-6" aria-hidden="true" />
-              Nueva venta
-            </Link>
-          </Button>
+      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="font-display text-2xl font-bold tracking-tight">Inicio</h1>
+          <p className="text-sm text-muted-foreground">
+            {data ? `Resumen del día · ${data.period_label}` : 'Resumen operativo de la clínica'}
+          </p>
         </div>
       </div>
 
-      <div className="mb-6">
+      <div className="mb-6 flex flex-col gap-2 sm:flex-row">
+        <Button asChild variant="success" size="xl" className="w-full sm:w-auto">
+          <Link to="/consultas/nueva">
+            <ClipboardPlus className="size-5" aria-hidden="true" />
+            Nueva consulta
+          </Link>
+        </Button>
+        <Button asChild variant="soft" size="xl" className="w-full sm:w-auto">
+          <Link to="/ventas/nueva">
+            <ShoppingBag className="size-5" aria-hidden="true" />
+            Nueva venta
+          </Link>
+        </Button>
+      </div>
+
+      {error && <ErrorState description={error} onRetry={load} className="mb-6" />}
+      {!data && !error && <LoadingState label="Cargando dashboard…" />}
+
+      {data && (
+        <div className="space-y-6">
+          <section className="mb-6">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="font-display text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                Resumen del día
+              </h2>
+              <span className="text-xs text-muted-foreground">
+                {new Date().toLocaleDateString('es-MX', {
+                  weekday: 'long',
+                  day: 'numeric',
+                  month: 'long',
+                })}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+              <KpiCard
+                label="Citas de hoy"
+                value={data.citas_total}
+                icon={CalendarCheck2}
+                hint={`${data.citas_por_estado.confirmed} confirmadas`}
+              />
+              <KpiCard
+                label="Pendientes"
+                value={data.citas_por_estado.scheduled}
+                icon={CalendarClock}
+                hint="por confirmar"
+              />
+              <KpiCard
+                label="Completadas"
+                value={data.citas_por_estado.completed}
+                icon={CalendarCheck2}
+              />
+              <KpiCard
+                label="Bloques"
+                value={data.bloques}
+                icon={CalendarX2}
+                hint="horario bloqueado"
+              />
+              <KpiCard label="Pacientes activos" value={data.pacientes_activos} icon={PawPrint} />
+            </div>
+          </section>
+
+          <div className="grid gap-4 lg:grid-cols-3">
+            <Card className="shadow-card lg:col-span-2">
+              <CardHeader>
+                <CardTitle className="font-display">
+                  {period === 'day' ? 'Citas por hora' : 'Citas por período'}
+                </CardTitle>
+                <CardDescription>
+                  {period === 'day'
+                    ? 'Distribución de citas de hoy'
+                    : period === 'week'
+                      ? 'Citas de los últimos 7 días'
+                      : 'Citas de los últimos 30 días'}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={data.citas_series}
+                    margin={{ top: 4, right: 8, left: -24, bottom: 0 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                    <XAxis
+                      dataKey="label"
+                      tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <YAxis
+                      allowDecimals={false}
+                      tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <Tooltip
+                      cursor={{ fill: 'var(--muted)' }}
+                      formatter={(v) => [`${v} citas`, 'Citas']}
+                    />
+                    <Bar
+                      dataKey="count"
+                      fill="var(--chart-1)"
+                      radius={[4, 4, 0, 0]}
+                      maxBarSize={28}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card className="shadow-card">
+              <CardHeader>
+                <CardTitle className="font-display">Alertas de stock</CardTitle>
+                <CardDescription>Productos bajo el umbral mínimo</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {data.stock_alerts.length === 0 ? (
+                  <div className="flex items-center gap-2 rounded-lg bg-success/10 px-3 py-2 text-sm text-success">
+                    <PackageMinus className="size-4" aria-hidden="true" />
+                    Sin alertas de stock
+                  </div>
+                ) : (
+                  data.stock_alerts.map((p) => (
+                    <div
+                      key={p.product_id}
+                      className="flex items-center justify-between rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-sm"
+                    >
+                      <div className="flex items-center gap-2">
+                        <TriangleAlert className="size-4 text-warning" aria-hidden="true" />
+                        <span className="font-medium">{p.name}</span>
+                      </div>
+                      <Badge variant="warning">{p.stock} en stock</Badge>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card className="shadow-card">
+            <CardHeader className="flex-row items-center justify-between space-y-0">
+              <div>
+                <CardTitle className="font-display">Citas del período</CardTitle>
+                <CardDescription>Próximas citas agendadas en el rango</CardDescription>
+              </div>
+              <Link
+                to="/agenda"
+                className="text-sm font-medium text-primary hover:text-primary-hover"
+              >
+                Ver agenda
+              </Link>
+            </CardHeader>
+            <CardContent>
+              {data.citas.length === 0 ? (
+                <EmptyState
+                  title="Sin citas en el período"
+                  description="Aún no hay citas agendadas en este rango."
+                />
+              ) : (
+                <div className="divide-y divide-border">
+                  {data.citas.map((c) => {
+                    const st = STATUS_LABELS[c.status] ?? { label: c.status, variant: 'secondary' }
+                    return (
+                      <div key={c.id} className="flex items-center justify-between py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="flex size-9 items-center justify-center rounded-full bg-secondary text-secondary-foreground">
+                            <PawPrint className="size-4" aria-hidden="true" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">{c.pet_name ?? c.id.slice(0, 8)}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {c.procedure_type}
+                              {c.vet_name ? ` · ${c.vet_name}` : ''}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm text-muted-foreground">
+                            {new Date(c.start_time).toLocaleString('es-MX', {
+                              day: period === 'day' ? undefined : 'numeric',
+                              month: period === 'day' ? undefined : 'short',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </span>
+                          <Badge variant={st.variant}>{st.label}</Badge>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      <section className="mb-6 mt-8">
         <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           Módulos
         </p>
@@ -223,9 +406,9 @@ export function Dashboard() {
                 }}
                 title="Arrastra a la barra lateral para fijarlo"
                 className={cn(
-                  'group flex cursor-grab flex-col overflow-hidden rounded-xl border border-border/60 shadow-sm backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 active:cursor-grabbing',
-                  meta.tint ?? 'bg-card/80',
-                  meta.glow ?? 'hover:shadow-glow',
+                  'group flex cursor-grab flex-col overflow-hidden rounded-xl border border-border/60 bg-card shadow-card transition-all duration-200 hover:-translate-y-0.5 active:cursor-grabbing',
+                  meta.tint ?? 'bg-card',
+                  meta.glow ?? 'hover:shadow-elevated',
                 )}
               >
                 <div className="relative aspect-[4/3] w-full overflow-hidden bg-secondary/40">
@@ -280,22 +463,22 @@ export function Dashboard() {
         <p className="mt-2 text-xs text-muted-foreground">
           Arrastra un módulo al sidebar para fijarlo, o desde el sidebar a aquí para quitarlo.
         </p>
-      </div>
+      </section>
 
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
+      <section className="mb-2 mt-8 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <LayoutDashboard className="size-6 text-primary" aria-hidden="true" />
-          <h1 className="text-2xl font-semibold tracking-tight">Dashboards</h1>
+          <LayoutDashboard className="size-5 text-primary" aria-hidden="true" />
+          <h2 className="font-display text-xl font-bold tracking-tight">Dashboards</h2>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex rounded-lg border border-border bg-card p-0.5">
+          <div className="flex rounded-full border border-border bg-card p-0.5">
             {PERIODS.map((p) => (
               <button
                 key={p.value}
                 type="button"
                 onClick={() => setPeriod(p.value)}
                 className={cn(
-                  'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+                  'rounded-full px-3 py-1.5 text-sm font-medium transition-colors',
                   period === p.value
                     ? 'bg-primary text-primary-foreground'
                     : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
@@ -322,10 +505,7 @@ export function Dashboard() {
             Bandeja de dashboards
           </Button>
         </div>
-      </div>
-      <p className="mb-4 text-sm text-muted-foreground">
-        {data ? `Resumen operativo · ${data.period_label}` : 'Resumen operativo'}
-      </p>
+      </section>
 
       <DashboardTray
         open={trayOpen}
@@ -342,7 +522,7 @@ export function Dashboard() {
         onDragLeave={() => setGridDragOver(false)}
         onDrop={handleGridDrop}
         className={cn(
-          'mb-6 grid gap-4 rounded-xl sm:grid-cols-2 xl:grid-cols-3',
+          'mb-6 mt-4 grid gap-4 rounded-xl sm:grid-cols-2 xl:grid-cols-3',
           gridDragOver && 'outline-2 outline-dashed outline-primary/40',
           active.length === 0 && 'border border-dashed border-border/60 bg-card/40 p-10',
         )}
@@ -367,7 +547,7 @@ export function Dashboard() {
                 className="group relative cursor-grab gap-3 active:cursor-grabbing"
               >
                 <CardHeader className="flex-row items-start justify-between gap-2 space-y-0 pb-0">
-                  <CardTitle className="text-base">{def.title}</CardTitle>
+                  <CardTitle className="font-display text-base">{def.title}</CardTitle>
                   <button
                     type="button"
                     onClick={() => remove(slug)}
@@ -390,176 +570,10 @@ export function Dashboard() {
         )}
       </div>
 
-      {error && <ErrorState description={error} onRetry={load} className="mb-6" />}
-
-      {!data && !error && <LoadingState label="Cargando dashboard…" />}
-
-      {data && (
-        <div className="space-y-6">
-          <div className="grid gap-6 lg:grid-cols-3">
-            <Card className="shadow-card lg:col-span-2">
-              <CardHeader>
-                <CardTitle>{period === 'day' ? 'Citas por hora' : 'Citas por período'}</CardTitle>
-                <CardDescription>
-                  {period === 'day'
-                    ? 'Distribución de citas de hoy'
-                    : period === 'week'
-                      ? 'Citas de los últimos 7 días'
-                      : 'Citas de los últimos 30 días'}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={data.citas_series}
-                    margin={{ top: 4, right: 8, left: -24, bottom: 0 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                    <XAxis
-                      dataKey="label"
-                      tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }}
-                      tickLine={false}
-                      axisLine={false}
-                    />
-                    <YAxis
-                      allowDecimals={false}
-                      tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }}
-                      tickLine={false}
-                      axisLine={false}
-                    />
-                    <Tooltip
-                      cursor={{ fill: 'var(--muted)' }}
-                      formatter={(v) => [`${v} citas`, 'Citas']}
-                    />
-                    <Bar
-                      dataKey="count"
-                      fill="var(--chart-1)"
-                      radius={[4, 4, 0, 0]}
-                      maxBarSize={28}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-
-            <Card className="shadow-card">
-              <CardHeader>
-                <CardTitle>Alertas de stock</CardTitle>
-                <CardDescription>Productos bajo el umbral mínimo</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {data.stock_alerts.length === 0 ? (
-                  <div className="flex items-center gap-2 rounded-md bg-success/10 px-3 py-2 text-sm text-success">
-                    <PackageMinus className="size-4" aria-hidden="true" />
-                    Sin alertas de stock
-                  </div>
-                ) : (
-                  data.stock_alerts.map((p) => (
-                    <div
-                      key={p.product_id}
-                      className="flex items-center justify-between rounded-md border border-warning/30 bg-warning/5 px-3 py-2 text-sm"
-                    >
-                      <div className="flex items-center gap-2">
-                        <TriangleAlert className="size-4 text-warning" aria-hidden="true" />
-                        <span className="font-medium">{p.name}</span>
-                      </div>
-                      <Badge variant="warning">{p.stock} en stock</Badge>
-                    </div>
-                  ))
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
-            <KpiCard
-              label="Citas de hoy"
-              value={data.citas_total}
-              icon={CalendarCheck2}
-              hint={`${data.citas_por_estado.confirmed} confirmadas`}
-            />
-            <KpiCard
-              label="Pendientes"
-              value={data.citas_por_estado.scheduled}
-              icon={CalendarClock}
-              hint="por confirmar"
-            />
-            <KpiCard
-              label="Completadas"
-              value={data.citas_por_estado.completed}
-              icon={CalendarCheck2}
-            />
-            <KpiCard
-              label="Bloques de horario"
-              value={data.bloques}
-              icon={CalendarX2}
-              hint="horario bloqueado"
-            />
-            <KpiCard label="Pacientes activos" value={data.pacientes_activos} icon={PawPrint} />
-          </div>
-
-          <Card className="shadow-card">
-            <CardHeader className="flex-row items-center justify-between space-y-0">
-              <div>
-                <CardTitle>Citas del período</CardTitle>
-                <CardDescription>Próximas citas agendadas en el rango</CardDescription>
-              </div>
-              <Link
-                to="/agenda"
-                className="text-sm font-medium text-primary hover:text-primary-hover"
-              >
-                Ver agenda
-              </Link>
-            </CardHeader>
-            <CardContent>
-              {data.citas.length === 0 ? (
-                <EmptyState
-                  title="Sin citas en el período"
-                  description="Aún no hay citas agendadas en este rango."
-                />
-              ) : (
-                <div className="divide-y divide-border">
-                  {data.citas.map((c) => {
-                    const st = STATUS_LABELS[c.status] ?? { label: c.status, variant: 'secondary' }
-                    return (
-                      <div key={c.id} className="flex items-center justify-between py-3">
-                        <div className="flex items-center gap-3">
-                          <div className="flex size-9 items-center justify-center rounded-full bg-secondary text-secondary-foreground">
-                            <PawPrint className="size-4" aria-hidden="true" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium">{c.pet_name ?? c.id.slice(0, 8)}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {c.procedure_type}
-                              {c.vet_name ? ` · ${c.vet_name}` : ''}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-sm text-muted-foreground">
-                            {new Date(c.start_time).toLocaleString('es-MX', {
-                              day: period === 'day' ? undefined : 'numeric',
-                              month: period === 'day' ? undefined : 'short',
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
-                          </span>
-                          <Badge variant={st.variant}>{st.label}</Badge>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Separator />
-          <p className="text-xs text-muted-foreground">
-            El módulo Finanzas (ingresos y gastos) es exclusivo del admin.
-          </p>
-        </div>
-      )}
+      <Separator />
+      <p className="mt-4 text-xs text-muted-foreground">
+        El módulo Finanzas (ingresos y gastos) es exclusivo del admin.
+      </p>
     </AppLayout>
   )
 }
