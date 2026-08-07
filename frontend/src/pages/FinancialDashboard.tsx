@@ -99,7 +99,7 @@ export function FinancialDashboard() {
     <AppLayout>
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Dashboard financiero</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Dashboard de finanzas</h1>
           <p className="text-sm text-muted-foreground">
             Exclusivo del admin · montos en moneda local
           </p>

@@ -488,7 +488,7 @@ export function Dashboard() {
 
           <Separator />
           <p className="text-xs text-muted-foreground">
-            El módulo Financiero (ingresos y gastos) es exclusivo del admin.
+            El módulo Finanzas (ingresos y gastos) es exclusivo del admin.
           </p>
         </div>
       )}
