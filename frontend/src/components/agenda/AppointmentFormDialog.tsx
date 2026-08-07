@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Loader2 } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Check, Loader2, Search } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { apiFetch } from '@/lib/api'
+import { cn } from '@/lib/utils'
 
 function toLocalInputValue(d: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0')
@@ -53,6 +54,9 @@ export function AppointmentFormDialog({
   const [pets, setPets] = useState<PetOption[]>([])
   const [vets, setVets] = useState<VetOption[]>([])
   const [petId, setPetId] = useState('')
+  const [petQuery, setPetQuery] = useState('')
+  const [petOpen, setPetOpen] = useState(false)
+  const petRef = useRef<HTMLDivElement>(null)
   const [vetId, setVetId] = useState('')
   const [procedure, setProcedure] = useState('Consulta')
   const [start, setStart] = useState(() => {
@@ -73,6 +77,9 @@ export function AppointmentFormDialog({
     if (!open) return
     setBranchId(defaultBranchId)
     setError(null)
+    setPetId('')
+    setPetQuery('')
+    setPetOpen(false)
     const d = new Date(defaultDay)
     d.setHours(9, 0, 0, 0)
     setStart(toLocalInputValue(d))
@@ -87,6 +94,24 @@ export function AppointmentFormDialog({
         setError(err instanceof Error ? err.message : 'No se pudieron cargar los datos'),
       )
   }, [open, defaultDay, defaultBranchId])
+
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (petRef.current && !petRef.current.contains(e.target as Node)) setPetOpen(false)
+    }
+    document.addEventListener('mousedown', onClick)
+    return () => document.removeEventListener('mousedown', onClick)
+  }, [])
+
+  const filteredPets = pets.filter((p) =>
+    p.name.toLowerCase().includes(petQuery.trim().toLowerCase()),
+  )
+
+  const pickPet = (p: PetOption) => {
+    setPetId(p.id)
+    setPetQuery(p.name)
+    setPetOpen(false)
+  }
 
   const submit = async () => {
     setError(null)
@@ -123,18 +148,52 @@ export function AppointmentFormDialog({
         <div className="grid gap-4">
           <div className="space-y-2">
             <Label>Paciente</Label>
-            <Select value={petId} onValueChange={setPetId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecciona el paciente" />
-              </SelectTrigger>
-              <SelectContent>
-                {pets.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="relative" ref={petRef}>
+              <div className="relative">
+                <Search
+                  className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                  aria-hidden="true"
+                />
+                <Input
+                  value={petQuery}
+                  onChange={(e) => {
+                    setPetQuery(e.target.value)
+                    setPetId('')
+                    setPetOpen(true)
+                  }}
+                  onFocus={() => setPetOpen(true)}
+                  placeholder="Escribe para buscar el paciente…"
+                  className="pl-9"
+                  autoComplete="off"
+                />
+              </div>
+              {petOpen && (
+                <div className="absolute z-20 mt-1 max-h-52 w-full overflow-y-auto rounded-md border border-border bg-card p-1 shadow-card">
+                  {filteredPets.length === 0 ? (
+                    <p className="px-2 py-1.5 text-sm text-muted-foreground">
+                      Sin resultados para «{petQuery.trim()}».
+                    </p>
+                  ) : (
+                    filteredPets.slice(0, 12).map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => pickPet(p)}
+                        className={cn(
+                          'flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent',
+                          p.id === petId && 'bg-accent',
+                        )}
+                      >
+                        <span className="flex-1 truncate">{p.name}</span>
+                        {p.id === petId && (
+                          <Check className="size-4 text-primary" aria-hidden="true" />
+                        )}
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
