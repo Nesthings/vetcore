@@ -4,7 +4,7 @@ import uuid
 from datetime import date, datetime
 
 from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Numeric, String, Text, func
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -13,7 +13,6 @@ from app.models.base import UUIDPkMixin
 
 class Pet(UUIDPkMixin, Base):
     __tablename__ = "pets"
-
     clinic_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("clinics.id"), nullable=False, index=True
     )
@@ -94,6 +93,37 @@ class CustomBreed(UUIDPkMixin, Base):
     )
     species: Mapped[str] = mapped_column(String(50), nullable=False)
     breed: Mapped[str] = mapped_column(String(100), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class PetPhoto(UUIDPkMixin, Base):
+    """Foto tomada por el veterinario durante la consulta (app móvil).
+
+    `pet_id` es nullable para el flujo walk-in (emergencia sin mascota
+    registrada), donde se guarda `walk_in_name`. Cada foto lleva una etiqueta
+    de texto libre y opcionalmente anotaciones JSON.
+    """
+
+    __tablename__ = "pet_photos"
+
+    clinic_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("clinics.id"), nullable=False, index=True
+    )
+    pet_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("pets.id"), nullable=True, index=True
+    )
+    walk_in_name: Mapped[str | None] = mapped_column(String(150))
+    vet_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id")
+    )
+    url: Mapped[str] = mapped_column(Text, nullable=False)
+    label: Mapped[str | None] = mapped_column(String(200))
+    taken_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    annotation_json: Mapped[dict | None] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

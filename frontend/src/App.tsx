@@ -18,6 +18,7 @@ import { DesignSystem } from '@/pages/DesignSystem'
 import { FinancialDashboard } from '@/pages/FinancialDashboard'
 import { Inventory } from '@/pages/Inventory'
 import { Invoices } from '@/pages/Invoices'
+import { Movil } from '@/pages/Movil'
 import { NewConsultation } from '@/pages/NewConsultation'
 import { NewSale } from '@/pages/NewSale'
 import { OwnerPetDetail } from '@/pages/owner/OwnerPetDetail'
@@ -222,6 +223,15 @@ function App() {
                     element={
                       <ProtectedRoute roles={['admin']}>
                         <SetupWizard />
+                      </ProtectedRoute>
+                    }
+                  />
+
+                  <Route
+                    path="/movil"
+                    element={
+                      <ProtectedRoute component="pets">
+                        <Movil />
                       </ProtectedRoute>
                     }
                   />

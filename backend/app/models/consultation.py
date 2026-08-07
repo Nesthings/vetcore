@@ -20,9 +20,10 @@ class Consultation(UUIDPkMixin, Base):
     branch_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("clinic_branches.id")
     )
-    pet_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("pets.id"), nullable=False, index=True
+    pet_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("pets.id"), nullable=True, index=True
     )
+    walk_in_name: Mapped[str | None] = mapped_column(String(150))
     vet_user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
     )

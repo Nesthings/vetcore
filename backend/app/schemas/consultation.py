@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class ConsultationItemCreate(BaseModel):
@@ -21,7 +21,8 @@ class ConsultationItemRead(BaseModel):
 
 class ConsultationCreate(BaseModel):
     branch_id: uuid.UUID | None = None
-    pet_id: uuid.UUID
+    pet_id: uuid.UUID | None = None
+    walk_in_name: str | None = Field(default=None, max_length=150)
     vet_user_id: uuid.UUID
     reason: str | None = None
     diagnosis: str | None = None
@@ -46,7 +47,8 @@ class ConsultationRead(BaseModel):
     id: uuid.UUID
     clinic_id: uuid.UUID
     branch_id: uuid.UUID | None
-    pet_id: uuid.UUID
+    pet_id: uuid.UUID | None
+    walk_in_name: str | None = None
     vet_user_id: uuid.UUID
     reason: str | None
     diagnosis: str | None
@@ -70,7 +72,8 @@ class CheckoutProductItem(BaseModel):
 
 class ConsultationCheckoutRequest(BaseModel):
     branch_id: uuid.UUID
-    pet_id: uuid.UUID
+    pet_id: uuid.UUID | None = None
+    walk_in_name: str | None = Field(default=None, max_length=150)
     vet_user_id: uuid.UUID
     reason: str | None = None
     weight_kg: float | None = Field(default=None, gt=0)
@@ -79,6 +82,12 @@ class ConsultationCheckoutRequest(BaseModel):
     products: list[CheckoutProductItem] = Field(default_factory=list)
     send_receipt_whatsapp: bool = False
     send_receipt_email: bool = False
+
+    @model_validator(mode="after")
+    def _pet_or_walk_in(self) -> "ConsultationCheckoutRequest":
+        if self.pet_id is None and not (self.walk_in_name or "").strip():
+            raise ValueError("Indica un paciente o un nombre sin registro")
+        return self
 
 
 class CheckoutResult(BaseModel):

@@ -11,7 +11,7 @@ import uuid
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
@@ -43,6 +43,7 @@ from app.models import (
     CustomBreed,
     Pet,
     PetCarnetRecord,
+    PetPhoto,
     PetWeightRecord,
     User,
     VaccinationPlan,
@@ -205,6 +206,102 @@ def pet_species(
         .order_by(func.count().desc())
     ).all()
     return [{"species": r.species, "count": r.count} for r in rows]
+
+
+@router.post(
+    "/photos/walkin",
+    status_code=status.HTTP_201_CREATED,
+    summary="Sube foto walk-in (mascota no registrada)",
+)
+def create_walkin_photo(
+    file: UploadFile = File(...),
+    name: str = Form(..., min_length=1, max_length=150),
+    label: str = Form(default="", max_length=200),
+    ctx: CurrentClinic = Depends(require_clinic_roles(*PET_MUTATORS)),
+    db: Session = Depends(get_db),
+) -> dict:
+    validate_extension(file.filename or "", ALLOWED_IMAGE_EXTENSIONS)
+    content = file.file.read()
+    if len(content) > MAX_IMAGE_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="La imagen supera el límite de 5 MB",
+        )
+    rel = save_media(f"walkin/{date.today().isoformat()}", file.filename or "photo.jpg", content)
+    photo = PetPhoto(
+        clinic_id=ctx.clinic["id"],
+        pet_id=None,
+        walk_in_name=name.strip(),
+        vet_user_id=ctx.user.sub,
+        url=public_url(rel),
+        label=label.strip() or None,
+        taken_at=datetime.now(UTC),
+    )
+    db.add(photo)
+    db.flush()
+    record_audit(
+        db,
+        clinic_id=ctx.clinic["id"],
+        actor_type="user",
+        actor_id=ctx.user.sub,
+        action="walkin_photo_uploaded",
+        entity_type="pet_photo",
+        entity_id=photo.id,
+        metadata={"name": photo.walk_in_name},
+    )
+    db.commit()
+    return {
+        "id": str(photo.id),
+        "url": photo.url,
+        "label": photo.label,
+        "walk_in_name": photo.walk_in_name,
+        "taken_at": photo.taken_at.isoformat(),
+    }
+
+
+@router.get("/photos/walkin", summary="Busca fotos walk-in por nombre")
+def list_walkin_photos(
+    name: str = Query(..., max_length=150),
+    ctx: CurrentClinic = Depends(get_current_clinic),
+    db: Session = Depends(get_db),
+) -> list[dict]:
+    photos = db.scalars(
+        select(PetPhoto)
+        .where(
+            PetPhoto.clinic_id == ctx.clinic["id"],
+            PetPhoto.walk_in_name.ilike(f"%{name.strip()}%"),
+        )
+        .order_by(PetPhoto.taken_at.desc())
+    ).all()
+    return [
+        {
+            "id": str(p.id),
+            "url": p.url,
+            "label": p.label,
+            "walk_in_name": p.walk_in_name,
+            "taken_at": p.taken_at.isoformat(),
+        }
+        for p in photos
+    ]
+
+
+@router.delete("/photos/walkin/{photo_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_walkin_photo(
+    photo_id: str,
+    ctx: CurrentClinic = Depends(require_clinic_roles(*PET_MUTATORS)),
+    db: Session = Depends(get_db),
+) -> None:
+    photo = db.scalar(
+        select(PetPhoto).where(
+            PetPhoto.id == photo_id,
+            PetPhoto.clinic_id == ctx.clinic["id"],
+            PetPhoto.pet_id.is_(None),
+        )
+    )
+    if photo is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Foto no encontrada")
+    db.delete(photo)
+    db.commit()
 
 
 def _pet_with_latest_weight(db: Session, pet: Pet) -> Pet:
@@ -535,6 +632,101 @@ def upload_owner_photo(
     )
     db.commit()
     return {"profile_photo_url": public_url(rel), "revertible": bool(row.profile_photo_url)}
+
+
+@router.get("/{pet_id}/photos", summary="Fotos de la sesión del veterinario")
+def pet_photos_list(
+    pet_id: str,
+    ctx: CurrentClinic = Depends(get_current_clinic),
+    db: Session = Depends(get_db),
+) -> list[dict]:
+    pet = _get_pet_or_404(db, ctx.clinic["id"], pet_id)
+    photos = db.scalars(
+        select(PetPhoto)
+        .where(PetPhoto.clinic_id == ctx.clinic["id"], PetPhoto.pet_id == pet.id)
+        .order_by(PetPhoto.taken_at.desc())
+    ).all()
+    return [
+        {
+            "id": str(p.id),
+            "url": p.url,
+            "label": p.label,
+            "taken_at": p.taken_at.isoformat(),
+        }
+        for p in photos
+    ]
+
+
+@router.post(
+    "/{pet_id}/photos",
+    status_code=status.HTTP_201_CREATED,
+    summary="Sube una foto de la sesión del veterinario",
+)
+def create_pet_photo(
+    pet_id: str,
+    file: UploadFile = File(...),
+    label: str = Form(default="", max_length=200),
+    ctx: CurrentClinic = Depends(require_clinic_roles(*PET_MUTATORS)),
+    db: Session = Depends(get_db),
+) -> dict:
+    pet = _get_pet_or_404(db, ctx.clinic["id"], pet_id)
+    validate_extension(file.filename or "", ALLOWED_IMAGE_EXTENSIONS)
+    content = file.file.read()
+    if len(content) > MAX_IMAGE_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="La imagen supera el límite de 5 MB",
+        )
+    rel = save_media(f"pets/{pet_id}/photos", file.filename or "photo.jpg", content)
+    photo = PetPhoto(
+        clinic_id=ctx.clinic["id"],
+        pet_id=pet.id,
+        walk_in_name=None,
+        vet_user_id=ctx.user.sub,
+        url=public_url(rel),
+        label=label.strip() or None,
+        taken_at=datetime.now(UTC),
+    )
+    db.add(photo)
+    db.flush()
+    record_audit(
+        db,
+        clinic_id=ctx.clinic["id"],
+        actor_type="user",
+        actor_id=ctx.user.sub,
+        action="pet_photo_uploaded",
+        entity_type="pet_photo",
+        entity_id=photo.id,
+        metadata={"pet_id": pet_id},
+    )
+    db.commit()
+    return {
+        "id": str(photo.id),
+        "url": photo.url,
+        "label": photo.label,
+        "taken_at": photo.taken_at.isoformat(),
+    }
+
+
+@router.delete("/{pet_id}/photos/{photo_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_pet_photo(
+    pet_id: str,
+    photo_id: str,
+    ctx: CurrentClinic = Depends(require_clinic_roles(*PET_MUTATORS)),
+    db: Session = Depends(get_db),
+) -> None:
+    pet = _get_pet_or_404(db, ctx.clinic["id"], pet_id)
+    photo = db.scalar(
+        select(PetPhoto).where(
+            PetPhoto.id == photo_id,
+            PetPhoto.pet_id == pet.id,
+            PetPhoto.clinic_id == ctx.clinic["id"],
+        )
+    )
+    if photo is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Foto no encontrada")
+    db.delete(photo)
+    db.commit()
 
 
 @router.get(
@@ -1105,6 +1297,8 @@ def photo_evolution(
 ) -> list[PhotoEvolutionItem]:
     pet = _get_pet_or_404(db, ctx.clinic["id"], pet_id)
 
+    out: list[PhotoEvolutionItem] = []
+
     consultations = list(
         db.scalars(
             select(Consultation)
@@ -1112,33 +1306,46 @@ def photo_evolution(
             .order_by(Consultation.created_at.asc())
         )
     )
-    if not consultations:
-        return []
-    consultation_ids = [c.id for c in consultations]
-
-    attachments = list(
-        db.scalars(
-            select(ConsultationAttachment)
-            .where(
-                ConsultationAttachment.consultation_id.in_(consultation_ids),
-                ConsultationAttachment.type == "photo",
+    if consultations:
+        consultation_ids = [c.id for c in consultations]
+        attachments = list(
+            db.scalars(
+                select(ConsultationAttachment)
+                .where(
+                    ConsultationAttachment.consultation_id.in_(consultation_ids),
+                    ConsultationAttachment.type == "photo",
+                )
+                .order_by(ConsultationAttachment.created_at.asc())
             )
-            .order_by(ConsultationAttachment.created_at.asc())
+        )
+        consult_by_id = {c.id: c for c in consultations}
+        for att in attachments:
+            c = consult_by_id.get(att.consultation_id)
+            if c is None:
+                continue
+            out.append(
+                PhotoEvolutionItem(
+                    url=att.url,
+                    consultation_id=c.id,
+                    consultation_date=c.created_at,
+                    reason=c.reason,
+                )
+            )
+
+    pet_photos = list(
+        db.scalars(
+            select(PetPhoto)
+            .where(PetPhoto.clinic_id == ctx.clinic["id"], PetPhoto.pet_id == pet.id)
+            .order_by(PetPhoto.taken_at.asc())
         )
     )
-
-    consult_by_id = {c.id: c for c in consultations}
-    out = []
-    for att in attachments:
-        c = consult_by_id.get(att.consultation_id)
-        if c is None:
-            continue
+    for p in pet_photos:
         out.append(
             PhotoEvolutionItem(
-                url=att.url,
-                consultation_id=c.id,
-                consultation_date=c.created_at,
-                reason=c.reason,
+                url=p.url,
+                consultation_id=p.id,
+                consultation_date=p.taken_at,
+                reason=p.label or "Sesión del veterinario",
             )
         )
     return out

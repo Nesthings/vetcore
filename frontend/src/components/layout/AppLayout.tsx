@@ -7,6 +7,7 @@ import {
   PawPrint,
   Receipt,
   Settings2,
+  Smartphone,
   UserRound,
 } from 'lucide-react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
@@ -275,6 +276,16 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                       Facturación
                     </NavLink>
                   )}
+                  {user?.role === 'admin' || user?.role === 'veterinario' ? (
+                    <NavLink
+                      to="/movil"
+                      onClick={() => setProfileOpen(false)}
+                      className="flex items-center gap-3 border-t border-border px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                    >
+                      <Smartphone className="size-4" aria-hidden="true" />
+                      Modo veterinario (móvil)
+                    </NavLink>
+                  ) : null}
                   <button
                     type="button"
                     onClick={handleLogout}

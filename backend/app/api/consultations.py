@@ -153,9 +153,13 @@ def checkout_consultation(
     """
     clinic_id = ctx.clinic["id"]
 
-    pet = db.scalar(select(Pet).where(Pet.id == body.pet_id, Pet.clinic_id == clinic_id))
-    if pet is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Paciente no encontrado")
+    pet = None
+    if body.pet_id is not None:
+        pet = db.scalar(select(Pet).where(Pet.id == body.pet_id, Pet.clinic_id == clinic_id))
+        if pet is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Paciente no encontrado"
+            )
     branch = db.get(ClinicBranch, body.branch_id)
     if branch is None or branch.clinic_id != ctx.clinic["id"]:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sucursal no encontrada")
@@ -244,20 +248,23 @@ def checkout_consultation(
             ConsultationItem(description=product.name, quantity=float(qty))
         )
 
-    owner_id = db.execute(
-        text(
-            "SELECT owner_id FROM owner_pet_links "
-            "WHERE pet_id = :pid AND clinic_id = :cid AND is_active = true "
-            "ORDER BY linked_at DESC LIMIT 1"
-        ),
-        {"pid": body.pet_id, "cid": clinic_id},
-    ).scalar()
+    owner_id = None
+    if body.pet_id is not None:
+        owner_id = db.execute(
+            text(
+                "SELECT owner_id FROM owner_pet_links "
+                "WHERE pet_id = :pid AND clinic_id = :cid AND is_active = true "
+                "ORDER BY linked_at DESC LIMIT 1"
+            ),
+            {"pid": body.pet_id, "cid": clinic_id},
+        ).scalar()
 
     performed_at = body.performed_at or datetime.now(UTC)
     consultation = Consultation(
         clinic_id=clinic_id,
         branch_id=body.branch_id,
         pet_id=body.pet_id,
+        walk_in_name=body.walk_in_name,
         vet_user_id=body.vet_user_id,
         reason=body.reason,
         performed_at=performed_at,
@@ -267,7 +274,7 @@ def checkout_consultation(
     db.add(consultation)
     db.flush()
 
-    if body.weight_kg is not None:
+    if body.weight_kg is not None and body.pet_id is not None:
         db.add(
             PetWeightRecord(
                 pet_id=body.pet_id,
@@ -320,9 +327,9 @@ def checkout_consultation(
 
     summary_data = {
         "clinic_name": f"{clinic.name}" + (f" — {branch.name}" if branch else ""),
-        "pet_name": pet.name,
-        "species": pet.species,
-        "breed": pet.breed,
+        "pet_name": pet.name if pet else (consultation.walk_in_name or "Paciente sin registro"),
+        "species": pet.species if pet else None,
+        "breed": pet.breed if pet else None,
         "vet_name": vet.full_name,
         "date_str": date_str,
         "reason": consultation.reason,
@@ -358,7 +365,7 @@ def checkout_consultation(
     receipt_data = {
         "clinic_name": clinic.name,
         "invoice_id": str(invoice.id)[:8].upper(),
-        "pet_name": pet.name,
+        "pet_name": pet.name if pet else (consultation.walk_in_name or "Paciente sin registro"),
         "status": invoice.status,
         "date_str": date_str,
         "items": receipt_items,
@@ -433,9 +440,9 @@ def generate_summary_pdf(
 
     data = {
         "clinic_name": f"{clinic.name}" + (f" — {branch.name}" if branch else ""),
-        "pet_name": pet.name,
-        "species": pet.species,
-        "breed": pet.breed,
+        "pet_name": pet.name if pet else (consultation.walk_in_name or "Paciente sin registro"),
+        "species": pet.species if pet else None,
+        "breed": pet.breed if pet else None,
         "vet_name": vet.full_name,
         "date_str": consultation.created_at.astimezone().strftime("%d/%m/%Y %H:%M"),
         "reason": consultation.reason,
