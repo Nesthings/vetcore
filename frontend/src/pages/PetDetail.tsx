@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { Icon as MDIIcon } from '@mdi/react'
+import { mdiPaw } from '@mdi/js'
 import {
   ArrowLeft,
+  Cake,
+  CalendarDays,
   Camera,
   ClipboardPlus,
   FileSignature,
@@ -13,6 +17,7 @@ import {
   TriangleAlert,
   UserRound,
   UserRoundCog,
+  Weight,
   X,
 } from 'lucide-react'
 import {
@@ -39,6 +44,7 @@ import { LoadingState } from '@/components/ui/loading-state'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import type { Pet } from '@/pages/Pets'
 import { apiFetch } from '@/lib/api'
+import { SPECIES_ICONS, speciesLabel } from '@/lib/species'
 import type { PetVaccinationPlan } from '@/lib/vaccination'
 
 interface TimelineEvent {
@@ -89,6 +95,40 @@ const ALERT_TYPES = [
   'Medidas especiales',
   'Otra',
 ]
+
+function calcAge(birth: string): string {
+  const b = new Date(birth)
+  const now = new Date()
+  let months = (now.getFullYear() - b.getFullYear()) * 12 + (now.getMonth() - b.getMonth())
+  if (now.getDate() < b.getDate()) months -= 1
+  if (months < 1) return 'Menos de 1 mes'
+  if (months < 12) return `${months} mes${months === 1 ? '' : 'es'}`
+  const years = Math.floor(months / 12)
+  const rest = months % 12
+  return rest
+    ? `${years} año${years === 1 ? '' : 's'} ${rest} m`
+    : `${years} año${years === 1 ? '' : 's'}`
+}
+
+function Stat({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: React.ElementType
+  label: string
+  value: string
+}) {
+  return (
+    <div className="rounded-xl border border-border/60 bg-card/80 px-3 py-2.5 backdrop-blur-sm">
+      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <Icon className="size-3.5 text-primary" aria-hidden="true" />
+        {label}
+      </div>
+      <p className="mt-1 truncate text-sm font-semibold text-foreground">{value}</p>
+    </div>
+  )
+}
 
 export function PetDetail() {
   const { id } = useParams<{ id: string }>()
@@ -177,7 +217,7 @@ export function PetDetail() {
 
   return (
     <AppLayout>
-      <div className="mb-6 flex items-center gap-3">
+      <div className="mb-5 flex items-center gap-3">
         <Link
           to="/pets"
           className="flex size-9 items-center justify-center rounded-md border border-border bg-card text-muted-foreground transition-colors hover:bg-accent"
@@ -185,32 +225,11 @@ export function PetDetail() {
         >
           <ArrowLeft className="size-4" />
         </Link>
-        <div className="flex-1">
-          <h1 className="text-2xl font-semibold tracking-tight">{pet?.name ?? 'Cargando…'}</h1>
-          <p className="text-sm text-muted-foreground">
-            {pet
-              ? `${pet.species}${pet.breed ? ` · ${pet.breed}` : ''}${pet.sex ? ` · ${pet.sex === 'M' ? 'Macho' : 'Hembra'}` : ''}`
-              : ''}
+        <div>
+          <p className="text-xs text-muted-foreground">
+            Pacientes / <span className="font-medium text-foreground">{pet?.name ?? 'Ficha'}</span>
           </p>
         </div>
-        {pet && (
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => setConsentOpen(true)}>
-              <FileSignature /> Consentimiento
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setInviteOpen(true)}>
-              <MailPlus /> Invitar dueño
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setTransferOpen(true)}>
-              <UserRoundCog /> Transferir dueño
-            </Button>
-            <Button asChild size="sm">
-              <Link to={`/consultas/nueva?pet=${id}`}>
-                <ClipboardPlus /> Nueva consulta
-              </Link>
-            </Button>
-          </div>
-        )}
       </div>
 
       {error && <ErrorState description={error} onRetry={load} className="mb-6" />}
@@ -218,85 +237,148 @@ export function PetDetail() {
 
       {pet && !error && (
         <div className="space-y-6">
-          <Card className="shadow-card">
-            <CardContent className="flex flex-col gap-6 p-6 sm:flex-row">
-              <div className="flex size-28 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-secondary text-primary">
-                {pet.clinical_photo_url ? (
-                  <img
-                    src={pet.clinical_photo_url}
-                    alt={pet.name}
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <PawPrint className="size-10" aria-hidden="true" />
-                )}
-              </div>
-              <div className="grid flex-1 grid-cols-2 gap-4 sm:grid-cols-3">
-                <div>
-                  <p className="text-xs text-muted-foreground">Nacimiento</p>
-                  <p className="text-sm font-medium">
-                    {pet.birth_date ? new Date(pet.birth_date).toLocaleDateString('es-MX') : '—'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Color</p>
-                  <p className="text-sm font-medium">
-                    {pet.color_primary ? (
-                      <>
-                        {pet.color_primary}
-                        {pet.color_secondary ? ` / ${pet.color_secondary}` : ''}
-                      </>
-                    ) : (
-                      '—'
-                    )}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Características</p>
-                  <p className="text-sm font-medium">{pet.markings || '—'}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Último peso</p>
-                  <p className="text-sm font-medium">
-                    {pet.latest_weight_kg ? `${pet.latest_weight_kg} kg` : '—'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Alergias</p>
-                  <p className="text-sm font-medium">{pet.allergies || '—'}</p>
-                </div>
-                {pet.clinical_alert_text && (
-                  <div className="col-span-2 flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-                    <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-                    <span>{pet.clinical_alert_text}</span>
+          <div className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-card">
+            <div
+              className="pointer-events-none absolute inset-0 bg-gradient-to-br from-sky-500/[0.12] via-primary/[0.04] to-transparent"
+              aria-hidden="true"
+            />
+            <CardContent className="relative p-6">
+              <div className="flex flex-col gap-6 lg:flex-row lg:items-center">
+                <div className="flex items-center gap-5">
+                  <div className="relative shrink-0">
+                    <div className="flex size-28 items-center justify-center overflow-hidden rounded-2xl border border-primary/10 bg-secondary/60 shadow-elevated">
+                      {pet.clinical_photo_url ? (
+                        <img
+                          src={pet.clinical_photo_url}
+                          alt={pet.name}
+                          className="size-full object-cover"
+                        />
+                      ) : (
+                        <PawPrint className="size-10 text-primary" aria-hidden="true" />
+                      )}
+                    </div>
+                    <span
+                      className="absolute -bottom-1.5 -right-1.5 flex size-8 items-center justify-center rounded-full border-4 border-card bg-sky-500 text-white shadow-glow"
+                      title={speciesLabel(pet.species)}
+                    >
+                      <MDIIcon
+                        path={SPECIES_ICONS[pet.species] ?? mdiPaw}
+                        size={0.6}
+                        aria-hidden="true"
+                      />
+                    </span>
                   </div>
-                )}
-                <div className="col-span-2 flex items-center gap-2 text-xs text-muted-foreground">
-                  <Camera className="size-4" aria-hidden="true" />
-                  Foto clínica del expediente (la de la Cartilla del dueño llega en 1.7)
+                  <div className="min-w-0">
+                    <h1 className="text-3xl font-bold tracking-tight text-foreground">
+                      {pet.name}
+                    </h1>
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                      <Badge className="gap-1.5 bg-sky-500/10 text-sky-700 hover:bg-sky-500/10 dark:text-sky-300">
+                        <MDIIcon
+                          path={SPECIES_ICONS[pet.species] ?? mdiPaw}
+                          size={0.6}
+                          aria-hidden="true"
+                        />
+                        {speciesLabel(pet.species)}
+                      </Badge>
+                      {pet.breed && <Badge variant="secondary">{pet.breed}</Badge>}
+                      {pet.sex && (
+                        <Badge variant="outline">{pet.sex === 'M' ? 'Macho' : 'Hembra'}</Badge>
+                      )}
+                      {pet.markings && (
+                        <Badge variant="outline" className="text-muted-foreground">
+                          {pet.markings}
+                        </Badge>
+                      )}
+                    </div>
+                    {pet.allergies && (
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        <span className="font-medium text-foreground">Alergias:</span>{' '}
+                        {pet.allergies}
+                      </p>
+                    )}
+                  </div>
                 </div>
+
+                <div className="grid flex-1 grid-cols-2 gap-3 sm:grid-cols-4">
+                  <Stat
+                    icon={Cake}
+                    label="Edad"
+                    value={pet.birth_date ? calcAge(pet.birth_date) : '—'}
+                  />
+                  <Stat
+                    icon={CalendarDays}
+                    label="Nacimiento"
+                    value={
+                      pet.birth_date
+                        ? new Date(pet.birth_date).toLocaleDateString('es-MX', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric',
+                          })
+                        : '—'
+                    }
+                  />
+                  <Stat
+                    icon={Weight}
+                    label="Último peso"
+                    value={pet.latest_weight_kg ? `${pet.latest_weight_kg} kg` : '—'}
+                  />
+                  <Stat
+                    icon={UserRound}
+                    label="Dueño"
+                    value={pet.owners?.find((o) => o.is_active)?.full_name ?? '—'}
+                  />
+                </div>
+              </div>
+
+              <div className="mt-6 flex flex-wrap gap-2">
+                <Button asChild size="sm">
+                  <Link to={`/consultas/nueva?pet=${id}`}>
+                    <ClipboardPlus /> Nueva consulta
+                  </Link>
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setConsentOpen(true)}>
+                  <FileSignature /> Consentimiento
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setInviteOpen(true)}>
+                  <MailPlus /> Invitar dueño
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setTransferOpen(true)}>
+                  <UserRoundCog /> Transferir dueño
+                </Button>
               </div>
             </CardContent>
-          </Card>
+          </div>
 
-          <Card className="shadow-card">
-            <CardContent className="space-y-3 p-5">
-              <div className="flex items-center justify-between">
-                <p className="flex items-center gap-2 text-sm font-semibold">
+          {pet.clinical_alert_text && (
+            <div className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+              <TriangleAlert className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
+              <div>
+                <p className="font-semibold">Alerta clínica</p>
+                <p>{pet.clinical_alert_text}</p>
+              </div>
+            </div>
+          )}
+
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Card className="shadow-card">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base">
                   <UserRound className="size-4 text-primary" aria-hidden="true" />
                   Dueño
-                </p>
-              </div>
-              {!pet.owners || pet.owners.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  Sin dueño registrado. Usa «Invitar dueño» o «Transferir dueño».
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  {pet.owners.map((o) => (
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {!pet.owners || pet.owners.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    Sin dueño registrado. Usa «Invitar dueño» o «Transferir dueño».
+                  </p>
+                ) : (
+                  pet.owners.map((o) => (
                     <div
                       key={o.owner_id}
-                      className="rounded-md border border-border/60 px-3 py-2 text-sm"
+                      className="rounded-xl border border-border/60 bg-muted/30 px-3 py-2.5 text-sm"
                     >
                       <p className="font-medium">
                         {o.full_name ?? 'Dueño registrado'}
@@ -306,7 +388,7 @@ export function PetDetail() {
                           </span>
                         )}
                       </p>
-                      <p className="text-muted-foreground">
+                      <p className="mt-0.5 text-muted-foreground">
                         {o.phone ? `Tel: ${o.phone}` : ''}
                         {o.phone && o.email ? ' · ' : ''}
                         {o.email ? o.email : ''}
@@ -319,76 +401,76 @@ export function PetDetail() {
                         </p>
                       )}
                     </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                  ))
+                )}
+              </CardContent>
+            </Card>
 
-          <Card className="border-warning/40 shadow-card">
-            <CardContent className="space-y-3 p-5">
-              <div className="flex items-center justify-between">
-                <p className="flex items-center gap-2 text-sm font-semibold">
+            <Card className="border-warning/40 shadow-card">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base">
                   <TriangleAlert className="size-4 text-warning" aria-hidden="true" />
                   Alertas clínicas
-                </p>
-              </div>
-              {alerts.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Sin alertas registradas.</p>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {alerts.map((a) => (
-                    <span
-                      key={a.id}
-                      className="inline-flex items-center gap-2 rounded-full border border-warning/40 bg-warning/10 px-3 py-1.5 text-sm font-medium text-warning"
-                    >
-                      <TriangleAlert className="size-3.5" aria-hidden="true" />
-                      <span>
-                        <b>{a.type}:</b> {a.description}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => removeAlert(a.id)}
-                        aria-label="Resolver alerta"
-                        className="text-warning/70 hover:text-warning"
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {alerts.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Sin alertas registradas.</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {alerts.map((a) => (
+                      <span
+                        key={a.id}
+                        className="inline-flex items-center gap-2 rounded-full border border-warning/40 bg-warning/10 px-3 py-1.5 text-sm font-medium text-warning"
                       >
-                        <X className="size-3.5" />
-                      </button>
-                    </span>
-                  ))}
+                        <TriangleAlert className="size-3.5" aria-hidden="true" />
+                        <span>
+                          <b>{a.type}:</b> {a.description}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => removeAlert(a.id)}
+                          aria-label="Resolver alerta"
+                          className="text-warning/70 hover:text-warning"
+                        >
+                          <X className="size-3.5" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    value={alertType}
+                    onChange={(e) => setAlertType(e.target.value)}
+                    className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+                  >
+                    {ALERT_TYPES.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    value={alertDesc}
+                    onChange={(e) => setAlertDesc(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && addAlert()}
+                    placeholder="Describe la alerta…"
+                    className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm"
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={addAlert}
+                    disabled={alertBusy}
+                  >
+                    {alertBusy ? <Loader2 className="animate-spin" /> : <Plus />} Agregar
+                  </Button>
                 </div>
-              )}
-              <div className="flex flex-wrap items-center gap-2">
-                <select
-                  value={alertType}
-                  onChange={(e) => setAlertType(e.target.value)}
-                  className="h-9 rounded-md border border-input bg-background px-2 text-sm"
-                >
-                  {ALERT_TYPES.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
-                    </option>
-                  ))}
-                </select>
-                <input
-                  value={alertDesc}
-                  onChange={(e) => setAlertDesc(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && addAlert()}
-                  placeholder="Describe la alerta…"
-                  className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm"
-                />
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={addAlert}
-                  disabled={alertBusy}
-                >
-                  {alertBusy ? <Loader2 className="animate-spin" /> : <Plus />} Agregar
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
 
           <Tabs defaultValue="timeline">
             <TabsList>
