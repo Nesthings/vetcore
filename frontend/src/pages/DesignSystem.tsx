@@ -43,20 +43,20 @@ import {
 } from '@/components/ui/table'
 
 const palette = [
-  { name: 'primary', token: 'bg-primary', hex: '#0f766e' },
-  { name: 'primary-hover', token: 'bg-primary-hover', hex: '#0d9488' },
-  { name: 'secondary', token: 'bg-secondary', hex: '#e6f5f1' },
-  { name: 'muted', token: 'bg-muted', hex: '#eef2f0' },
-  { name: 'accent', token: 'bg-accent', hex: '#d9f0ea' },
-  { name: 'destructive', token: 'bg-destructive', hex: '#d92d20' },
-  { name: 'success', token: 'bg-success', hex: '#21813e' },
-  { name: 'warning', token: 'bg-warning', hex: '#b45309' },
-  { name: 'info', token: 'bg-info', hex: '#2563eb' },
-  { name: 'chart-1', token: 'bg-chart-1', hex: '#0f766e' },
-  { name: 'chart-2', token: 'bg-chart-2', hex: '#2dd4bf' },
-  { name: 'chart-3', token: 'bg-chart-3', hex: '#eab308' },
-  { name: 'chart-4', token: 'bg-chart-4', hex: '#f97316' },
-  { name: 'chart-5', token: 'bg-chart-5', hex: '#2563eb' },
+  { name: 'primary', token: 'bg-primary', hex: '#3f3f46' },
+  { name: 'primary-hover', token: 'bg-primary-hover', hex: '#27272a' },
+  { name: 'secondary', token: 'bg-secondary', hex: '#f1f1f3' },
+  { name: 'muted', token: 'bg-muted', hex: '#f4f4f5' },
+  { name: 'accent', token: 'bg-accent', hex: '#eceef0' },
+  { name: 'destructive', token: 'bg-destructive', hex: '#dc2626' },
+  { name: 'success', token: 'bg-success', hex: '#16a34a' },
+  { name: 'warning', token: 'bg-warning', hex: '#d97706' },
+  { name: 'info', token: 'bg-info', hex: '#0284c7' },
+  { name: 'chart-1', token: 'bg-chart-1', hex: '#ef4444' },
+  { name: 'chart-2', token: 'bg-chart-2', hex: '#f97316' },
+  { name: 'chart-3', token: 'bg-chart-3', hex: '#0ea5e9' },
+  { name: 'chart-4', token: 'bg-chart-4', hex: '#a855f7' },
+  { name: 'chart-5', token: 'bg-chart-5', hex: '#10b981' },
 ]
 
 const typeScale = [
@@ -87,9 +87,9 @@ export function DesignSystem() {
         <Badge variant="secondary">Subfase 0.4</Badge>
         <h1 className="text-3xl font-semibold tracking-tight">Sistema de diseño — VetCore</h1>
         <p className="max-w-2xl text-sm text-muted-foreground">
-          Paleta "teal clínico", tipografía Inter, espaciado en múltiplos de 4px y componentes base
-          reutilizables. Esta página es transitoria: muestra los componentes que usarán todas las
-          pantallas de la Fase 1.
+          Paleta neutra (grafito/plata) con acentos en familia pastel, tipografía Inter, espaciado
+          en múltiplos de 4px y componentes base reutilizables. Esta página es transitoria: muestra
+          los componentes que usarán todas las pantallas de la Fase 1.
         </p>
       </header>
 
