@@ -116,7 +116,7 @@ export function AppointmentDetailDialog({
         <DialogHeader>
           <DialogTitle>Detalle de la cita</DialogTitle>
           <DialogDescription>
-            {appointment.pet_name ?? appointment.pet_id.slice(0, 8)} · {appointment.procedure_type}
+            {appointment.pet_name ?? 'Paciente sin registro'} · {appointment.procedure_type}
           </DialogDescription>
         </DialogHeader>
 
@@ -130,6 +130,7 @@ export function AppointmentDetailDialog({
             <p>
               <span className="text-muted-foreground">Paciente: </span>
               <span className="font-medium">{appointment.pet_name}</span>
+              {!appointment.pet_id && <Badge variant="secondary">sin registro</Badge>}
             </p>
             <p>
               <span className="text-muted-foreground">Veterinario: </span>

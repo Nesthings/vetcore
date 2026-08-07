@@ -154,6 +154,9 @@ export function TimeGrid({
                       )}
                     >
                       {a.pet_name ?? 'Paciente'}
+                      {!a.pet_id && (
+                        <span className="font-medium text-muted-foreground"> · s/r</span>
+                      )}
                     </p>
                     <p className="truncate pl-1 text-[11px] leading-tight text-muted-foreground">
                       {a.procedure_type}

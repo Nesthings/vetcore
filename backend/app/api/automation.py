@@ -81,9 +81,13 @@ def reminder_schedule(
     if appointment is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cita no encontrada")
 
-    pet = db.get(Pet, appointment.pet_id)
+    pet = db.get(Pet, appointment.pet_id) if appointment.pet_id else None
     vet = db.get(User, appointment.vet_user_id) if appointment.vet_user_id else None
-    _, consent = _get_consent(db, ctx.clinic["id"], str(appointment.pet_id))
+    _, consent = (
+        _get_consent(db, ctx.clinic["id"], str(appointment.pet_id))
+        if appointment.pet_id
+        else (None, False)
+    )
 
     stages = []
     for stage, hours in REMINDER_STAGES:
@@ -98,7 +102,7 @@ def reminder_schedule(
         )
     return ReminderSchedule(
         appointment_id=appointment.id,
-        pet_name=pet.name if pet else None,
+        pet_name=pet.name if pet else appointment.walk_in_name,
         vet_name=vet.full_name if vet else None,
         start_time=appointment.start_time,
         consent=consent,
@@ -119,6 +123,7 @@ def run_reminders(
         db.scalars(
             select(Appointment).where(
                 Appointment.clinic_id == ctx.clinic["id"],
+                Appointment.pet_id.is_not(None),
                 Appointment.status.in_(["scheduled", "confirmed"]),
                 Appointment.start_time > now,
                 Appointment.start_time <= horizon,

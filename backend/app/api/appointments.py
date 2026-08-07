@@ -23,7 +23,7 @@ def _with_names(db: Session, appointments: list[Appointment]) -> list[dict]:
     """Enriquece las citas con nombres legibles para la UI de la agenda."""
     if not appointments:
         return []
-    pet_ids = {a.pet_id for a in appointments}
+    pet_ids = {a.pet_id for a in appointments if a.pet_id}
     vet_ids = {a.vet_user_id for a in appointments if a.vet_user_id}
     branch_ids = {a.branch_id for a in appointments}
 
@@ -43,7 +43,7 @@ def _with_names(db: Session, appointments: list[Appointment]) -> list[dict]:
     for a in appointments:
         data = AppointmentRead.model_validate(a).model_dump()
         data.update(
-            pet_name=pets.get(a.pet_id),
+            pet_name=pets.get(a.pet_id) or a.walk_in_name,
             vet_name=vets.get(a.vet_user_id),
             branch_name=branches.get(a.branch_id),
         )
@@ -93,6 +93,13 @@ def _validate_dependencies(db: Session, clinic_id: str, body: AppointmentCreate)
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="end_time debe ser posterior a start_time",
         )
+    if body.pet_id is None:
+        if not (body.walk_in_name or "").strip():
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Indica un paciente o un nombre sin registro",
+            )
+        return
     pet = db.scalar(select(Pet).where(Pet.id == body.pet_id, Pet.clinic_id == clinic_id))
     if pet is None:
         raise HTTPException(

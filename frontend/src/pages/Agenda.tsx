@@ -24,7 +24,8 @@ export interface Appointment {
   id: string
   clinic_id: string
   branch_id: string
-  pet_id: string
+  pet_id: string | null
+  walk_in_name?: string
   vet_user_id: string | null
   procedure_type: string
   start_time: string
