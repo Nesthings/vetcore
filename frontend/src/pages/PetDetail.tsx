@@ -720,28 +720,30 @@ export function PetDetail() {
                 />
               ) : (
                 <div className="overflow-hidden rounded-lg border border-border">
-                  <Table>
+                  <Table className="table-fixed [&_th]:border-l [&_th:first-child]:border-l-0 [&_td]:border-l [&_td:first-child]:border-l-0">
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Vacuna</TableHead>
-                        <TableHead className="min-w-40">Enfermedades que previene</TableHead>
-                        <TableHead className="min-w-48">Esquema recomendado</TableHead>
-                        <TableHead className="min-w-48">Aplicaciones</TableHead>
-                        <TableHead className="text-right">Registrar</TableHead>
+                        <TableHead className="w-[25%]">Vacuna</TableHead>
+                        <TableHead className="w-[22%]">Enfermedades que previene</TableHead>
+                        <TableHead className="w-[28%]">Esquema recomendado</TableHead>
+                        <TableHead className="w-[14%]">Aplicaciones</TableHead>
+                        <TableHead className="w-[11%] text-right">Registrar</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {carnet.map((v) => (
                         <Fragment key={v.name}>
                           <TableRow>
-                            <TableCell className="font-medium">{v.name}</TableCell>
-                            <TableCell className="text-muted-foreground">
+                            <TableCell className="whitespace-normal break-words font-medium">
+                              {v.name}
+                            </TableCell>
+                            <TableCell className="whitespace-normal break-words text-muted-foreground">
                               {v.prevents ?? '—'}
                             </TableCell>
-                            <TableCell className="text-xs text-muted-foreground">
+                            <TableCell className="whitespace-normal break-words text-xs text-muted-foreground">
                               {v.schedule ?? '—'}
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="whitespace-normal">
                               {v.applications.length === 0 ? (
                                 <span className="text-sm text-muted-foreground">—</span>
                               ) : (
