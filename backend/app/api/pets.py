@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import CurrentClinic, get_current_clinic, require_clinic_roles, require_component
 from app.core.events import notify_roles, record_audit
 from app.core.images import process_cartilla_photo
+from app.core.security import create_share_token
 from app.core.seed_vaccination_plans import ensure_standard_plans
 from app.core.storage import (
     ALLOWED_IMAGE_EXTENSIONS,
@@ -1060,6 +1061,30 @@ def create_invitation(
         activation_url=f"/activate?token={token}",
         expires_at=expires_at,
     )
+
+
+@router.post(
+    "/{pet_id}/share-link",
+    summary="Genera el enlace de la cartilla para el dueño (sin login)",
+)
+def create_share_link(
+    pet_id: str,
+    ctx: CurrentClinic = Depends(require_clinic_roles(*PET_MUTATORS)),
+    db: Session = Depends(get_db),
+) -> dict:
+    pet = _get_pet_or_404(db, ctx.clinic["id"], pet_id)
+    token, expires_at = create_share_token(str(pet.id))
+    record_audit(
+        db,
+        clinic_id=ctx.clinic["id"],
+        actor_type="user",
+        actor_id=ctx.user.sub,
+        action="cartilla_share_link_created",
+        entity_type="pet",
+        entity_id=pet.id,
+    )
+    db.commit()
+    return {"url": f"/cartilla?token={token}", "expires_at": expires_at.isoformat()}
 
 
 @router.get(

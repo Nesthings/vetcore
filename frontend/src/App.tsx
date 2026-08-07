@@ -13,6 +13,7 @@ import { ResetPassword } from '@/pages/auth/ResetPassword'
 import { Agenda } from '@/pages/Agenda'
 import { Audit } from '@/pages/Audit'
 import { Automation } from '@/pages/Automation'
+import { CartillaShare } from '@/pages/CartillaShare'
 import { Dashboard } from '@/pages/Dashboard'
 import { DesignSystem } from '@/pages/DesignSystem'
 import { FinancialDashboard } from '@/pages/FinancialDashboard'
@@ -48,6 +49,7 @@ function App() {
                   <Route path="/activate" element={<Activate />} />
                   <Route path="/forgot-password" element={<ForgotPassword />} />
                   <Route path="/reset-password" element={<ResetPassword />} />
+                  <Route path="/cartilla" element={<CartillaShare />} />
                   <Route path="/design-system" element={<DesignSystem />} />
 
                   <Route

@@ -28,6 +28,7 @@ from app.api import (
     sales,
     schedule_blocks,
     services,
+    share,
     users,
     vaccination_plans,
     waitlist,
@@ -75,6 +76,7 @@ app.include_router(reports.router, prefix="/api/v1")
 app.include_router(notifications.router, prefix="/api/v1")
 app.include_router(audit.router, prefix="/api/v1")
 app.include_router(vaccination_plans.router, prefix="/api/v1")
+app.include_router(share.router, prefix="/api/v1")
 
 # Media (MVP local). La URL pública /media/... es la que devuelven los endpoints.
 media_dir = Path(settings.media_root)

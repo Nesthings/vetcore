@@ -51,3 +51,33 @@ def get_token_payload(token: str) -> dict:
         return decode_token(token)
     except JWTError as exc:
         raise InvalidTokenError("Token inválido o expirado") from exc
+
+
+SHARE_TOKEN_EXPIRE_DAYS = 30
+
+
+def create_share_token(pet_id: str) -> tuple[str, datetime]:
+    """Token de acceso a la cartilla para el dueño (sin login).
+
+    Expira en `SHARE_TOKEN_EXPIRE_DAYS` y solo da acceso de solo lectura +
+    acciones puntuales (foto, alertas, firmar consentimientos) de esa mascota.
+    """
+    expire = datetime.now(UTC) + timedelta(days=SHARE_TOKEN_EXPIRE_DAYS)
+    payload = {
+        "sub": pet_id,
+        "scope": "cartilla",
+        "exp": expire,
+        "iat": datetime.now(UTC),
+    }
+    return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm), expire
+
+
+def decode_share_token(token: str) -> str:
+    """Decodifica un token de cartilla y devuelve el pet_id. Lanza InvalidTokenError."""
+    payload = get_token_payload(token)
+    if payload.get("scope") != "cartilla":
+        raise InvalidTokenError("Token no válido para la cartilla")
+    pet_id = payload.get("sub")
+    if not pet_id:
+        raise InvalidTokenError("Token inválido")
+    return str(pet_id)

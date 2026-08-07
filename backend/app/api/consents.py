@@ -18,12 +18,53 @@ from app.core.events import record_audit
 from app.core.storage import public_url, save_media
 from app.db.session import get_db
 from app.models import Clinic, DigitalConsent, Pet
-from app.schemas.consent import ConsentCreate, ConsentRead
+from app.schemas.consent import ConsentCreate, ConsentRead, PendingConsentCreate
 from app.services.pdf import build_consent_pdf
 
 router = APIRouter(prefix="/consents", tags=["consents"])
 
 CONSENT_MUTATORS = ("admin", "veterinario", "recepcion")
+
+
+@router.post(
+    "/pending",
+    response_model=ConsentRead,
+    status_code=status.HTTP_201_CREATED,
+    summary="Crea un consentimiento pendiente de firma del dueño (remoto)",
+)
+def create_pending_consent(
+    body: PendingConsentCreate,
+    ctx: CurrentClinic = Depends(require_clinic_roles(*CONSENT_MUTATORS)),
+    db: Session = Depends(get_db),
+) -> DigitalConsent:
+    pet = db.scalar(
+        select(Pet).where(Pet.id == body.pet_id, Pet.clinic_id == ctx.clinic["id"])
+    )
+    if pet is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Paciente no encontrado")
+
+    consent = DigitalConsent(
+        clinic_id=ctx.clinic["id"],
+        pet_id=pet.id,
+        title=body.title,
+        body=body.body,
+        status="pending",
+    )
+    db.add(consent)
+    db.flush()
+    record_audit(
+        db,
+        clinic_id=ctx.clinic["id"],
+        actor_type="user",
+        actor_id=ctx.user.sub,
+        action="consent_pending_created",
+        entity_type="consent",
+        entity_id=consent.id,
+        metadata={"pet_id": str(pet.id), "title": body.title},
+    )
+    db.commit()
+    db.refresh(consent)
+    return consent
 
 
 @router.post("", response_model=ConsentRead, status_code=status.HTTP_201_CREATED)

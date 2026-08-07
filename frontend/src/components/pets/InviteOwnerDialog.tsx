@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Copy, Loader2, MailCheck } from 'lucide-react'
+import { Copy, Link2, Loader2, MailCheck } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -17,6 +17,11 @@ import { apiFetch } from '@/lib/api'
 interface InvitationResult {
   token: string
   activation_url: string
+  expires_at: string
+}
+
+interface ShareLinkResult {
+  url: string
   expires_at: string
 }
 
@@ -46,6 +51,9 @@ export function InviteOwnerDialog({
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [share, setShare] = useState<ShareLinkResult | null>(null)
+  const [shareCopied, setShareCopied] = useState(false)
+  const [shareBusy, setShareBusy] = useState(false)
 
   const hasRegistered = Boolean(defaultOwner) && Boolean(defaultOwner?.phone || defaultOwner?.email)
 
@@ -101,6 +109,31 @@ export function InviteOwnerDialog({
     })
   }
 
+  const generateShareLink = async () => {
+    setShareBusy(true)
+    setError(null)
+    try {
+      const res = await apiFetch<ShareLinkResult>(`/pets/${petId}/share-link`, {
+        method: 'POST',
+      })
+      setShare(res)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo generar el enlace')
+    } finally {
+      setShareBusy(false)
+    }
+  }
+
+  const copyShareLink = () => {
+    const link = `${window.location.origin}${share?.url}`
+    navigator.clipboard?.writeText(link).then(() => {
+      setShareCopied(true)
+      setTimeout(() => setShareCopied(false), 2000)
+    })
+  }
+
+  const shareFullLink = share ? `${window.location.origin}${share.url}` : ''
+
   const fullLink = result ? `${window.location.origin}${result.activation_url}` : ''
 
   return (
@@ -109,9 +142,58 @@ export function InviteOwnerDialog({
         <DialogHeader>
           <DialogTitle>Invitar al dueño de {petName}</DialogTitle>
           <DialogDescription>
-            Genera el enlace de activación para el dueño. Si ya tiene cuenta, se reutiliza.
+            Comparte la cartilla con el dueño o genera su invitación de cuenta.
           </DialogDescription>
         </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="rounded-lg border border-border bg-muted/40 p-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Enlace de la cartilla (sin login)
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              El dueño abre la cartilla de {petName}, sube su foto, gestiona alertas y firma
+              consentimientos.
+            </p>
+            {!share ? (
+              <Button
+                type="button"
+                size="sm"
+                className="mt-2"
+                onClick={generateShareLink}
+                disabled={shareBusy}
+              >
+                {shareBusy ? <Loader2 className="animate-spin" /> : <Link2 />} Generar enlace
+              </Button>
+            ) : (
+              <div className="mt-2 space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <code className="min-w-0 flex-1 truncate rounded-md border border-border bg-card px-2 py-1.5 text-xs">
+                    {shareFullLink}
+                  </code>
+                  <Button type="button" variant="outline" size="sm" onClick={copyShareLink}>
+                    <Copy /> {shareCopied ? 'Copiado' : 'Copiar'}
+                  </Button>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Vence el{' '}
+                  {new Date(share.expires_at).toLocaleDateString('es-MX', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric',
+                  })}
+                  . Compártelo por WhatsApp, correo o como prefieras.
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="h-px flex-1 bg-border" />
+            <span className="text-xs text-muted-foreground">o con cuenta del dueño</span>
+            <div className="h-px flex-1 bg-border" />
+          </div>
+        </div>
 
         {!result ? (
           <form onSubmit={submit} className="grid gap-4">

@@ -14,6 +14,12 @@ class ConsentCreate(BaseModel):
     signature_base64: str = Field(min_length=1, description="PNG en base64 (data URI o cruda)")
 
 
+class PendingConsentCreate(BaseModel):
+    pet_id: uuid.UUID
+    title: str = Field(min_length=1, max_length=200)
+    body: str = Field(min_length=1)
+
+
 class ConsentRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -23,6 +29,7 @@ class ConsentRead(BaseModel):
     owner_id: uuid.UUID | None
     title: str
     body: str
-    signature_url: str
-    pdf_url: str
+    status: str
+    signature_url: str | None
+    pdf_url: str | None
     signed_at: datetime

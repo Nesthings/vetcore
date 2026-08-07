@@ -17,6 +17,7 @@ import {
   PawPrint,
   Phone,
   Plus,
+  Send,
   Stethoscope,
   Syringe,
   TriangleAlert,
@@ -101,8 +102,9 @@ interface Consent {
   pet_id: string
   title: string
   body: string
-  signature_url: string
-  pdf_url: string
+  status: string
+  signature_url?: string | null
+  pdf_url?: string | null
   signed_at: string
 }
 
@@ -394,6 +396,7 @@ export function PetDetail() {
   const [inviteOpen, setInviteOpen] = useState(false)
   const [transferOpen, setTransferOpen] = useState(false)
   const [consentOpen, setConsentOpen] = useState(false)
+  const [remoteConsentOpen, setRemoteConsentOpen] = useState(false)
   const [alertType, setAlertType] = useState(ALERT_TYPES[0])
   const [alertDesc, setAlertDesc] = useState('')
   const [alertBusy, setAlertBusy] = useState(false)
@@ -1346,9 +1349,14 @@ export function PetDetail() {
                 <p className="text-sm text-muted-foreground">
                   Consentimientos informados firmados por el dueño.
                 </p>
-                <Button size="sm" onClick={() => setConsentOpen(true)}>
-                  <FileSignature /> Nuevo consentimiento
-                </Button>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => setRemoteConsentOpen(true)}>
+                    <Send /> Para firma del dueño
+                  </Button>
+                  <Button size="sm" onClick={() => setConsentOpen(true)}>
+                    <FileSignature /> Nuevo consentimiento
+                  </Button>
+                </div>
               </div>
               {consents.length === 0 ? (
                 <EmptyState
@@ -1364,32 +1372,48 @@ export function PetDetail() {
                       className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card p-3 shadow-sm"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                        <div
+                          className={`flex size-10 shrink-0 items-center justify-center rounded-lg ${
+                            c.status === 'pending'
+                              ? 'bg-warning/10 text-warning'
+                              : 'bg-primary/10 text-primary'
+                          }`}
+                        >
                           <FileSignature className="size-4" aria-hidden="true" />
                         </div>
                         <div className="min-w-0">
                           <p className="text-sm font-medium">{c.title}</p>
                           <p className="text-xs text-muted-foreground">
-                            Firmado{' '}
-                            {new Date(c.signed_at).toLocaleString('es-MX', {
-                              day: 'numeric',
-                              month: 'short',
-                              year: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
+                            {c.status === 'pending' ? (
+                              'Pendiente de firma del dueño'
+                            ) : (
+                              <>
+                                Firmado{' '}
+                                {new Date(c.signed_at).toLocaleString('es-MX', {
+                                  day: 'numeric',
+                                  month: 'short',
+                                  year: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                              </>
+                            )}
                           </p>
                         </div>
                       </div>
-                      <a
-                        href={c.pdf_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-accent"
-                      >
-                        <FileText className="size-3.5" aria-hidden="true" />
-                        Ver PDF
-                      </a>
+                      {c.status === 'pending' ? (
+                        <Badge variant="warning">Pendiente</Badge>
+                      ) : (
+                        <a
+                          href={c.pdf_url ?? '#'}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-accent"
+                        >
+                          <FileText className="size-3.5" aria-hidden="true" />
+                          Ver PDF
+                        </a>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -1589,6 +1613,20 @@ export function PetDetail() {
           onOpenChange={setConsentOpen}
           onSaved={() => {
             setConsentOpen(false)
+            load()
+          }}
+        />
+      )}
+
+      {pet && (
+        <ConsentDialog
+          petId={pet.id}
+          petName={pet.name}
+          open={remoteConsentOpen}
+          onOpenChange={setRemoteConsentOpen}
+          remote
+          onSaved={() => {
+            setRemoteConsentOpen(false)
             load()
           }}
         />

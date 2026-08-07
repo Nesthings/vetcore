@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { FileSignature, Loader2, PenLine } from 'lucide-react'
+import { FileSignature, Loader2, PenLine, Send } from 'lucide-react'
 
 import { SignaturePad } from '@/components/pets/SignaturePad'
 import { Button } from '@/components/ui/button'
@@ -22,12 +22,14 @@ export function ConsentDialog({
   open,
   onOpenChange,
   onSaved,
+  remote = false,
 }: {
   petId: string
   petName: string
   open: boolean
   onOpenChange: (open: boolean) => void
   onSaved: () => void
+  remote?: boolean
 }) {
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
@@ -39,22 +41,29 @@ export function ConsentDialog({
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
-    if (!signature) {
+    if (!remote && !signature) {
       setError('El dueño debe firmar en la tablet antes de guardar.')
       return
     }
     setSubmitting(true)
     try {
-      await apiFetch('/consents', {
-        method: 'POST',
-        body: JSON.stringify({
-          pet_id: petId,
-          title,
-          body,
-          owner_name: ownerName || null,
-          signature_base64: signature,
-        }),
-      })
+      if (remote) {
+        await apiFetch('/consents/pending', {
+          method: 'POST',
+          body: JSON.stringify({ pet_id: petId, title, body }),
+        })
+      } else {
+        await apiFetch('/consents', {
+          method: 'POST',
+          body: JSON.stringify({
+            pet_id: petId,
+            title,
+            body,
+            owner_name: ownerName || null,
+            signature_base64: signature,
+          }),
+        })
+      }
       onSaved()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo guardar el consentimiento')
@@ -67,9 +76,14 @@ export function ConsentDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Nuevo consentimiento informado</DialogTitle>
+          <DialogTitle>
+            {remote ? 'Consentimiento para firma del dueño' : 'Nuevo consentimiento informado'}
+          </DialogTitle>
           <DialogDescription>
-            {petName} · El dueño firma en la tablet y se genera el PDF.
+            {petName} ·{' '}
+            {remote
+              ? 'Se enviará a la cartilla del dueño para que lo firme a distancia.'
+              : 'El dueño firma en la tablet y se genera el PDF.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -95,23 +109,28 @@ export function ConsentDialog({
               required
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="consent-owner">Nombre del dueño que firma</Label>
-            <Input
-              id="consent-owner"
-              value={ownerName}
-              onChange={(e) => setOwnerName(e.target.value)}
-              placeholder="Nombre del dueño"
-            />
-          </div>
 
-          <div className="rounded-md border border-border p-4">
-            <div className="mb-2 flex items-center gap-2">
-              <PenLine className="size-4 text-primary" aria-hidden="true" />
-              <p className="text-sm font-medium">Firma en tablet</p>
+          {!remote && (
+            <div className="space-y-2">
+              <Label htmlFor="consent-owner">Nombre del dueño que firma</Label>
+              <Input
+                id="consent-owner"
+                value={ownerName}
+                onChange={(e) => setOwnerName(e.target.value)}
+                placeholder="Nombre del dueño"
+              />
             </div>
-            <SignaturePad onDataUrl={setSignature} />
-          </div>
+          )}
+
+          {!remote && (
+            <div className="rounded-md border border-border p-4">
+              <div className="mb-2 flex items-center gap-2">
+                <PenLine className="size-4 text-primary" aria-hidden="true" />
+                <p className="text-sm font-medium">Firma en tablet</p>
+              </div>
+              <SignaturePad onDataUrl={setSignature} />
+            </div>
+          )}
 
           {error && <p className="text-sm text-destructive">{error}</p>}
 
@@ -120,8 +139,14 @@ export function ConsentDialog({
               Cancelar
             </Button>
             <Button type="submit" disabled={submitting}>
-              {submitting ? <Loader2 className="animate-spin" /> : <FileSignature />}
-              Firmar y generar PDF
+              {submitting ? (
+                <Loader2 className="animate-spin" />
+              ) : remote ? (
+                <Send />
+              ) : (
+                <FileSignature />
+              )}
+              {remote ? 'Enviar para firma' : 'Firmar y generar PDF'}
             </Button>
           </DialogFooter>
         </form>
