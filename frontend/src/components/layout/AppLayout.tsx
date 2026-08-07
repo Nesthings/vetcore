@@ -18,7 +18,7 @@ import { cn } from '@/lib/utils'
 import { apiFetch } from '@/lib/api'
 import { usePermissions } from '@/lib/permissions'
 import { useNavConfig } from '@/lib/nav-config'
-import { MODULE_META, NAV_ROUTES, pageBgForPath } from '@/lib/nav'
+import { MODULE_META, NAV_ROUTES } from '@/lib/nav'
 import { NotificationBell } from '@/components/layout/NotificationBell'
 import { ThemeToggle } from '@/components/layout/ThemeToggle'
 
@@ -30,7 +30,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const { pinned, pin } = useNavConfig()
   const { pathname } = useLocation()
   const navigate = useNavigate()
-  const pageBg = pageBgForPath(pathname)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [fullName, setFullName] = useState<string | null>(null)
   const [clinicName, setClinicName] = useState<string>('')
@@ -103,6 +102,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     icon: MODULE_META[i.component].icon,
   }))
 
+  const principalItems = NAV_ITEMS.filter((i) => i.component === 'dashboard')
+  const moduleItems = NAV_ITEMS.filter((i) => i.component !== 'dashboard')
+
   const handleNavDrop = (e: React.DragEvent) => {
     e.preventDefault()
     setNavDragOver(false)
@@ -117,6 +119,42 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   const displayName = fullName ?? user?.role ?? ''
 
+  const navLinkClass = ({ isActive }: { isActive: boolean }) =>
+    cn(
+      'group flex cursor-grab items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all duration-200 active:cursor-grabbing',
+      collapsed && 'justify-center px-2',
+      isActive
+        ? 'bg-primary/10 text-primary'
+        : 'text-muted-foreground hover:bg-accent/70 hover:text-accent-foreground',
+    )
+
+  const renderNavItem = (item: (typeof NAV_ITEMS)[number]) => (
+    <NavLink
+      key={item.to}
+      to={item.to}
+      end={item.end}
+      draggable={item.component !== 'dashboard'}
+      onDragStart={(e) => {
+        e.dataTransfer.setData('text/plain', item.component)
+        e.dataTransfer.effectAllowed = 'move'
+      }}
+      onClick={() => {
+        if (window.innerWidth < 768) setCollapsed(true)
+      }}
+      title={
+        item.component !== 'dashboard'
+          ? collapsed
+            ? item.label
+            : 'Arrastra al Inicio para quitar de la barra'
+          : item.label
+      }
+      className={navLinkClass}
+    >
+      <item.icon className="size-[18px] shrink-0" aria-hidden="true" />
+      {!collapsed && <span className="truncate">{item.label}</span>}
+    </NavLink>
+  )
+
   return (
     <div className="flex min-h-screen bg-background">
       {collapsed === false && (
@@ -128,24 +166,31 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       )}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-40 flex h-screen flex-col overflow-hidden border-r border-border bg-card bg-gradient-to-b from-primary/10 via-transparent to-transparent transition-[width,transform] duration-300 md:sticky md:top-0 md:translate-x-0',
-          collapsed ? '-translate-x-full md:w-0 md:translate-x-0' : 'w-60 translate-x-0',
+          'fixed inset-y-0 left-0 z-40 flex h-screen flex-col overflow-hidden border-r border-border bg-card transition-[width,transform] duration-300 md:sticky md:top-0 md:translate-x-0',
+          collapsed ? 'w-16 -translate-x-full md:w-16 md:translate-x-0' : 'w-64 translate-x-0',
         )}
       >
-        <div className="flex items-center gap-2 border-b border-border px-4 py-4">
-          <div className="bg-brand-gradient flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-lg text-primary-foreground shadow-glow">
+        <div
+          className={cn(
+            'flex items-center gap-2.5 border-b border-border px-4 py-4',
+            collapsed && 'justify-center px-2',
+          )}
+        >
+          <div className="bg-brand-gradient flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-xl text-primary-foreground shadow-card">
             {clinicLogoUrl ? (
               <img src={clinicLogoUrl} alt={clinicName} className="size-full object-cover" />
             ) : (
               <PawPrint className="size-5" aria-hidden="true" />
             )}
           </div>
-          <div className="min-w-0 flex-1 leading-tight">
-            <p className="break-words text-sm font-semibold text-foreground">
-              {clinicName || 'VetCore'}
-            </p>
-            <p className="text-xs text-muted-foreground">Panel clínico</p>
-          </div>
+          {!collapsed && (
+            <div className="min-w-0 flex-1 leading-tight">
+              <p className="break-words font-display text-sm font-semibold text-foreground">
+                {clinicName || 'VetCore'}
+              </p>
+              <p className="text-xs text-muted-foreground">Panel clínico</p>
+            </div>
+          )}
         </div>
 
         <nav
@@ -157,53 +202,40 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           onDragLeave={() => setNavDragOver(false)}
           onDrop={handleNavDrop}
           className={cn(
-            'flex-1 space-y-1 p-3 transition-colors',
+            'flex-1 space-y-4 overflow-y-auto p-3 transition-colors',
             navDragOver && 'rounded-lg bg-primary/10 outline-2 outline-dashed outline-primary/40',
           )}
         >
-          {NAV_ITEMS.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.end}
-              draggable={item.component !== 'dashboard'}
-              onDragStart={(e) => {
-                e.dataTransfer.setData('text/plain', item.component)
-                e.dataTransfer.effectAllowed = 'move'
-              }}
-              onClick={() => {
-                if (window.innerWidth < 768) setCollapsed(true)
-              }}
-              title={
-                item.component !== 'dashboard'
-                  ? 'Arrastra al Inicio para quitar de la barra'
-                  : undefined
-              }
-              className={({ isActive }) =>
-                cn(
-                  'flex cursor-grab items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all duration-200 active:cursor-grabbing',
-                  isActive
-                    ? 'bg-gradient-to-r from-primary to-primary-hover text-primary-foreground shadow-glow'
-                    : 'text-muted-foreground hover:bg-accent/70 hover:text-accent-foreground',
-                )
-              }
-            >
-              <item.icon className="size-4" aria-hidden="true" />
-              {item.label}
-            </NavLink>
-          ))}
+          <div className="space-y-1">
+            {!collapsed && (
+              <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/80">
+                Principal
+              </p>
+            )}
+            {principalItems.map(renderNavItem)}
+          </div>
+          {moduleItems.length > 0 && (
+            <div className="space-y-1">
+              {!collapsed && (
+                <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/80">
+                  Módulos
+                </p>
+              )}
+              {moduleItems.map(renderNavItem)}
+            </div>
+          )}
         </nav>
       </aside>
 
-      <main className="min-w-0 flex-1">
-        <header className="sticky top-0 z-10 flex h-14 items-center justify-between gap-3 border-b border-border/70 bg-background/80 bg-gradient-to-b from-primary/[0.06] via-transparent to-transparent px-6 backdrop-blur">
-          <div className="flex items-center gap-3">
+      <main className="flex min-w-0 flex-1 flex-col">
+        <header className="sticky top-0 z-10 flex h-16 items-center justify-between gap-3 border-b border-border/80 bg-background/85 px-4 backdrop-blur sm:px-6">
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => setCollapsed((c) => !c)}
               title={collapsed ? 'Expandir menú (Ctrl+Shift+B)' : 'Colapsar menú (Ctrl+Shift+B)'}
               aria-label={collapsed ? 'Expandir menú' : 'Colapsar menú'}
-              className="flex size-9 items-center justify-center rounded-md border border-border bg-card text-muted-foreground transition-colors hover:bg-accent"
+              className="flex size-9 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground shadow-card transition-colors hover:bg-accent hover:text-foreground"
             >
               {collapsed ? (
                 <PanelLeftOpen className="size-4" aria-hidden="true" />
@@ -214,15 +246,15 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             {pathname !== '/' && (
               <NavLink
                 to="/"
-                className="flex size-9 items-center justify-center rounded-md border border-border bg-card text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                className="flex size-9 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground shadow-card transition-colors hover:bg-accent hover:text-foreground"
                 title="Volver al inicio"
                 aria-label="Volver al inicio"
               >
                 <Home className="size-4" aria-hidden="true" />
               </NavLink>
             )}
-            <p className="text-sm text-muted-foreground">
-              Hola, <span className="font-medium text-foreground">{displayName}</span>
+            <p className="ml-1 hidden text-sm text-muted-foreground sm:block">
+              Hola, <span className="font-semibold text-foreground">{displayName}</span>
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -232,7 +264,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               <button
                 type="button"
                 onClick={() => setProfileOpen((o) => !o)}
-                className="flex size-9 items-center justify-center overflow-hidden rounded-full border border-border bg-secondary text-xs font-semibold text-secondary-foreground transition-colors hover:bg-accent"
+                className="flex size-9 items-center justify-center overflow-hidden rounded-full border-2 border-primary/30 bg-secondary text-xs font-semibold text-secondary-foreground transition-colors hover:bg-accent"
                 aria-label="Menú de perfil"
               >
                 {avatarUrl ? (
@@ -243,77 +275,77 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               </button>
 
               {profileOpen && (
-                <div className="absolute right-0 top-12 z-50 w-56 overflow-hidden rounded-xl border border-border bg-card shadow-dialog">
-                  <div className="border-b border-border px-3 py-2.5">
+                <div className="absolute right-0 top-12 z-50 w-60 overflow-hidden rounded-xl border border-border bg-card shadow-dialog">
+                  <div className="border-b border-border bg-muted/40 px-3 py-3">
                     <p className="truncate text-sm font-semibold text-foreground">{displayName}</p>
                     <p className="text-xs capitalize text-muted-foreground">{user?.role}</p>
                   </div>
-                  <NavLink
-                    to="/profile"
-                    onClick={() => setProfileOpen(false)}
-                    className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-                  >
-                    <UserRound className="size-4" aria-hidden="true" />
-                    Ver perfil
-                  </NavLink>
-                  {hasComponent('settings') && (
+                  <div className="p-1.5">
                     <NavLink
-                      to="/settings"
+                      to="/profile"
                       onClick={() => setProfileOpen(false)}
-                      className="flex items-center gap-3 border-t border-border px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                      className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
                     >
-                      <Settings2 className="size-4" aria-hidden="true" />
-                      Configuración de la clínica
+                      <UserRound className="size-4" aria-hidden="true" />
+                      Ver perfil
                     </NavLink>
-                  )}
-                  {hasComponent('audit') && (
-                    <NavLink
-                      to="/audit"
-                      onClick={() => setProfileOpen(false)}
-                      className="flex items-center gap-3 border-t border-border px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                    {hasComponent('settings') && (
+                      <NavLink
+                        to="/settings"
+                        onClick={() => setProfileOpen(false)}
+                        className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                      >
+                        <Settings2 className="size-4" aria-hidden="true" />
+                        Configuración de la clínica
+                      </NavLink>
+                    )}
+                    {hasComponent('audit') && (
+                      <NavLink
+                        to="/audit"
+                        onClick={() => setProfileOpen(false)}
+                        className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                      >
+                        <History className="size-4" aria-hidden="true" />
+                        Bitácora
+                      </NavLink>
+                    )}
+                    {hasComponent('invoices') && (
+                      <NavLink
+                        to="/invoices"
+                        onClick={() => setProfileOpen(false)}
+                        className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                      >
+                        <Receipt className="size-4" aria-hidden="true" />
+                        Facturación
+                      </NavLink>
+                    )}
+                    {user?.role === 'admin' || user?.role === 'veterinario' ? (
+                      <NavLink
+                        to="/movil"
+                        onClick={() => setProfileOpen(false)}
+                        className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                      >
+                        <Smartphone className="size-4" aria-hidden="true" />
+                        Modo veterinario (móvil)
+                      </NavLink>
+                    ) : null}
+                  </div>
+                  <div className="border-t border-border p-1.5">
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10"
                     >
-                      <History className="size-4" aria-hidden="true" />
-                      Bitácora
-                    </NavLink>
-                  )}
-                  {hasComponent('invoices') && (
-                    <NavLink
-                      to="/invoices"
-                      onClick={() => setProfileOpen(false)}
-                      className="flex items-center gap-3 border-t border-border px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-                    >
-                      <Receipt className="size-4" aria-hidden="true" />
-                      Facturación
-                    </NavLink>
-                  )}
-                  {user?.role === 'admin' || user?.role === 'veterinario' ? (
-                    <NavLink
-                      to="/movil"
-                      onClick={() => setProfileOpen(false)}
-                      className="flex items-center gap-3 border-t border-border px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-                    >
-                      <Smartphone className="size-4" aria-hidden="true" />
-                      Modo veterinario (móvil)
-                    </NavLink>
-                  ) : null}
-                  <button
-                    type="button"
-                    onClick={handleLogout}
-                    className="flex w-full items-center gap-3 border-t border-border px-3 py-2.5 text-sm font-medium text-destructive transition-colors hover:bg-accent"
-                  >
-                    <LogOut className="size-4" aria-hidden="true" />
-                    Cerrar sesión
-                  </button>
+                      <LogOut className="size-4" aria-hidden="true" />
+                      Cerrar sesión
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
           </div>
         </header>
-        <div
-          className={cn('p-6', pageBg && 'bg-gradient-to-b via-transparent to-transparent', pageBg)}
-        >
-          {children}
-        </div>
+        <div className="flex-1 p-4 sm:p-6">{children}</div>
       </main>
     </div>
   )

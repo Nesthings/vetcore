@@ -6,56 +6,56 @@
 /*
  * ============================================================================
  * DESIGN SYSTEM — VetCore
- * Paleta neutra (grafito/plata) + acentos en familia pastel.
+ * Dirección visual: "papel clínico cálido" + verde clínico profundo.
  *
- * Los módulos del Inicio aportan el color (rojo, naranja, azul, morado, verde,
- * rosa, amarillo, peach); el "cromo" de la interfaz es neutro para ser
- * compatible con todos y darles protagonismo. Consistente en día y noche.
- *
- * - Tipografía: Inter (Google Fonts) con jerarquía por pesos y tamaños.
- * - Espaciado: escala de 4px/8px (default de Tailwind).
- * - Radios, sombras y estados definidos deliberadamente, no defaults genéricos.
+ * - Neutrales cálidos (nada de gris frío de template) para dar calidez.
+ * - Primario verde clínico (confianza + salud) como identidad.
+ * - Acentos pastel por módulo (rojo, naranja, azul, morado, verde, rosa,
+ *   ámbar, peach) que aportan los módulos; el "cromo" es cálido y neutro.
+ * - Tipografía: Plus Jakarta Sans (display) + Geist (UI) + Geist Mono (código).
+ * - Sombras difusas y moderadas (soft structuralism).
+ * Consistente en día y noche.
  * ============================================================================
  */
 
 :root {
-  --radius: 0.625rem;
+  --radius: 0.75rem;
 
-  /* Neutrales base (sin tinte, para que resalten los pasteles) */
-  --background: #f7f7f8;
-  --foreground: #18181b;
+  /* Neutrales cálidos "papel" */
+  --background: #faf9f6;
+  --foreground: #212725;
   --card: #ffffff;
-  --card-foreground: #18181b;
+  --card-foreground: #212725;
   --popover: #ffffff;
-  --popover-foreground: #18181b;
+  --popover-foreground: #212725;
 
-  /* Primario: grafito neutro (botones, links, ítem activo) */
-  --primary: #3f3f46;
-  --primary-hover: #27272a;
+  /* Primario: verde clínico profundo */
+  --primary: #1e6f5e;
+  --primary-hover: #175447;
   --primary-foreground: #ffffff;
 
-  /* Superficies secundarias y acentos (grises neutros) */
-  --secondary: #f1f1f3;
-  --secondary-foreground: #3f3f46;
-  --muted: #f4f4f5;
-  --muted-foreground: #6b7280;
-  --accent: #eceef0;
-  --accent-foreground: #27272a;
+  /* Superficies secundarias y acentos (cálidos) */
+  --secondary: #f2f0e9;
+  --secondary-foreground: #2e3632;
+  --muted: #f4f2ec;
+  --muted-foreground: #5c6763;
+  --accent: #eeece4;
+  --accent-foreground: #1e2623;
 
   /* Estados semánticos */
-  --destructive: #dc2626;
+  --destructive: #b4453a;
   --destructive-foreground: #ffffff;
-  --success: #16a34a;
+  --success: #2e7d5b;
   --success-foreground: #ffffff;
-  --warning: #d97706;
+  --warning: #c26e16;
   --warning-foreground: #ffffff;
-  --info: #0284c7;
+  --info: #3a6ea5;
   --info-foreground: #ffffff;
 
   /* Bordes y anillos */
-  --border: #e4e4e7;
-  --input: #d4d4d8;
-  --ring: #3f3f46;
+  --border: #e7e3da;
+  --input: #ddd9ce;
+  --ring: #1e6f5e;
 
   /* Colores de gráficas — familia pastel (mismo lenguaje que los módulos) */
   --chart-1: #ef4444;
@@ -66,32 +66,32 @@
 }
 
 .dark {
-  --background: #121215;
-  --foreground: #e7e7ea;
-  --card: #1a1a1e;
-  --card-foreground: #e7e7ea;
-  --popover: #1a1a1e;
-  --popover-foreground: #e7e7ea;
-  --primary: #e4e4e7;
-  --primary-hover: #ffffff;
-  --primary-foreground: #18181b;
-  --secondary: #232327;
-  --secondary-foreground: #d4d4d8;
-  --muted: #1e1e22;
-  --muted-foreground: #9ca3af;
-  --accent: #26262b;
-  --accent-foreground: #e4e4e7;
-  --destructive: #f87171;
-  --destructive-foreground: #3b0a0a;
-  --success: #4ade80;
-  --success-foreground: #082b17;
-  --warning: #fbbf24;
-  --warning-foreground: #3b2706;
-  --info: #38bdf8;
-  --info-foreground: #0b1b33;
-  --border: #2a2a30;
-  --input: #34343b;
-  --ring: #e4e4e7;
+  --background: #121816;
+  --foreground: #e8ece9;
+  --card: #1a211e;
+  --card-foreground: #e8ece9;
+  --popover: #1a211e;
+  --popover-foreground: #e8ece9;
+  --primary: #34a88c;
+  --primary-hover: #45b89c;
+  --primary-foreground: #06231b;
+  --secondary: #232b27;
+  --secondary-foreground: #cdd6d1;
+  --muted: #1e2622;
+  --muted-foreground: #9aa6a0;
+  --accent: #262f2b;
+  --accent-foreground: #e8ece9;
+  --destructive: #e0706a;
+  --destructive-foreground: #3a0c0a;
+  --success: #5bc49b;
+  --success-foreground: #06231b;
+  --warning: #e5a05a;
+  --warning-foreground: #3a2406;
+  --info: #6fa6d9;
+  --info-foreground: #0a1e33;
+  --border: #2b342f;
+  --input: #37413b;
+  --ring: #34a88c;
   --chart-1: #f87171;
   --chart-2: #fb923c;
   --chart-3: #38bdf8;
@@ -134,27 +134,33 @@
 
   /* Tipografía del sistema */
   --font-sans:
-    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
     sans-serif;
+  --font-display:
+    'Plus Jakarta Sans', 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial,
+    sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
-  /* Radios coherentes sobre la base de 0.625rem */
+  /* Radios coherentes sobre la base de 0.75rem */
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 
-  /* Sombras de elevación propias (sin "sombras genéricas" de template) */
-  --shadow-card: 0 1px 2px 0 rgb(24 24 27 / 0.05), 0 1px 3px 0 rgb(24 24 27 / 0.07);
-  --shadow-elevated: 0 4px 12px -2px rgb(24 24 27 / 0.12), 0 2px 4px -2px rgb(24 24 27 / 0.06);
-  --shadow-dialog: 0 12px 32px -4px rgb(24 24 27 / 0.2), 0 4px 8px -4px rgb(24 24 27 / 0.09);
+  /* Sombras difusas y moderadas (soft structuralism) */
+  --shadow-card: 0 1px 2px 0 rgb(24 34 30 / 0.05), 0 8px 24px -16px rgb(24 34 30 / 0.1);
+  --shadow-elevated: 0 12px 32px -16px rgb(24 34 30 / 0.16);
+  --shadow-dialog: 0 24px 64px -24px rgb(24 34 30 / 0.24);
 
   /* Resplandores al hover ("iluminan" el elemento) */
-  --shadow-glow: 0 10px 34px -8px rgb(63 63 70 / 0.45), 0 2px 10px -4px rgb(63 63 70 / 0.22);
-  --shadow-glow-success: 0 10px 34px -8px rgb(22 163 74 / 0.45), 0 2px 10px -4px rgb(22 163 74 / 0.22);
-  --shadow-glow-destructive: 0 10px 34px -8px rgb(220 38 38 / 0.42), 0 2px 10px -4px rgb(220 38 38 / 0.22);
+  --shadow-glow: 0 10px 34px -8px rgb(30 111 94 / 0.45), 0 2px 10px -4px rgb(30 111 94 / 0.22);
+  --shadow-glow-success:
+    0 10px 34px -8px rgb(46 125 91 / 0.45), 0 2px 10px -4px rgb(46 125 91 / 0.22);
+  --shadow-glow-destructive:
+    0 10px 34px -8px rgb(180 69 58 / 0.42), 0 2px 10px -4px rgb(180 69 58 / 0.22);
 
-  /* Gradiente de marca (grafito) para acentos */
-  --gradient-brand: linear-gradient(135deg, var(--primary) 0%, #71717a 100%);
+  /* Gradiente de marca (verde) para acentos */
+  --gradient-brand: linear-gradient(135deg, var(--primary) 0%, #2e8b72 100%);
 }
 
 @layer base {
@@ -163,30 +169,24 @@
   }
 
   body {
-    @apply text-foreground antialiased;
+    @apply font-sans text-foreground antialiased;
     background-color: var(--background);
-    background-image:
-      radial-gradient(1100px 520px at 100% -5%, rgb(161 161 170 / 0.1), transparent 60%),
-      radial-gradient(900px 480px at -5% 100%, rgb(228 228 231 / 0.25), transparent 55%),
-      linear-gradient(180deg, var(--background) 0%, #f0f0f2 45%, var(--background) 100%);
-    background-attachment: fixed;
     font-feature-settings: 'cv11', 'ss01';
     text-rendering: optimizeLegibility;
   }
 
-  .dark body {
-    background-image:
-      radial-gradient(1100px 520px at 100% -5%, rgb(161 161 170 / 0.08), transparent 60%),
-      radial-gradient(900px 480px at -5% 100%, rgb(63 63 70 / 0.18), transparent 55%),
-      linear-gradient(180deg, var(--background) 0%, #1a1a1e 45%, var(--background) 100%);
+  /* Jerarquía tipográfica base (display cálida) */
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
   }
-
-  /* Jerarquía tipográfica base */
   h1 {
-    @apply text-3xl font-semibold tracking-tight;
+    @apply text-3xl font-bold tracking-tight;
   }
   h2 {
-    @apply text-2xl font-semibold tracking-tight;
+    @apply text-2xl font-bold tracking-tight;
   }
   h3 {
     @apply text-xl font-semibold;
