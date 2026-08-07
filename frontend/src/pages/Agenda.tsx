@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { CalendarPlus, CalendarX2, ChevronLeft, ChevronRight, Clock } from 'lucide-react'
+import {
+  CalendarCheck2,
+  CalendarClock,
+  CalendarPlus,
+  CalendarX2,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  XCircle,
+} from 'lucide-react'
 
 import { AppLayout } from '@/components/layout/AppLayout'
 import { AppointmentDetailDialog } from '@/components/agenda/AppointmentDetailDialog'
@@ -47,6 +57,30 @@ export interface ScheduleBlock {
 }
 
 const DAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
+
+function MiniStat({
+  label,
+  value,
+  icon: Icon,
+  tint,
+}: {
+  label: string
+  value: number
+  icon: React.ElementType
+  tint: string
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-border bg-card p-3 shadow-card">
+      <span className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${tint}`}>
+        <Icon className="size-4" aria-hidden="true" />
+      </span>
+      <div className="min-w-0">
+        <p className="text-lg font-bold leading-none text-foreground">{value}</p>
+        <p className="mt-0.5 truncate text-xs text-muted-foreground">{label}</p>
+      </div>
+    </div>
+  )
+}
 
 function startOfWeek(d: Date): Date {
   const copy = new Date(d)
@@ -127,6 +161,15 @@ export function Agenda() {
     })
   }
 
+  const stats = useMemo(() => {
+    const scheduled = appointments.filter((a) => a.status === 'scheduled').length
+    const confirmed = appointments.filter((a) => a.status === 'confirmed').length
+    const completed = appointments.filter((a) => a.status === 'completed').length
+    const cancelled = appointments.filter((a) => a.status === 'cancelled').length
+    const noShow = appointments.filter((a) => a.status === 'no_show').length
+    return { scheduled, confirmed, completed, cancelled, noShow }
+  }, [appointments])
+
   return (
     <AppLayout>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -174,13 +217,13 @@ export function Agenda() {
             </Button>
           </div>
 
-          <div className="flex overflow-hidden rounded-md border border-border bg-card">
+          <div className="flex overflow-hidden rounded-full border border-border bg-card">
             {(['day', 'week'] as const).map((v) => (
               <button
                 key={v}
                 type="button"
                 onClick={() => setView(v)}
-                className={`px-3 py-2 text-sm font-medium transition-colors ${
+                className={`px-4 py-2 text-sm font-medium transition-colors ${
                   view === v
                     ? 'bg-primary text-primary-foreground'
                     : 'text-muted-foreground hover:bg-accent'
@@ -191,7 +234,7 @@ export function Agenda() {
             ))}
           </div>
 
-          <Button size="sm" onClick={() => setBlockOpen(true)}>
+          <Button variant="outline" size="sm" onClick={() => setBlockOpen(true)}>
             <CalendarX2 />
             Bloquear
           </Button>
@@ -201,6 +244,35 @@ export function Agenda() {
           </Button>
         </div>
       </div>
+
+      {!loading && !error && (
+        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <MiniStat
+            label="Por atender"
+            value={stats.scheduled + stats.confirmed}
+            icon={CalendarCheck2}
+            tint="bg-info/10 text-info"
+          />
+          <MiniStat
+            label="Pendientes de confirmar"
+            value={stats.scheduled}
+            icon={CalendarClock}
+            tint="bg-warning/10 text-warning"
+          />
+          <MiniStat
+            label="Completadas"
+            value={stats.completed}
+            icon={CheckCircle2}
+            tint="bg-success/10 text-success"
+          />
+          <MiniStat
+            label="Canceladas / No asistió"
+            value={stats.cancelled + stats.noShow}
+            icon={XCircle}
+            tint="bg-destructive/10 text-destructive"
+          />
+        </div>
+      )}
 
       {error && <ErrorState description={error} onRetry={loadData} className="mb-6" />}
       {loading && <LoadingState label="Cargando agenda…" />}

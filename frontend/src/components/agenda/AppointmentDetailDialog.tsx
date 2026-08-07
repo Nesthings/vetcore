@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Bell, Check, CircleCheck, Loader2, X } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Bell, Check, CircleCheck, ClipboardPlus, Loader2, X } from 'lucide-react'
 
 import { statusBadge } from '@/components/agenda/TimeGrid'
 import { Badge } from '@/components/ui/badge'
@@ -66,6 +67,7 @@ export function AppointmentDetailDialog({
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [schedule, setSchedule] = useState<ReminderSchedule | null>(null)
+  const navigate = useNavigate()
 
   useEffect(() => {
     if (open) {
@@ -158,6 +160,15 @@ export function AppointmentDetailDialog({
           </div>
 
           <div className="flex flex-wrap gap-2">
+            {appointment.pet_id && (
+              <Button
+                variant="success"
+                size="sm"
+                onClick={() => navigate(`/consultas/nueva?pet=${appointment.pet_id}`)}
+              >
+                <ClipboardPlus /> Atender (Nueva consulta)
+              </Button>
+            )}
             <Button size="sm" variant="outline" onClick={() => setStatus('confirmed')}>
               <Check /> Confirmar
             </Button>
