@@ -370,6 +370,41 @@ function Stat({
   )
 }
 
+function SectionHeading({
+  icon: Icon,
+  title,
+  subtitle,
+  tint = 'primary',
+}: {
+  icon: React.ElementType
+  title: string
+  subtitle?: string
+  tint?: 'primary' | 'warning' | 'success' | 'destructive' | 'info'
+}) {
+  const tints: Record<string, string> = {
+    primary: 'bg-primary/10 text-primary',
+    warning: 'bg-warning/10 text-warning',
+    success: 'bg-success/10 text-success',
+    destructive: 'bg-destructive/10 text-destructive',
+    info: 'bg-info/10 text-info',
+  }
+  return (
+    <div className="flex items-center gap-2.5">
+      <span
+        className={cn('flex size-7 shrink-0 items-center justify-center rounded-lg', tints[tint])}
+      >
+        <Icon className="size-4" aria-hidden="true" />
+      </span>
+      <div className="min-w-0">
+        <h2 className="font-display text-sm font-semibold uppercase tracking-[0.12em] text-foreground">
+          {title}
+        </h2>
+        {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
+      </div>
+    </div>
+  )
+}
+
 export function PetDetail() {
   const { id } = useParams<{ id: string }>()
   const [pet, setPet] = useState<Pet | null>(null)
@@ -608,8 +643,8 @@ export function PetDetail() {
       {loading && <LoadingState label="Cargando ficha…" />}
 
       {pet && !error && (
-        <div className="space-y-6">
-          <div className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-card">
+        <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
+          <div className="relative overflow-hidden">
             {(() => {
               const male = isMale(pet.sex)
               const female = isFemale(pet.sex)
@@ -642,7 +677,7 @@ export function PetDetail() {
                     className={`pointer-events-none absolute inset-0 bg-gradient-to-b ${accent.gradient}`}
                     aria-hidden="true"
                   />
-                  <CardContent className="relative flex flex-col items-center p-8 text-center">
+                  <div className="relative flex flex-col items-center p-6 pt-8 text-center sm:p-8">
                     <div className="relative">
                       <div
                         className={`flex size-44 items-center justify-center overflow-hidden rounded-[2rem] border-4 ${accent.ring} bg-secondary/60 shadow-elevated ${accent.glow}`}
@@ -745,14 +780,14 @@ export function PetDetail() {
                         <UserRoundCog /> Transferir dueño
                       </Button>
                     </div>
-                  </CardContent>
+                  </div>
                 </>
               )
             })()}
           </div>
 
           {pet.clinical_alert_text && (
-            <div className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+            <div className="flex items-start gap-3 border-t border-border bg-destructive/5 px-5 py-3 text-sm text-destructive sm:px-6">
               <TriangleAlert className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
               <div>
                 <p className="font-semibold">Alerta clínica</p>
@@ -761,15 +796,10 @@ export function PetDetail() {
             </div>
           )}
 
-          <div className="grid gap-6 lg:grid-cols-2">
-            <Card className="shadow-card">
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <UserRound className="size-4 text-primary" aria-hidden="true" />
-                  Dueño
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
+          <div className="grid border-t border-border lg:grid-cols-2 lg:divide-x lg:divide-border">
+            <div className="p-5 sm:p-6">
+              <SectionHeading icon={UserRound} title="Dueño" />
+              <div className="mt-3 space-y-3">
                 {!pet.owners || pet.owners.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
                     Sin dueño registrado. Usa «Invitar dueño» o «Transferir dueño».
@@ -848,17 +878,12 @@ export function PetDetail() {
                     )
                   })
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </div>
 
-            <Card className="border-warning/40 shadow-card">
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <TriangleAlert className="size-4 text-warning" aria-hidden="true" />
-                  Alertas clínicas
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
+            <div className="p-5 sm:p-6">
+              <SectionHeading icon={TriangleAlert} title="Alertas clínicas" tint="warning" />
+              <div className="mt-3 space-y-3">
                 {alerts.length === 0 ? (
                   <p className="text-sm text-muted-foreground">Sin alertas registradas.</p>
                 ) : (
@@ -915,23 +940,21 @@ export function PetDetail() {
                     {alertBusy ? <Loader2 className="animate-spin" /> : <Plus />} Agregar
                   </Button>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </div>
 
-          <Card className="shadow-card">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Syringe className="size-4 text-primary" aria-hidden="true" />
-                Carnet de vacunación
-              </CardTitle>
-              <CardDescription>
-                {carnet.length > 0
+          <div className="border-t border-border p-5 sm:p-6">
+            <SectionHeading
+              icon={Syringe}
+              title="Carnet de vacunación"
+              subtitle={
+                carnet.length > 0
                   ? `Esquema estándar para ${speciesLabel(carnetSpecies)} · Cartilla Nacional de Vacunación (México)`
-                  : 'Sin esquema estándar definido para esta especie'}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+                  : 'Sin esquema estándar definido para esta especie'
+              }
+            />
+            <div className="mt-3">
               {carnet.length === 0 ? (
                 <EmptyState
                   title="Sin esquema de vacunación"
@@ -1067,471 +1090,475 @@ export function PetDetail() {
                   </div>
                 </>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
-          <Tabs defaultValue="timeline" className="space-y-5">
-            <TabsList className="w-full justify-start gap-1 overflow-x-auto rounded-xl border border-border bg-card p-1 sm:w-auto sm:overflow-visible">
-              <TabsTrigger value="timeline" className="gap-1.5">
-                <History className="size-4" aria-hidden="true" />
-                Línea de tiempo
-              </TabsTrigger>
-              <TabsTrigger value="peso" className="gap-1.5">
-                <Weight className="size-4" aria-hidden="true" />
-                Peso
-              </TabsTrigger>
-              <TabsTrigger value="fotos" className="gap-1.5">
-                <Camera className="size-4" aria-hidden="true" />
-                Fotos
-              </TabsTrigger>
-              <TabsTrigger value="consents" className="gap-1.5">
-                <FileSignature className="size-4" aria-hidden="true" />
-                Consentimientos
-              </TabsTrigger>
-              <TabsTrigger value="vacunacion" className="gap-1.5">
-                <Syringe className="size-4" aria-hidden="true" />
-                Vacunación
-              </TabsTrigger>
-              <TabsTrigger value="familia" className="gap-1.5">
-                <Users className="size-4" aria-hidden="true" />
-                Familia
-              </TabsTrigger>
-            </TabsList>
+          <div className="border-t border-border p-5 sm:p-6">
+            <Tabs defaultValue="timeline" className="space-y-5">
+              <TabsList className="w-full justify-start gap-1 overflow-x-auto rounded-xl border border-border bg-card p-1 sm:w-auto sm:overflow-visible">
+                <TabsTrigger value="timeline" className="gap-1.5">
+                  <History className="size-4" aria-hidden="true" />
+                  Línea de tiempo
+                </TabsTrigger>
+                <TabsTrigger value="peso" className="gap-1.5">
+                  <Weight className="size-4" aria-hidden="true" />
+                  Peso
+                </TabsTrigger>
+                <TabsTrigger value="fotos" className="gap-1.5">
+                  <Camera className="size-4" aria-hidden="true" />
+                  Fotos
+                </TabsTrigger>
+                <TabsTrigger value="consents" className="gap-1.5">
+                  <FileSignature className="size-4" aria-hidden="true" />
+                  Consentimientos
+                </TabsTrigger>
+                <TabsTrigger value="vacunacion" className="gap-1.5">
+                  <Syringe className="size-4" aria-hidden="true" />
+                  Vacunación
+                </TabsTrigger>
+                <TabsTrigger value="familia" className="gap-1.5">
+                  <Users className="size-4" aria-hidden="true" />
+                  Familia
+                </TabsTrigger>
+              </TabsList>
 
-            <TabsContent value="timeline">
-              {timeline.length === 0 ? (
-                <EmptyState
-                  title="Sin actividad"
-                  description="Aún no hay consultas ni citas para este paciente."
-                  icon={History}
-                />
-              ) : (
-                <div className="relative space-y-4 pl-10">
-                  <div className="absolute bottom-2 left-4 top-2 w-px bg-gradient-to-b from-primary/40 via-border to-transparent" />
-                  {timeline.map((e) => {
-                    const isConsulta = e.type === 'consulta'
-                    const isFoto = e.type === 'foto'
-                    const st = CITA_STATUS[e.status ?? ''] ?? {
-                      label: e.status ?? '',
-                      variant: 'secondary',
-                    }
-                    return (
-                      <div key={`${e.type}-${e.id}`} className="relative">
-                        <span
-                          className={`absolute -left-10 top-1 flex size-8 items-center justify-center rounded-full border-4 border-background shadow-card ${
-                            isConsulta
-                              ? 'bg-sky-500 text-white'
-                              : isFoto
-                                ? 'bg-violet-500 text-white'
-                                : 'bg-primary text-primary-foreground'
-                          }`}
-                        >
-                          {isConsulta ? (
-                            <Stethoscope className="size-3.5" aria-hidden="true" />
-                          ) : isFoto ? (
-                            <Camera className="size-3.5" aria-hidden="true" />
-                          ) : (
-                            <CalendarDays className="size-3.5" aria-hidden="true" />
-                          )}
-                        </span>
-                        <Card className="overflow-hidden shadow-card transition-shadow hover:shadow-elevated">
-                          <CardContent className="p-4">
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                              <div className="flex items-center gap-2">
-                                <p className="text-sm font-semibold">{e.title}</p>
-                                {isConsulta ? (
-                                  <Badge variant="success">Consulta</Badge>
-                                ) : isFoto ? (
-                                  <Badge
-                                    variant="outline"
-                                    className="text-violet-600 dark:text-violet-300"
-                                  >
-                                    Foto
-                                  </Badge>
-                                ) : (
-                                  st.label && <Badge variant={st.variant}>{st.label}</Badge>
-                                )}
-                              </div>
-                              <span className="rounded-md bg-muted/60 px-2 py-1 text-xs font-medium text-muted-foreground">
-                                {new Date(e.date).toLocaleString('es-MX', {
-                                  day: 'numeric',
-                                  month: 'short',
-                                  year: 'numeric',
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                })}
-                              </span>
-                            </div>
-                            {e.subtitle && (
-                              <p className="mt-2 text-xs text-muted-foreground">{e.subtitle}</p>
-                            )}
-                            {isFoto && e.url && (
-                              <img
-                                src={e.url}
-                                alt={e.title}
-                                className="mt-2 aspect-video w-full max-w-xs rounded-lg border border-border/60 object-cover"
-                              />
-                            )}
-                            {e.author && (
-                              <p className="mt-1.5 text-xs text-muted-foreground/70">{e.author}</p>
-                            )}
-                          </CardContent>
-                        </Card>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </TabsContent>
-
-            <TabsContent value="peso">
-              <Card className="shadow-card">
-                <CardHeader className="flex-row items-start justify-between space-y-0">
-                  <div>
-                    <CardTitle>Peso histórico</CardTitle>
-                    <CardDescription>
-                      Serie de tiempo por consulta (el default visual es el último valor)
-                    </CardDescription>
-                  </div>
-                  {latestWeight != null && (
-                    <div className="text-right">
-                      <p className="text-3xl font-bold tracking-tight text-foreground">
-                        {latestWeight} <span className="text-lg font-semibold">kg</span>
-                      </p>
-                      {weightDelta != null && (
-                        <p
-                          className={`text-xs font-medium ${
-                            weightDelta > 0
-                              ? 'text-success'
-                              : weightDelta < 0
-                                ? 'text-destructive'
-                                : 'text-muted-foreground'
-                          }`}
-                        >
-                          {weightDelta > 0 ? '▲ +' : weightDelta < 0 ? '▼ ' : '= '}
-                          {Math.abs(weightDelta).toFixed(2)} kg vs. registro anterior
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </CardHeader>
-                <CardContent className="h-72">
-                  {weights.length === 0 ? (
-                    <EmptyState
-                      title="Sin registros de peso"
-                      description="Aún no hay pesajes registrados."
-                      icon={Weight}
-                    />
-                  ) : (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart
-                        data={weightChart}
-                        margin={{ top: 8, right: 8, left: -20, bottom: 0 }}
-                      >
-                        <CartesianGrid
-                          strokeDasharray="3 3"
-                          stroke="var(--border)"
-                          vertical={false}
-                        />
-                        <XAxis
-                          dataKey="fecha"
-                          tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }}
-                          tickLine={false}
-                          axisLine={false}
-                        />
-                        <YAxis
-                          domain={['auto', 'auto']}
-                          tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }}
-                          tickLine={false}
-                          axisLine={false}
-                        />
-                        <Tooltip formatter={(v) => [`${v} kg`, 'Peso']} />
-                        <Line
-                          type="monotone"
-                          dataKey="peso"
-                          stroke="var(--chart-1)"
-                          strokeWidth={2.5}
-                          dot={{ r: 4, fill: 'var(--chart-1)' }}
-                          activeDot={{ r: 6 }}
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="fotos" className="space-y-4">
-              {photos.length === 0 ? (
-                <EmptyState
-                  title="Sin fotos de evolución"
-                  description="Las fotos adjuntas a las consultas aparecerán aquí para comparar la evolución."
-                  icon={Camera}
-                />
-              ) : (
-                <div className="flex flex-col items-center gap-4">
-                  <div className="flex w-full max-w-md items-center gap-3 rounded-xl border border-border bg-card p-3 shadow-sm">
-                    <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      Comparar
-                    </span>
-                    <select
-                      value={compareIdx}
-                      onChange={(e) => setCompareIdx(Number(e.target.value))}
-                      className="h-9 flex-1 rounded-md border border-input bg-background px-2 text-sm"
-                    >
-                      {photos.map((p, i) => (
-                        <option key={p.consultation_id} value={i}>
-                          Antes: {new Date(p.consultation_date).toLocaleDateString('es-MX')}{' '}
-                          {p.reason ? `· ${p.reason}` : ''}
-                        </option>
-                      ))}
-                    </select>
-                    <span className="shrink-0 text-sm font-medium text-foreground">
-                      vs.{' '}
-                      {new Date(photos[photos.length - 1].consultation_date).toLocaleDateString(
-                        'es-MX',
-                      )}
-                    </span>
-                  </div>
-                  <PhotoComparison
-                    before={photos[compareIdx].url}
-                    after={photos[photos.length - 1].url}
-                    beforeLabel={new Date(photos[compareIdx].consultation_date).toLocaleDateString(
-                      'es-MX',
-                    )}
-                    afterLabel={new Date(
-                      photos[photos.length - 1].consultation_date,
-                    ).toLocaleDateString('es-MX')}
+              <TabsContent value="timeline">
+                {timeline.length === 0 ? (
+                  <EmptyState
+                    title="Sin actividad"
+                    description="Aún no hay consultas ni citas para este paciente."
+                    icon={History}
                   />
-                  <p className="text-center text-xs text-muted-foreground">
-                    Arrastra el divisor para comparar la evolución entre dos consultas.
-                  </p>
-                </div>
-              )}
-            </TabsContent>
-
-            <TabsContent value="consents" className="space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-sm text-muted-foreground">
-                  Consentimientos informados firmados por el dueño.
-                </p>
-                <div className="flex gap-2">
-                  <Button size="sm" variant="outline" onClick={() => setRemoteConsentOpen(true)}>
-                    <Send /> Para firma del dueño
-                  </Button>
-                  <Button size="sm" onClick={() => setConsentOpen(true)}>
-                    <FileSignature /> Nuevo consentimiento
-                  </Button>
-                </div>
-              </div>
-              {consents.length === 0 ? (
-                <EmptyState
-                  title="Sin consentimientos"
-                  description="Genera el primero para procedimientos como anestesia o cirugía."
-                  icon={FileSignature}
-                />
-              ) : (
-                <div className="space-y-2">
-                  {consents.map((c) => (
-                    <div
-                      key={c.id}
-                      className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card p-3 shadow-sm"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={`flex size-10 shrink-0 items-center justify-center rounded-lg ${
-                            c.status === 'pending'
-                              ? 'bg-warning/10 text-warning'
-                              : 'bg-primary/10 text-primary'
-                          }`}
-                        >
-                          <FileSignature className="size-4" aria-hidden="true" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium">{c.title}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {c.status === 'pending' ? (
-                              'Pendiente de firma del dueño'
+                ) : (
+                  <div className="relative space-y-4 pl-10">
+                    <div className="absolute bottom-2 left-4 top-2 w-px bg-gradient-to-b from-primary/40 via-border to-transparent" />
+                    {timeline.map((e) => {
+                      const isConsulta = e.type === 'consulta'
+                      const isFoto = e.type === 'foto'
+                      const st = CITA_STATUS[e.status ?? ''] ?? {
+                        label: e.status ?? '',
+                        variant: 'secondary',
+                      }
+                      return (
+                        <div key={`${e.type}-${e.id}`} className="relative">
+                          <span
+                            className={`absolute -left-10 top-1 flex size-8 items-center justify-center rounded-full border-4 border-background shadow-card ${
+                              isConsulta
+                                ? 'bg-sky-500 text-white'
+                                : isFoto
+                                  ? 'bg-violet-500 text-white'
+                                  : 'bg-primary text-primary-foreground'
+                            }`}
+                          >
+                            {isConsulta ? (
+                              <Stethoscope className="size-3.5" aria-hidden="true" />
+                            ) : isFoto ? (
+                              <Camera className="size-3.5" aria-hidden="true" />
                             ) : (
-                              <>
-                                Firmado{' '}
-                                {new Date(c.signed_at).toLocaleString('es-MX', {
-                                  day: 'numeric',
-                                  month: 'short',
-                                  year: 'numeric',
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                })}
-                              </>
+                              <CalendarDays className="size-3.5" aria-hidden="true" />
                             )}
+                          </span>
+                          <Card className="overflow-hidden shadow-card transition-shadow hover:shadow-elevated">
+                            <CardContent className="p-4">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div className="flex items-center gap-2">
+                                  <p className="text-sm font-semibold">{e.title}</p>
+                                  {isConsulta ? (
+                                    <Badge variant="success">Consulta</Badge>
+                                  ) : isFoto ? (
+                                    <Badge
+                                      variant="outline"
+                                      className="text-violet-600 dark:text-violet-300"
+                                    >
+                                      Foto
+                                    </Badge>
+                                  ) : (
+                                    st.label && <Badge variant={st.variant}>{st.label}</Badge>
+                                  )}
+                                </div>
+                                <span className="rounded-md bg-muted/60 px-2 py-1 text-xs font-medium text-muted-foreground">
+                                  {new Date(e.date).toLocaleString('es-MX', {
+                                    day: 'numeric',
+                                    month: 'short',
+                                    year: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  })}
+                                </span>
+                              </div>
+                              {e.subtitle && (
+                                <p className="mt-2 text-xs text-muted-foreground">{e.subtitle}</p>
+                              )}
+                              {isFoto && e.url && (
+                                <img
+                                  src={e.url}
+                                  alt={e.title}
+                                  className="mt-2 aspect-video w-full max-w-xs rounded-lg border border-border/60 object-cover"
+                                />
+                              )}
+                              {e.author && (
+                                <p className="mt-1.5 text-xs text-muted-foreground/70">
+                                  {e.author}
+                                </p>
+                              )}
+                            </CardContent>
+                          </Card>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="peso">
+                <Card className="shadow-card">
+                  <CardHeader className="flex-row items-start justify-between space-y-0">
+                    <div>
+                      <CardTitle>Peso histórico</CardTitle>
+                      <CardDescription>
+                        Serie de tiempo por consulta (el default visual es el último valor)
+                      </CardDescription>
+                    </div>
+                    {latestWeight != null && (
+                      <div className="text-right">
+                        <p className="text-3xl font-bold tracking-tight text-foreground">
+                          {latestWeight} <span className="text-lg font-semibold">kg</span>
+                        </p>
+                        {weightDelta != null && (
+                          <p
+                            className={`text-xs font-medium ${
+                              weightDelta > 0
+                                ? 'text-success'
+                                : weightDelta < 0
+                                  ? 'text-destructive'
+                                  : 'text-muted-foreground'
+                            }`}
+                          >
+                            {weightDelta > 0 ? '▲ +' : weightDelta < 0 ? '▼ ' : '= '}
+                            {Math.abs(weightDelta).toFixed(2)} kg vs. registro anterior
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </CardHeader>
+                  <CardContent className="h-72">
+                    {weights.length === 0 ? (
+                      <EmptyState
+                        title="Sin registros de peso"
+                        description="Aún no hay pesajes registrados."
+                        icon={Weight}
+                      />
+                    ) : (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart
+                          data={weightChart}
+                          margin={{ top: 8, right: 8, left: -20, bottom: 0 }}
+                        >
+                          <CartesianGrid
+                            strokeDasharray="3 3"
+                            stroke="var(--border)"
+                            vertical={false}
+                          />
+                          <XAxis
+                            dataKey="fecha"
+                            tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }}
+                            tickLine={false}
+                            axisLine={false}
+                          />
+                          <YAxis
+                            domain={['auto', 'auto']}
+                            tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }}
+                            tickLine={false}
+                            axisLine={false}
+                          />
+                          <Tooltip formatter={(v) => [`${v} kg`, 'Peso']} />
+                          <Line
+                            type="monotone"
+                            dataKey="peso"
+                            stroke="var(--chart-1)"
+                            strokeWidth={2.5}
+                            dot={{ r: 4, fill: 'var(--chart-1)' }}
+                            activeDot={{ r: 6 }}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="fotos" className="space-y-4">
+                {photos.length === 0 ? (
+                  <EmptyState
+                    title="Sin fotos de evolución"
+                    description="Las fotos adjuntas a las consultas aparecerán aquí para comparar la evolución."
+                    icon={Camera}
+                  />
+                ) : (
+                  <div className="flex flex-col items-center gap-4">
+                    <div className="flex w-full max-w-md items-center gap-3 rounded-xl border border-border bg-card p-3 shadow-sm">
+                      <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Comparar
+                      </span>
+                      <select
+                        value={compareIdx}
+                        onChange={(e) => setCompareIdx(Number(e.target.value))}
+                        className="h-9 flex-1 rounded-md border border-input bg-background px-2 text-sm"
+                      >
+                        {photos.map((p, i) => (
+                          <option key={p.consultation_id} value={i}>
+                            Antes: {new Date(p.consultation_date).toLocaleDateString('es-MX')}{' '}
+                            {p.reason ? `· ${p.reason}` : ''}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="shrink-0 text-sm font-medium text-foreground">
+                        vs.{' '}
+                        {new Date(photos[photos.length - 1].consultation_date).toLocaleDateString(
+                          'es-MX',
+                        )}
+                      </span>
+                    </div>
+                    <PhotoComparison
+                      before={photos[compareIdx].url}
+                      after={photos[photos.length - 1].url}
+                      beforeLabel={new Date(
+                        photos[compareIdx].consultation_date,
+                      ).toLocaleDateString('es-MX')}
+                      afterLabel={new Date(
+                        photos[photos.length - 1].consultation_date,
+                      ).toLocaleDateString('es-MX')}
+                    />
+                    <p className="text-center text-xs text-muted-foreground">
+                      Arrastra el divisor para comparar la evolución entre dos consultas.
+                    </p>
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="consents" className="space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm text-muted-foreground">
+                    Consentimientos informados firmados por el dueño.
+                  </p>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" onClick={() => setRemoteConsentOpen(true)}>
+                      <Send /> Para firma del dueño
+                    </Button>
+                    <Button size="sm" onClick={() => setConsentOpen(true)}>
+                      <FileSignature /> Nuevo consentimiento
+                    </Button>
+                  </div>
+                </div>
+                {consents.length === 0 ? (
+                  <EmptyState
+                    title="Sin consentimientos"
+                    description="Genera el primero para procedimientos como anestesia o cirugía."
+                    icon={FileSignature}
+                  />
+                ) : (
+                  <div className="space-y-2">
+                    {consents.map((c) => (
+                      <div
+                        key={c.id}
+                        className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card p-3 shadow-sm"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`flex size-10 shrink-0 items-center justify-center rounded-lg ${
+                              c.status === 'pending'
+                                ? 'bg-warning/10 text-warning'
+                                : 'bg-primary/10 text-primary'
+                            }`}
+                          >
+                            <FileSignature className="size-4" aria-hidden="true" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium">{c.title}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {c.status === 'pending' ? (
+                                'Pendiente de firma del dueño'
+                              ) : (
+                                <>
+                                  Firmado{' '}
+                                  {new Date(c.signed_at).toLocaleString('es-MX', {
+                                    day: 'numeric',
+                                    month: 'short',
+                                    year: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  })}
+                                </>
+                              )}
+                            </p>
+                          </div>
+                        </div>
+                        {c.status === 'pending' ? (
+                          <Badge variant="warning">Pendiente</Badge>
+                        ) : (
+                          <a
+                            href={c.pdf_url ?? '#'}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-accent"
+                          >
+                            <FileText className="size-3.5" aria-hidden="true" />
+                            Ver PDF
+                          </a>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="vacunacion" className="space-y-4">
+                {vaccination.length === 0 ? (
+                  <EmptyState
+                    title="Sin plan de vacunación"
+                    description="Asigna un plan al dar de alta a la mascota para generar sus citas de vacunación automáticamente."
+                    icon={Syringe}
+                  />
+                ) : (
+                  vaccination.map((vp) => (
+                    <div
+                      key={vp.id}
+                      className="space-y-3 rounded-xl border border-border/60 bg-card p-4 shadow-sm"
+                    >
+                      <div className="flex flex-wrap items-center gap-3">
+                        <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-pink-500/10 text-pink-600 dark:text-pink-300">
+                          <Syringe className="size-4" aria-hidden="true" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold">
+                            {vp.plan_name}
+                            {vp.compound ? ` · ${vp.compound}` : ''}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {vp.branch_name}
+                            {vp.vet_name ? ` · ${vp.vet_name}` : ''} · Inicia{' '}
+                            {new Date(`${vp.start_date}T00:00:00`).toLocaleDateString('es-MX')}
                           </p>
                         </div>
                       </div>
-                      {c.status === 'pending' ? (
-                        <Badge variant="warning">Pendiente</Badge>
-                      ) : (
-                        <a
-                          href={c.pdf_url ?? '#'}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-accent"
-                        >
-                          <FileText className="size-3.5" aria-hidden="true" />
-                          Ver PDF
-                        </a>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </TabsContent>
-
-            <TabsContent value="vacunacion" className="space-y-4">
-              {vaccination.length === 0 ? (
-                <EmptyState
-                  title="Sin plan de vacunación"
-                  description="Asigna un plan al dar de alta a la mascota para generar sus citas de vacunación automáticamente."
-                  icon={Syringe}
-                />
-              ) : (
-                vaccination.map((vp) => (
-                  <div
-                    key={vp.id}
-                    className="space-y-3 rounded-xl border border-border/60 bg-card p-4 shadow-sm"
-                  >
-                    <div className="flex flex-wrap items-center gap-3">
-                      <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-pink-500/10 text-pink-600 dark:text-pink-300">
-                        <Syringe className="size-4" aria-hidden="true" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold">
-                          {vp.plan_name}
-                          {vp.compound ? ` · ${vp.compound}` : ''}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {vp.branch_name}
-                          {vp.vet_name ? ` · ${vp.vet_name}` : ''} · Inicia{' '}
-                          {new Date(`${vp.start_date}T00:00:00`).toLocaleDateString('es-MX')}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      {vp.doses.map((d) => (
-                        <div
-                          key={d.id}
-                          className={cn(
-                            'flex items-center justify-between gap-2 rounded-lg border px-3 py-2.5',
-                            d.status === 'completed'
-                              ? 'border-success/30 bg-success/5'
-                              : 'border-border/60 bg-muted/20',
-                          )}
-                        >
-                          <div className="flex min-w-0 items-center gap-2.5">
-                            <span
-                              className={cn(
-                                'size-2.5 shrink-0 rounded-full',
-                                d.status === 'completed'
-                                  ? 'bg-success'
-                                  : d.status === 'skipped'
-                                    ? 'bg-muted-foreground/50'
-                                    : 'bg-warning',
-                              )}
-                              aria-hidden="true"
-                            />
-                            <div className="min-w-0">
-                              <p className="truncate text-sm font-medium">{d.label}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {new Date(`${d.due_date}T00:00:00`).toLocaleDateString('es-MX')}
-                                {d.appointment_start
-                                  ? ` · ${new Date(d.appointment_start).toLocaleTimeString(
-                                      'es-MX',
-                                      {
-                                        hour: '2-digit',
-                                        minute: '2-digit',
-                                      },
-                                    )}`
-                                  : ''}
-                              </p>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {vp.doses.map((d) => (
+                          <div
+                            key={d.id}
+                            className={cn(
+                              'flex items-center justify-between gap-2 rounded-lg border px-3 py-2.5',
+                              d.status === 'completed'
+                                ? 'border-success/30 bg-success/5'
+                                : 'border-border/60 bg-muted/20',
+                            )}
+                          >
+                            <div className="flex min-w-0 items-center gap-2.5">
+                              <span
+                                className={cn(
+                                  'size-2.5 shrink-0 rounded-full',
+                                  d.status === 'completed'
+                                    ? 'bg-success'
+                                    : d.status === 'skipped'
+                                      ? 'bg-muted-foreground/50'
+                                      : 'bg-warning',
+                                )}
+                                aria-hidden="true"
+                              />
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-medium">{d.label}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {new Date(`${d.due_date}T00:00:00`).toLocaleDateString('es-MX')}
+                                  {d.appointment_start
+                                    ? ` · ${new Date(d.appointment_start).toLocaleTimeString(
+                                        'es-MX',
+                                        {
+                                          hour: '2-digit',
+                                          minute: '2-digit',
+                                        },
+                                      )}`
+                                    : ''}
+                                </p>
+                              </div>
                             </div>
+                            <Badge
+                              variant={
+                                d.status === 'completed'
+                                  ? 'success'
+                                  : d.status === 'skipped'
+                                    ? 'outline'
+                                    : 'warning'
+                              }
+                            >
+                              {d.status === 'completed'
+                                ? 'Completada'
+                                : d.status === 'skipped'
+                                  ? 'Omitida'
+                                  : 'Programada'}
+                            </Badge>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </TabsContent>
+
+              <TabsContent value="familia">
+                {family.length === 0 ? (
+                  <EmptyState
+                    title="Sin familia registrada"
+                    description="Otras mascotas con el mismo nombre de dueño aparecerán aquí como hermano o hermana."
+                    icon={Users}
+                  />
+                ) : (
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {family.map((m) => {
+                      const esHermano = m.relation === 'hermano'
+                      return (
+                        <Link
+                          key={m.id}
+                          to={`/pets/${m.id}`}
+                          className="group flex items-center gap-3 rounded-xl border border-border/60 bg-card p-3 shadow-sm transition-colors hover:border-primary/40 hover:bg-accent"
+                        >
+                          <Avatar
+                            src={m.photo_url}
+                            name={m.name}
+                            className={cn(
+                              'size-12 shrink-0 border-2',
+                              esHermano
+                                ? 'border-sky-400/60 bg-sky-500/10 text-sky-600 dark:text-sky-300'
+                                : 'border-pink-400/60 bg-pink-500/10 text-pink-600 dark:text-pink-300',
+                            )}
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-semibold">{m.name}</p>
+                            <p className="truncate text-xs capitalize text-muted-foreground">
+                              {speciesLabel(m.species)}
+                              {m.breed ? ` · ${m.breed}` : ''}
+                            </p>
                           </div>
                           <Badge
-                            variant={
-                              d.status === 'completed'
-                                ? 'success'
-                                : d.status === 'skipped'
-                                  ? 'outline'
-                                  : 'warning'
+                            variant="outline"
+                            className={
+                              esHermano
+                                ? 'bg-sky-500/10 text-sky-700 dark:text-sky-300'
+                                : 'bg-pink-500/10 text-pink-700 dark:text-pink-300'
                             }
                           >
-                            {d.status === 'completed'
-                              ? 'Completada'
-                              : d.status === 'skipped'
-                                ? 'Omitida'
-                                : 'Programada'}
+                            {m.relation === 'hermana'
+                              ? 'Hermana'
+                              : m.relation === 'hermano'
+                                ? 'Hermano'
+                                : 'Hermano(a)'}
                           </Badge>
-                        </div>
-                      ))}
-                    </div>
+                        </Link>
+                      )
+                    })}
                   </div>
-                ))
-              )}
-            </TabsContent>
-
-            <TabsContent value="familia">
-              {family.length === 0 ? (
-                <EmptyState
-                  title="Sin familia registrada"
-                  description="Otras mascotas con el mismo nombre de dueño aparecerán aquí como hermano o hermana."
-                  icon={Users}
-                />
-              ) : (
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {family.map((m) => {
-                    const esHermano = m.relation === 'hermano'
-                    return (
-                      <Link
-                        key={m.id}
-                        to={`/pets/${m.id}`}
-                        className="group flex items-center gap-3 rounded-xl border border-border/60 bg-card p-3 shadow-sm transition-colors hover:border-primary/40 hover:bg-accent"
-                      >
-                        <Avatar
-                          src={m.photo_url}
-                          name={m.name}
-                          className={cn(
-                            'size-12 shrink-0 border-2',
-                            esHermano
-                              ? 'border-sky-400/60 bg-sky-500/10 text-sky-600 dark:text-sky-300'
-                              : 'border-pink-400/60 bg-pink-500/10 text-pink-600 dark:text-pink-300',
-                          )}
-                        />
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-semibold">{m.name}</p>
-                          <p className="truncate text-xs capitalize text-muted-foreground">
-                            {speciesLabel(m.species)}
-                            {m.breed ? ` · ${m.breed}` : ''}
-                          </p>
-                        </div>
-                        <Badge
-                          variant="outline"
-                          className={
-                            esHermano
-                              ? 'bg-sky-500/10 text-sky-700 dark:text-sky-300'
-                              : 'bg-pink-500/10 text-pink-700 dark:text-pink-300'
-                          }
-                        >
-                          {m.relation === 'hermana'
-                            ? 'Hermana'
-                            : m.relation === 'hermano'
-                              ? 'Hermano'
-                              : 'Hermano(a)'}
-                        </Badge>
-                      </Link>
-                    )
-                  })}
-                </div>
-              )}
-            </TabsContent>
-          </Tabs>
+                )}
+              </TabsContent>
+            </Tabs>
+          </div>
         </div>
       )}
 
