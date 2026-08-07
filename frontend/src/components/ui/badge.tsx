@@ -16,6 +16,12 @@ const badgeVariants = cva(
         success: 'bg-success text-success-foreground [a&]:hover:bg-success/90',
         warning: 'bg-warning text-warning-foreground [a&]:hover:bg-warning/90',
         info: 'bg-info text-info-foreground [a&]:hover:bg-info/90',
+        'soft-default': 'border-primary/15 bg-primary/10 text-primary',
+        'soft-secondary': 'border-border bg-muted text-muted-foreground',
+        'soft-success': 'border-success/20 bg-success/10 text-success',
+        'soft-warning': 'border-warning/20 bg-warning/10 text-warning',
+        'soft-info': 'border-info/20 bg-info/10 text-info',
+        'soft-destructive': 'border-destructive/20 bg-destructive/10 text-destructive',
         outline:
           'border-border text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground',
         ghost: '[a&]:hover:bg-accent [a&]:hover:text-accent-foreground',
