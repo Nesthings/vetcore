@@ -211,19 +211,19 @@ export function Dashboard() {
                   e.dataTransfer.effectAllowed = 'move'
                 }}
                 title="Arrastra a la barra lateral para fijarlo"
-                className="group flex cursor-grab flex-col gap-3 rounded-xl border border-border/60 bg-card/80 p-4 shadow-sm backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-glow active:cursor-grabbing"
+                className="group flex cursor-grab flex-col gap-3 rounded-xl border border-border/60 bg-card/80 p-5 shadow-sm backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-glow active:cursor-grabbing"
               >
                 <div
                   className={cn(
-                    'flex size-11 items-center justify-center rounded-lg transition-transform duration-200 group-hover:scale-105',
+                    'flex size-13 items-center justify-center rounded-lg transition-transform duration-200 group-hover:scale-105',
                     meta.iconBg,
                   )}
                 >
-                  <meta.icon className={cn('size-5', meta.text)} aria-hidden="true" />
+                  <meta.icon className={cn('size-6', meta.text)} aria-hidden="true" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold">{m.label}</p>
-                  <p className="text-xs text-muted-foreground">{meta.desc}</p>
+                  <p className="text-base font-semibold">{m.label}</p>
+                  <p className="text-sm text-muted-foreground">{meta.desc}</p>
                 </div>
               </Link>
             )
