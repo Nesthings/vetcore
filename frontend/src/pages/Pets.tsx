@@ -39,6 +39,7 @@ export interface PetOwner {
   full_name?: string | null
   phone?: string | null
   email?: string | null
+  profile_photo_url?: string | null
   alt_contact_name?: string | null
   alt_phone?: string | null
   linked_at: string

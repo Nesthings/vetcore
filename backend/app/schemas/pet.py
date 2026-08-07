@@ -53,6 +53,7 @@ class OwnerLinkRead(BaseModel):
     full_name: str | None = None
     phone: str | None
     email: str | None
+    profile_photo_url: str | None = None
     alt_contact_name: str | None = None
     alt_phone: str | None = None
     linked_at: datetime

@@ -10,8 +10,10 @@ import {
   ClipboardPlus,
   FileSignature,
   Loader2,
+  Mail,
   MailPlus,
   PawPrint,
+  Phone,
   Plus,
   Syringe,
   TriangleAlert,
@@ -170,6 +172,7 @@ export function PetDetail() {
   const [alertType, setAlertType] = useState(ALERT_TYPES[0])
   const [alertDesc, setAlertDesc] = useState('')
   const [alertBusy, setAlertBusy] = useState(false)
+  const [ownerPhotoBusy, setOwnerPhotoBusy] = useState(false)
 
   const load = useCallback(async () => {
     if (!id) return
@@ -229,6 +232,22 @@ export function PetDetail() {
       await load()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo eliminar la alerta')
+    }
+  }
+
+  const uploadOwnerPhoto = async (file: File) => {
+    if (!pet) return
+    setOwnerPhotoBusy(true)
+    setError(null)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      await apiFetch(`/pets/${pet.id}/owner-photo`, { method: 'POST', body: fd })
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo subir la foto del dueño')
+    } finally {
+      setOwnerPhotoBusy(false)
     }
   }
 
@@ -419,39 +438,120 @@ export function PetDetail() {
                   Dueño
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
+              <CardContent className="space-y-3">
                 {!pet.owners || pet.owners.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
                     Sin dueño registrado. Usa «Invitar dueño» o «Transferir dueño».
                   </p>
                 ) : (
-                  pet.owners.map((o) => (
-                    <div
-                      key={o.owner_id}
-                      className="rounded-xl border border-border/60 bg-muted/30 px-3 py-2.5 text-sm"
-                    >
-                      <p className="font-medium">
-                        {o.full_name ?? 'Dueño registrado'}
-                        {!o.is_active && (
-                          <span className="ml-2 text-xs text-muted-foreground">
-                            (vínculo inactivo)
-                          </span>
-                        )}
-                      </p>
-                      <p className="mt-0.5 text-muted-foreground">
-                        {o.phone ? `Tel: ${o.phone}` : ''}
-                        {o.phone && o.email ? ' · ' : ''}
-                        {o.email ? o.email : ''}
-                        {!o.phone && !o.email ? 'Sin contacto' : ''}
-                      </p>
-                      {(o.alt_contact_name || o.alt_phone) && (
-                        <p className="text-xs text-muted-foreground">
-                          Alternativo:{' '}
-                          {[o.alt_contact_name, o.alt_phone].filter(Boolean).join(' · ')}
-                        </p>
-                      )}
-                    </div>
-                  ))
+                  pet.owners.map((o) => {
+                    const initials =
+                      (o.full_name ?? 'D')
+                        .split(/\s+/)
+                        .slice(0, 2)
+                        .map((w) => w[0]?.toUpperCase() ?? '')
+                        .join('') || 'D'
+                    return (
+                      <div
+                        key={o.owner_id}
+                        className="flex flex-col gap-4 rounded-xl border border-border/60 bg-muted/30 p-4 sm:flex-row sm:items-center"
+                      >
+                        <div className="relative shrink-0 self-center">
+                          <div className="flex size-16 items-center justify-center overflow-hidden rounded-full border-2 border-primary/20 bg-secondary text-base font-semibold text-primary shadow-card">
+                            {o.profile_photo_url ? (
+                              <img
+                                src={o.profile_photo_url}
+                                alt={o.full_name ?? 'Dueño'}
+                                className="size-full object-cover"
+                              />
+                            ) : (
+                              initials
+                            )}
+                          </div>
+                          <label
+                            className={`absolute -bottom-1 -right-1 flex size-7 cursor-pointer items-center justify-center rounded-full border-2 border-card bg-primary text-primary-foreground shadow-card transition-colors hover:bg-primary-hover ${
+                              ownerPhotoBusy ? 'pointer-events-none opacity-70' : ''
+                            }`}
+                            title="Subir foto de perfil del dueño"
+                          >
+                            {ownerPhotoBusy ? (
+                              <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+                            ) : (
+                              <Camera className="size-3.5" aria-hidden="true" />
+                            )}
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                const f = e.target.files?.[0]
+                                if (f) uploadOwnerPhoto(f)
+                                e.target.value = ''
+                              }}
+                            />
+                          </label>
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-base font-semibold text-foreground">
+                              {o.full_name ?? 'Dueño registrado'}
+                            </p>
+                            {!o.is_active && (
+                              <span className="text-xs text-muted-foreground">
+                                (vínculo inactivo)
+                              </span>
+                            )}
+                          </div>
+                          <div className="mt-2 space-y-1">
+                            {o.phone && (
+                              <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <Phone
+                                  className="size-3.5 shrink-0 text-primary"
+                                  aria-hidden="true"
+                                />
+                                {o.phone}
+                              </p>
+                            )}
+                            {o.email && (
+                              <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <Mail
+                                  className="size-3.5 shrink-0 text-primary"
+                                  aria-hidden="true"
+                                />
+                                {o.email}
+                              </p>
+                            )}
+                            {!o.phone && !o.email && (
+                              <p className="text-sm text-muted-foreground">
+                                Sin contacto registrado
+                              </p>
+                            )}
+                            {(o.alt_contact_name || o.alt_phone) && (
+                              <p className="text-xs text-muted-foreground">
+                                Alternativo:{' '}
+                                {[o.alt_contact_name, o.alt_phone].filter(Boolean).join(' · ')}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex shrink-0 flex-col gap-1.5 sm:items-end">
+                          <Button variant="outline" size="sm" onClick={() => setInviteOpen(true)}>
+                            <MailPlus /> Invitar
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-muted-foreground"
+                            onClick={() => setTransferOpen(true)}
+                          >
+                            <UserRoundCog /> Transferir
+                          </Button>
+                        </div>
+                      </div>
+                    )
+                  })
                 )}
               </CardContent>
             </Card>
