@@ -789,6 +789,11 @@ export function PetDetail() {
           petName={pet.name}
           open={inviteOpen}
           onOpenChange={setInviteOpen}
+          defaultOwner={{
+            name: pet.owners?.find((o) => o.is_active)?.full_name ?? null,
+            phone: pet.owners?.find((o) => o.is_active)?.phone ?? null,
+            email: pet.owners?.find((o) => o.is_active)?.email ?? null,
+          }}
         />
       )}
 

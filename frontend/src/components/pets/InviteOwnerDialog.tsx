@@ -20,33 +20,58 @@ interface InvitationResult {
   expires_at: string
 }
 
+interface OwnerContact {
+  name?: string | null
+  phone?: string | null
+  email?: string | null
+}
+
 export function InviteOwnerDialog({
   petId,
   petName,
   open,
   onOpenChange,
+  defaultOwner,
 }: {
   petId: string
   petName: string
   open: boolean
   onOpenChange: (open: boolean) => void
+  defaultOwner?: OwnerContact | null
 }) {
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
+  const [usingDifferent, setUsingDifferent] = useState(false)
   const [result, setResult] = useState<InvitationResult | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
 
+  const hasRegistered = Boolean(defaultOwner) && Boolean(defaultOwner?.phone || defaultOwner?.email)
+
   useEffect(() => {
     if (open) {
-      setPhone('')
-      setEmail('')
       setResult(null)
       setError(null)
       setCopied(false)
+      setPhone(defaultOwner?.phone ?? '')
+      setEmail(defaultOwner?.email ?? '')
+      setUsingDifferent(!hasRegistered)
     }
-  }, [open])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, defaultOwner])
+
+  const useRegistered = () => {
+    setUsingDifferent(false)
+    setPhone(defaultOwner?.phone ?? '')
+    setEmail(defaultOwner?.email ?? '')
+  }
+
+  const useOther = () => {
+    setUsingDifferent(true)
+    setPhone('')
+    setEmail('')
+  }
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -90,25 +115,62 @@ export function InviteOwnerDialog({
 
         {!result ? (
           <form onSubmit={submit} className="grid gap-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Teléfono</Label>
-                <Input
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+52..."
-                />
+            {hasRegistered && !usingDifferent ? (
+              <div className="rounded-lg border border-border bg-muted/40 p-3">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Contacto registrado del dueño
+                </p>
+                {defaultOwner?.name && (
+                  <p className="mt-1 text-sm font-semibold text-foreground">{defaultOwner.name}</p>
+                )}
+                <p className="mt-0.5 text-sm text-muted-foreground">
+                  {[defaultOwner?.phone, defaultOwner?.email].filter(Boolean).join(' · ') ||
+                    'Sin contacto'}
+                </p>
+                <Button
+                  type="button"
+                  variant="link"
+                  size="sm"
+                  className="mt-1.5 h-auto p-0"
+                  onClick={useOther}
+                >
+                  Usar otros datos
+                </Button>
               </div>
-              <div className="space-y-2">
-                <Label>Correo</Label>
-                <Input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="dueño@ejemplo.com"
-                />
-              </div>
-            </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Teléfono</Label>
+                    <Input
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="+52..."
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Correo</Label>
+                    <Input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="dueño@ejemplo.com"
+                    />
+                  </div>
+                </div>
+                {hasRegistered && (
+                  <Button
+                    type="button"
+                    variant="link"
+                    size="sm"
+                    className="h-auto justify-start p-0"
+                    onClick={useRegistered}
+                  >
+                    Volver a usar el contacto registrado
+                  </Button>
+                )}
+              </>
+            )}
             <p className="text-xs text-muted-foreground">
               Al menos uno de los dos. La clínica ya capturó este contacto en persona.
             </p>
