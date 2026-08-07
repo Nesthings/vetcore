@@ -30,6 +30,12 @@ const ROLE_LABELS: Record<string, string> = {
   recepcion: 'Recepción',
 }
 
+const ROLE_BADGE: Record<string, 'soft-info' | 'soft-success' | 'soft-secondary'> = {
+  admin: 'soft-info',
+  veterinario: 'soft-success',
+  recepcion: 'soft-secondary',
+}
+
 interface ClinicProfile {
   id: string
   name: string
@@ -182,15 +188,15 @@ export function Settings() {
 
       {!loading && !error && (
         <Tabs defaultValue="users">
-          <TabsList>
+          <TabsList className="w-full justify-start gap-1 overflow-x-auto rounded-xl border border-border bg-card p-1 sm:w-auto sm:overflow-visible">
             <TabsTrigger value="users">
-              <Users className="mr-2 size-4" /> Usuarios
+              <Users className="size-4" /> Usuarios
             </TabsTrigger>
             <TabsTrigger value="branches">
-              <Settings2 className="mr-2 size-4" /> Sucursales
+              <Settings2 className="size-4" /> Sucursales
             </TabsTrigger>
             <TabsTrigger value="clinic">
-              <Building2 className="mr-2 size-4" /> Clínica
+              <Building2 className="size-4" /> Clínica
             </TabsTrigger>
           </TabsList>
 
@@ -215,9 +221,9 @@ export function Settings() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Nombre</TableHead>
-                      <TableHead>Correo</TableHead>
+                      <TableHead className="hidden lg:table-cell">Correo</TableHead>
                       <TableHead>Rol</TableHead>
-                      <TableHead>Sucursal</TableHead>
+                      <TableHead className="hidden md:table-cell">Sucursal</TableHead>
                       <TableHead>Estado</TableHead>
                       <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
@@ -226,11 +232,17 @@ export function Settings() {
                     {users.map((u) => (
                       <TableRow key={u.id}>
                         <TableCell className="font-medium">{u.full_name}</TableCell>
-                        <TableCell>{u.email}</TableCell>
-                        <TableCell>{ROLE_LABELS[u.role] ?? u.role}</TableCell>
-                        <TableCell>{u.branch_name ?? '—'}</TableCell>
+                        <TableCell className="hidden lg:table-cell">{u.email}</TableCell>
                         <TableCell>
-                          <Badge variant={u.is_active ? 'success' : 'secondary'}>
+                          <Badge variant={ROLE_BADGE[u.role] ?? 'soft-secondary'}>
+                            {ROLE_LABELS[u.role] ?? u.role}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell">
+                          {u.branch_name ?? '—'}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={u.is_active ? 'soft-success' : 'soft-secondary'}>
                             {u.is_active ? 'Activo' : 'Inactivo'}
                           </Badge>
                         </TableCell>
