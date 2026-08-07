@@ -14,6 +14,7 @@ from decimal import Decimal
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps import CurrentClinic, get_current_clinic, require_clinic_roles, require_component
@@ -347,21 +348,32 @@ def _get_or_create_owner(
         owner = db.execute(
             text("SELECT id FROM owners WHERE email = :email"), {"email": email}
         ).scalar()
-    elif phone:
+    if owner is None and phone:
         owner = db.execute(
             text("SELECT id FROM owners WHERE phone = :phone"), {"phone": phone}
         ).scalar()
-    else:
-        return None
 
     if owner is None:
-        owner = db.execute(
-            text(
-                "INSERT INTO owners (phone, email, full_name) "
-                "VALUES (:phone, :email, :name) RETURNING id"
-            ),
-            {"phone": phone, "email": email, "name": full_name},
-        ).scalar()
+        try:
+            owner = db.execute(
+                text(
+                    "INSERT INTO owners (phone, email, full_name) "
+                    "VALUES (:phone, :email, :name) RETURNING id"
+                ),
+                {"phone": phone, "email": email, "name": full_name},
+            ).scalar()
+        except IntegrityError:
+            db.rollback()
+            # Otro request pudo crear al dueño con el mismo teléfono/correo:
+            # reintenta el lookup y reutiliza.
+            owner = db.execute(
+                text(
+                    "SELECT id FROM owners WHERE (:phone IS NOT NULL AND phone = :phone) "
+                    "OR (:email IS NOT NULL AND email = :email) "
+                    "LIMIT 1"
+                ),
+                {"phone": phone, "email": email},
+            ).scalar()
     elif full_name:
         db.execute(
             text(
