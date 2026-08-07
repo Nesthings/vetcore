@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import MDIIcon from '@mdi/react'
+import { Icon as MDIIcon } from '@mdi/react'
 import {
   mdiBird,
   mdiCat,
