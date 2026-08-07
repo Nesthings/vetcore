@@ -52,6 +52,7 @@ import { ErrorState } from '@/components/ui/error-state'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { LoadingState } from '@/components/ui/loading-state'
+import { SectionHeading } from '@/components/ui/section-heading'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Table,
@@ -366,41 +367,6 @@ function Stat({
         {label}
       </div>
       <p className="mt-1 truncate text-sm font-semibold text-foreground">{value}</p>
-    </div>
-  )
-}
-
-function SectionHeading({
-  icon: Icon,
-  title,
-  subtitle,
-  tint = 'primary',
-}: {
-  icon: React.ElementType
-  title: string
-  subtitle?: string
-  tint?: 'primary' | 'warning' | 'success' | 'destructive' | 'info'
-}) {
-  const tints: Record<string, string> = {
-    primary: 'bg-primary/10 text-primary',
-    warning: 'bg-warning/10 text-warning',
-    success: 'bg-success/10 text-success',
-    destructive: 'bg-destructive/10 text-destructive',
-    info: 'bg-info/10 text-info',
-  }
-  return (
-    <div className="flex items-center gap-2.5">
-      <span
-        className={cn('flex size-7 shrink-0 items-center justify-center rounded-lg', tints[tint])}
-      >
-        <Icon className="size-4" aria-hidden="true" />
-      </span>
-      <div className="min-w-0">
-        <h2 className="font-display text-sm font-semibold uppercase tracking-[0.12em] text-foreground">
-          {title}
-        </h2>
-        {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
-      </div>
     </div>
   )
 }
