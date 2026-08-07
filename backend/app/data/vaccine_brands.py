@@ -49,10 +49,48 @@ GATO_BRANDS: list[str] = [
     "Hipracat",
 ]
 
+EQUINO_BRANDS: list[str] = [
+    "Fluvac Innovator",
+    "Fluvac Innovator T",
+    "Encevac",
+    "Encevac T",
+    "Vaccin 5",
+    "Prestige",
+    "Prestige T",
+    "Prestige 4",
+    "Vetera Gold",
+    "Vetera 2V",
+    "Rhinoflu",
+    "Toxoide Tetánico",
+    "Rabisin",
+    "Rabigen Mono",
+]
+
+HURON_BRANDS: list[str] = [
+    "Purevax Ferret (Moquillo)",
+    "Galaxy-D",
+    "Rabigen Mono",
+    "Rabisin",
+    "Nobivac Rabia",
+]
+
+CONEJO_BRANDS: list[str] = [
+    "Pestorin (RHD)",
+    "Eravac (RHDV2)",
+    "Cunivac (RHD)",
+    "Novarvax (RHD)",
+]
+
 
 def brands_for_species(species: str | None) -> list[str]:
     if species == "perro":
         return GENERAL_BRANDS + PERRO_BRANDS
     if species == "gato":
         return GENERAL_BRANDS + GATO_BRANDS
+    if species == "equino":
+        return EQUINO_BRANDS
+    if species == "hurones":
+        return HURON_BRANDS
+    if species == "conejo":
+        return CONEJO_BRANDS
     return GENERAL_BRANDS
