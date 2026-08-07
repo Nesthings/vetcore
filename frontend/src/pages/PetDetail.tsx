@@ -64,13 +64,14 @@ import { cn } from '@/lib/utils'
 import type { PetVaccinationPlan } from '@/lib/vaccination'
 
 interface TimelineEvent {
-  type: 'consulta' | 'cita'
+  type: 'consulta' | 'cita' | 'foto'
   id: string
   title: string
   subtitle: string
   author?: string | null
   date: string
   status?: string | null
+  url?: string | null
 }
 
 interface WeightRecord {
@@ -145,6 +146,165 @@ const CITA_STATUS: Record<
   completed: { label: 'Completada', variant: 'success' },
   cancelled: { label: 'Cancelada', variant: 'destructive' },
   no_show: { label: 'No asistió', variant: 'secondary' },
+}
+
+function CarnetApps({ apps, onRemove }: { apps: CarnetApp[]; onRemove: (id: string) => void }) {
+  if (apps.length === 0) return <span className="text-sm text-muted-foreground">—</span>
+  return (
+    <div className="space-y-1.5">
+      {apps.map((app) => (
+        <div key={app.id} className="rounded-md border border-border/60 bg-muted/30 px-2 py-1">
+          <div className="flex items-center gap-1.5">
+            <span className="font-medium">
+              {new Date(app.date_applied).toLocaleDateString('es-MX')}
+            </span>
+            <button
+              type="button"
+              onClick={() => onRemove(app.id)}
+              aria-label={`Eliminar aplicación ${new Date(app.date_applied).toLocaleDateString('es-MX')}`}
+              className="ml-auto shrink-0 text-muted-foreground hover:text-destructive"
+            >
+              <X className="size-3" />
+            </button>
+          </div>
+          {(app.lot || app.vet_name) && (
+            <p className="mt-0.5 break-words text-xs text-muted-foreground">
+              {[app.lot && `Lote ${app.lot}`, app.vet_name].filter(Boolean).join(' · ')}
+            </p>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+interface CarnetAppFormProps {
+  vaccine: string
+  appDate: string
+  setAppDate: (v: string) => void
+  appBrand: string
+  setAppBrand: (v: string) => void
+  appBrandQuery: string
+  setAppBrandQuery: (v: string) => void
+  appBrandOpen: boolean
+  setAppBrandOpen: (v: boolean) => void
+  appBrandRef: React.RefObject<HTMLDivElement | null>
+  filteredBrands: string[]
+  appLot: string
+  setAppLot: (v: string) => void
+  appVet: string
+  setAppVet: (v: string) => void
+  vets: { id: string; full_name: string }[]
+  busy: boolean
+  onSave: () => void
+  onCancel: () => void
+}
+
+function CarnetAppForm(props: CarnetAppFormProps) {
+  const {
+    appDate,
+    setAppDate,
+    appBrand,
+    setAppBrand,
+    setAppBrandQuery,
+    appBrandOpen,
+    setAppBrandOpen,
+    appBrandRef,
+    filteredBrands,
+    appLot,
+    setAppLot,
+    appVet,
+    setAppVet,
+    vets,
+    busy,
+    onSave,
+    onCancel,
+  } = props
+
+  return (
+    <div className="flex flex-wrap items-end gap-3 py-1">
+      <div className="space-y-1.5">
+        <Label>Fecha</Label>
+        <Input
+          type="date"
+          value={appDate}
+          onChange={(e) => setAppDate(e.target.value)}
+          className="w-36"
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label>Marca</Label>
+        <div className="relative" ref={appBrandRef}>
+          <Input
+            value={appBrand}
+            onChange={(e) => {
+              setAppBrand(e.target.value)
+              setAppBrandQuery(e.target.value)
+              setAppBrandOpen(true)
+            }}
+            onFocus={() => setAppBrandOpen(true)}
+            placeholder="Busca la marca…"
+            className="w-52"
+            autoComplete="off"
+          />
+          {appBrandOpen && (
+            <div className="absolute z-20 mt-1 max-h-44 w-full overflow-y-auto rounded-md border border-border bg-card p-1 shadow-card">
+              {filteredBrands.length === 0 ? (
+                <p className="px-2 py-1.5 text-sm text-muted-foreground">Sin coincidencias.</p>
+              ) : (
+                filteredBrands.map((b) => (
+                  <button
+                    key={b}
+                    type="button"
+                    onClick={() => {
+                      setAppBrand(b)
+                      setAppBrandQuery(b)
+                      setAppBrandOpen(false)
+                    }}
+                    className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
+                  >
+                    {b}
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="space-y-1.5">
+        <Label>Lote</Label>
+        <Input
+          value={appLot}
+          onChange={(e) => setAppLot(e.target.value)}
+          placeholder="Ej. RAB-2026-01"
+          className="w-40"
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label>Veterinario</Label>
+        <select
+          value={appVet}
+          onChange={(e) => setAppVet(e.target.value)}
+          className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+        >
+          <option value="">—</option>
+          {vets.map((u) => (
+            <option key={u.id} value={u.id}>
+              {u.full_name}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="flex gap-2">
+        <Button size="sm" onClick={onSave} disabled={busy || !appDate}>
+          {busy ? <Loader2 className="animate-spin" /> : 'Guardar'}
+        </Button>
+        <Button size="sm" variant="ghost" onClick={onCancel}>
+          Cancelar
+        </Button>
+      </div>
+    </div>
+  )
 }
 
 function calcAge(birth: string): string {
@@ -352,6 +512,38 @@ export function PetDetail() {
       setError(err instanceof Error ? err.message : 'No se pudo eliminar la aplicación')
     }
   }
+
+  const toggleAddRow = (vaccine: string) => {
+    setAddingFor(addingFor === vaccine ? null : vaccine)
+    setAppDate('')
+    setAppBrand('')
+    setAppBrandQuery('')
+    setAppBrandOpen(false)
+    setAppLot('')
+    setAppVet('')
+  }
+
+  const carnetFormProps = (vaccine: string): CarnetAppFormProps => ({
+    vaccine,
+    appDate,
+    setAppDate,
+    appBrand,
+    setAppBrand,
+    appBrandQuery,
+    setAppBrandQuery,
+    appBrandOpen,
+    setAppBrandOpen,
+    appBrandRef,
+    filteredBrands,
+    appLot,
+    setAppLot,
+    appVet,
+    setAppVet,
+    vets,
+    busy: carnetBusy,
+    onSave: () => saveCarnetApp(vaccine),
+    onCancel: () => setAddingFor(null),
+  })
 
   const weightChart = [...weights].reverse().map((w) => ({
     fecha: new Date(w.recorded_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' }),
@@ -764,221 +956,139 @@ export function PetDetail() {
                   icon={Syringe}
                 />
               ) : (
-                <div className="overflow-hidden rounded-lg border border-border">
-                  <Table className="table-fixed [&_th]:border-l [&_th:first-child]:border-l-0 [&_td]:border-l [&_td:first-child]:border-l-0">
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-[21%] whitespace-normal">Vacuna</TableHead>
-                        <TableHead className="w-[12%] whitespace-normal">Marca</TableHead>
-                        <TableHead className="w-[17%] whitespace-normal">
-                          Enfermedades que previene
-                        </TableHead>
-                        <TableHead className="w-[23%] whitespace-normal">
-                          Esquema recomendado
-                        </TableHead>
-                        <TableHead className="w-[15%] whitespace-normal">Aplicaciones</TableHead>
-                        <TableHead className="w-[12%] whitespace-normal text-right">
-                          Registrar
-                        </TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {carnet.map((v) => (
-                        <Fragment key={v.name}>
-                          <TableRow>
-                            <TableCell className="whitespace-normal break-words font-medium">
-                              {v.name}
-                            </TableCell>
-                            <TableCell className="whitespace-normal">
-                              {v.applications.length === 0 ? (
-                                <span className="text-sm text-muted-foreground">—</span>
-                              ) : (
-                                <div className="space-y-1.5">
-                                  {v.applications.map((app) => (
-                                    <p
-                                      key={app.id}
-                                      className="break-words rounded-md border border-border/60 bg-muted/30 px-2 py-1 text-xs font-medium"
-                                    >
-                                      {app.brand ?? '—'}
-                                    </p>
-                                  ))}
-                                </div>
-                              )}
-                            </TableCell>
-                            <TableCell className="whitespace-normal break-words text-muted-foreground">
-                              {v.prevents ?? '—'}
-                            </TableCell>
-                            <TableCell className="whitespace-normal break-words text-xs text-muted-foreground">
-                              {v.schedule ?? '—'}
-                            </TableCell>
-                            <TableCell className="whitespace-normal">
-                              {v.applications.length === 0 ? (
-                                <span className="text-sm text-muted-foreground">—</span>
-                              ) : (
-                                <div className="space-y-1.5">
-                                  {v.applications.map((app) => (
-                                    <div
-                                      key={app.id}
-                                      className="rounded-md border border-border/60 bg-muted/30 px-2 py-1"
-                                    >
-                                      <div className="flex items-center gap-1.5">
-                                        <span className="font-medium">
-                                          {new Date(app.date_applied).toLocaleDateString('es-MX')}
-                                        </span>
-                                        <button
-                                          type="button"
-                                          onClick={() => removeCarnetApp(app.id)}
-                                          aria-label={`Eliminar aplicación ${new Date(
-                                            app.date_applied,
-                                          ).toLocaleDateString('es-MX')}`}
-                                          className="ml-auto shrink-0 text-muted-foreground hover:text-destructive"
-                                        >
-                                          <X className="size-3" />
-                                        </button>
-                                      </div>
-                                      {(app.lot || app.vet_name) && (
-                                        <p className="mt-0.5 break-words text-xs text-muted-foreground">
-                                          {[app.lot && `Lote ${app.lot}`, app.vet_name]
-                                            .filter(Boolean)
-                                            .join(' · ')}
-                                        </p>
-                                      )}
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  setAddingFor(addingFor === v.name ? null : v.name)
-                                  setAppDate('')
-                                  setAppBrand('')
-                                  setAppBrandQuery('')
-                                  setAppBrandOpen(false)
-                                  setAppLot('')
-                                  setAppVet('')
-                                }}
-                              >
-                                <Plus /> Añadir
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                          {addingFor === v.name && (
+                <>
+                  {/* Tabla (escritorio) */}
+                  <div className="hidden overflow-hidden rounded-lg border border-border md:block">
+                    <Table className="table-fixed [&_th]:border-l [&_th:first-child]:border-l-0 [&_td]:border-l [&_td:first-child]:border-l-0">
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[21%] whitespace-normal">Vacuna</TableHead>
+                          <TableHead className="w-[12%] whitespace-normal">Marca</TableHead>
+                          <TableHead className="w-[17%] whitespace-normal">
+                            Enfermedades que previene
+                          </TableHead>
+                          <TableHead className="w-[23%] whitespace-normal">
+                            Esquema recomendado
+                          </TableHead>
+                          <TableHead className="w-[15%] whitespace-normal">Aplicaciones</TableHead>
+                          <TableHead className="w-[12%] whitespace-normal text-right">
+                            Registrar
+                          </TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {carnet.map((v) => (
+                          <Fragment key={v.name}>
                             <TableRow>
-                              <TableCell colSpan={6} className="bg-muted/30">
-                                <div className="flex flex-wrap items-end gap-3 py-1">
-                                  <div className="space-y-1.5">
-                                    <Label>Fecha</Label>
-                                    <Input
-                                      type="date"
-                                      value={appDate}
-                                      onChange={(e) => setAppDate(e.target.value)}
-                                      className="w-36"
-                                    />
-                                  </div>
-                                  <div className="space-y-1.5">
-                                    <Label>Marca</Label>
-                                    <div className="relative" ref={appBrandRef}>
-                                      <Input
-                                        value={appBrand}
-                                        onChange={(e) => {
-                                          setAppBrand(e.target.value)
-                                          setAppBrandQuery(e.target.value)
-                                          setAppBrandOpen(true)
-                                        }}
-                                        onFocus={() => setAppBrandOpen(true)}
-                                        placeholder="Busca la marca…"
-                                        className="w-52"
-                                        autoComplete="off"
-                                      />
-                                      {appBrandOpen && (
-                                        <div className="absolute z-20 mt-1 max-h-44 w-full overflow-y-auto rounded-md border border-border bg-card p-1 shadow-card">
-                                          {filteredBrands.length === 0 ? (
-                                            <p className="px-2 py-1.5 text-sm text-muted-foreground">
-                                              Sin coincidencias.
-                                            </p>
-                                          ) : (
-                                            filteredBrands.map((b) => (
-                                              <button
-                                                key={b}
-                                                type="button"
-                                                onClick={() => {
-                                                  setAppBrand(b)
-                                                  setAppBrandQuery(b)
-                                                  setAppBrandOpen(false)
-                                                }}
-                                                className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
-                                              >
-                                                {b}
-                                              </button>
-                                            ))
-                                          )}
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                  <div className="space-y-1.5">
-                                    <Label>Lote</Label>
-                                    <Input
-                                      value={appLot}
-                                      onChange={(e) => setAppLot(e.target.value)}
-                                      placeholder="Ej. RAB-2026-01"
-                                      className="w-40"
-                                    />
-                                  </div>
-                                  <div className="space-y-1.5">
-                                    <Label>Veterinario</Label>
-                                    <select
-                                      value={appVet}
-                                      onChange={(e) => setAppVet(e.target.value)}
-                                      className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-                                    >
-                                      <option value="">—</option>
-                                      {vets.map((u) => (
-                                        <option key={u.id} value={u.id}>
-                                          {u.full_name}
-                                        </option>
-                                      ))}
-                                    </select>
-                                  </div>
-                                  <div className="flex gap-2">
-                                    <Button
-                                      size="sm"
-                                      onClick={() => saveCarnetApp(v.name)}
-                                      disabled={carnetBusy || !appDate}
-                                    >
-                                      {carnetBusy ? (
-                                        <Loader2 className="animate-spin" />
-                                      ) : (
-                                        'Guardar'
-                                      )}
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      onClick={() => setAddingFor(null)}
-                                    >
-                                      Cancelar
-                                    </Button>
-                                  </div>
+                              <TableCell className="whitespace-normal break-words font-medium">
+                                {v.name}
+                              </TableCell>
+                              <TableCell className="whitespace-normal">
+                                <div className="space-y-1.5">
+                                  {v.applications.length === 0 ? (
+                                    <span className="text-sm text-muted-foreground">—</span>
+                                  ) : (
+                                    v.applications.map((app) => (
+                                      <p
+                                        key={app.id}
+                                        className="break-words rounded-md border border-border/60 bg-muted/30 px-2 py-1 text-xs font-medium"
+                                      >
+                                        {app.brand ?? '—'}
+                                      </p>
+                                    ))
+                                  )}
                                 </div>
                               </TableCell>
+                              <TableCell className="whitespace-normal break-words text-muted-foreground">
+                                {v.prevents ?? '—'}
+                              </TableCell>
+                              <TableCell className="whitespace-normal break-words text-xs text-muted-foreground">
+                                {v.schedule ?? '—'}
+                              </TableCell>
+                              <TableCell className="whitespace-normal">
+                                <CarnetApps apps={v.applications} onRemove={removeCarnetApp} />
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => toggleAddRow(v.name)}
+                                >
+                                  <Plus /> Añadir
+                                </Button>
+                              </TableCell>
                             </TableRow>
-                          )}
-                        </Fragment>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                            {addingFor === v.name && (
+                              <TableRow>
+                                <TableCell colSpan={6} className="bg-muted/30">
+                                  <CarnetAppForm {...carnetFormProps(v.name)} />
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </Fragment>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  {/* Tarjetas (móvil) */}
+                  <div className="space-y-3 md:hidden">
+                    {carnet.map((v) => (
+                      <div key={v.name} className="rounded-xl border border-border bg-card p-4">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold">{v.name}</p>
+                            {v.prevents && (
+                              <p className="mt-0.5 text-xs text-muted-foreground">{v.prevents}</p>
+                            )}
+                          </div>
+                          <Button variant="outline" size="sm" onClick={() => toggleAddRow(v.name)}>
+                            <Plus /> Añadir
+                          </Button>
+                        </div>
+                        {v.schedule && (
+                          <p className="mt-2 rounded-md bg-muted/40 px-2 py-1.5 text-xs text-muted-foreground">
+                            Esquema: {v.schedule}
+                          </p>
+                        )}
+                        {v.applications.length > 0 && (
+                          <div className="mt-3">
+                            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                              Marca
+                            </p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {v.applications.map((app) => (
+                                <span
+                                  key={app.id}
+                                  className="rounded-md border border-border/60 bg-muted/30 px-2 py-1 text-xs font-medium"
+                                >
+                                  {app.brand ?? '—'}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        <div className="mt-3">
+                          <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                            Aplicaciones
+                          </p>
+                          <CarnetApps apps={v.applications} onRemove={removeCarnetApp} />
+                        </div>
+                        {addingFor === v.name && (
+                          <div className="mt-3 border-t border-border pt-3">
+                            <CarnetAppForm {...carnetFormProps(v.name)} />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>
 
           <Tabs defaultValue="timeline" className="space-y-5">
-            <TabsList className="w-full flex-wrap justify-start gap-1 rounded-xl border border-border bg-card p-1 sm:w-auto">
+            <TabsList className="w-full justify-start gap-1 overflow-x-auto rounded-xl border border-border bg-card p-1 sm:w-auto sm:overflow-visible">
               <TabsTrigger value="timeline" className="gap-1.5">
                 <History className="size-4" aria-hidden="true" />
                 Línea de tiempo
@@ -1013,6 +1123,7 @@ export function PetDetail() {
                   <div className="absolute bottom-2 left-4 top-2 w-px bg-gradient-to-b from-primary/40 via-border to-transparent" />
                   {timeline.map((e) => {
                     const isConsulta = e.type === 'consulta'
+                    const isFoto = e.type === 'foto'
                     const st = CITA_STATUS[e.status ?? ''] ?? {
                       label: e.status ?? '',
                       variant: 'secondary',
@@ -1023,11 +1134,15 @@ export function PetDetail() {
                           className={`absolute -left-10 top-1 flex size-8 items-center justify-center rounded-full border-4 border-background shadow-card ${
                             isConsulta
                               ? 'bg-sky-500 text-white'
-                              : 'bg-primary text-primary-foreground'
+                              : isFoto
+                                ? 'bg-violet-500 text-white'
+                                : 'bg-primary text-primary-foreground'
                           }`}
                         >
                           {isConsulta ? (
                             <Stethoscope className="size-3.5" aria-hidden="true" />
+                          ) : isFoto ? (
+                            <Camera className="size-3.5" aria-hidden="true" />
                           ) : (
                             <CalendarDays className="size-3.5" aria-hidden="true" />
                           )}
@@ -1039,6 +1154,13 @@ export function PetDetail() {
                                 <p className="text-sm font-semibold">{e.title}</p>
                                 {isConsulta ? (
                                   <Badge variant="success">Consulta</Badge>
+                                ) : isFoto ? (
+                                  <Badge
+                                    variant="outline"
+                                    className="text-violet-600 dark:text-violet-300"
+                                  >
+                                    Foto
+                                  </Badge>
                                 ) : (
                                   st.label && <Badge variant={st.variant}>{st.label}</Badge>
                                 )}
@@ -1055,6 +1177,13 @@ export function PetDetail() {
                             </div>
                             {e.subtitle && (
                               <p className="mt-2 text-xs text-muted-foreground">{e.subtitle}</p>
+                            )}
+                            {isFoto && e.url && (
+                              <img
+                                src={e.url}
+                                alt={e.title}
+                                className="mt-2 aspect-video w-full max-w-xs rounded-lg border border-border/60 object-cover"
+                              />
                             )}
                             {e.author && (
                               <p className="mt-1.5 text-xs text-muted-foreground/70">{e.author}</p>

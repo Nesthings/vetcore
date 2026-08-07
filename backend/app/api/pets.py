@@ -893,6 +893,15 @@ def pet_timeline(
         else {}
     )
 
+    photo_vets = db.execute(
+        text(
+            "SELECT p.id, p.label, p.url, p.taken_at, u.full_name AS vet_name "
+            "FROM pet_photos p LEFT JOIN users u ON u.id = p.vet_user_id "
+            "WHERE p.pet_id = :pid AND p.clinic_id = :cid"
+        ),
+        {"pid": pet.id, "cid": ctx.clinic["id"]},
+    ).mappings().all()
+
     events: list[dict] = []
     for c in consultations:
         events.append(
@@ -916,6 +925,19 @@ def pet_timeline(
                 "author": None,
                 "date": a.start_time.isoformat(),
                 "status": a.status,
+            }
+        )
+    for p in photo_vets:
+        events.append(
+            {
+                "type": "foto",
+                "id": str(p["id"]),
+                "title": p["label"] or "Foto de la consulta",
+                "subtitle": "",
+                "author": p["vet_name"],
+                "date": p["taken_at"].isoformat(),
+                "status": None,
+                "url": p["url"],
             }
         )
 

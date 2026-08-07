@@ -119,10 +119,17 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen bg-background">
+      {collapsed === false && (
+        <div
+          className="fixed inset-0 z-30 bg-black/40 backdrop-blur-[1px] md:hidden"
+          onClick={() => setCollapsed(true)}
+          aria-hidden="true"
+        />
+      )}
       <aside
         className={cn(
-          'sticky top-0 flex h-screen flex-col overflow-hidden border-r border-border bg-card bg-gradient-to-b from-primary/10 via-transparent to-transparent transition-[width] duration-300',
-          collapsed ? 'w-0' : 'w-60',
+          'fixed inset-y-0 left-0 z-40 flex h-screen flex-col overflow-hidden border-r border-border bg-card bg-gradient-to-b from-primary/10 via-transparent to-transparent transition-[width,transform] duration-300 md:sticky md:top-0 md:translate-x-0',
+          collapsed ? '-translate-x-full md:w-0 md:translate-x-0' : 'w-60 translate-x-0',
         )}
       >
         <div className="flex items-center gap-2 border-b border-border px-4 py-4">
@@ -163,6 +170,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               onDragStart={(e) => {
                 e.dataTransfer.setData('text/plain', item.component)
                 e.dataTransfer.effectAllowed = 'move'
+              }}
+              onClick={() => {
+                if (window.innerWidth < 768) setCollapsed(true)
               }}
               title={
                 item.component !== 'dashboard'
