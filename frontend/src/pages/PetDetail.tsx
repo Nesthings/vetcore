@@ -749,12 +749,18 @@ export function PetDetail() {
                   <Table className="table-fixed [&_th]:border-l [&_th:first-child]:border-l-0 [&_td]:border-l [&_td:first-child]:border-l-0">
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-[21%]">Vacuna</TableHead>
-                        <TableHead className="w-[12%]">Marca</TableHead>
-                        <TableHead className="w-[17%]">Enfermedades que previene</TableHead>
-                        <TableHead className="w-[23%]">Esquema recomendado</TableHead>
-                        <TableHead className="w-[15%]">Aplicaciones</TableHead>
-                        <TableHead className="w-[12%] text-right">Registrar</TableHead>
+                        <TableHead className="w-[21%] whitespace-normal">Vacuna</TableHead>
+                        <TableHead className="w-[12%] whitespace-normal">Marca</TableHead>
+                        <TableHead className="w-[17%] whitespace-normal">
+                          Enfermedades que previene
+                        </TableHead>
+                        <TableHead className="w-[23%] whitespace-normal">
+                          Esquema recomendado
+                        </TableHead>
+                        <TableHead className="w-[15%] whitespace-normal">Aplicaciones</TableHead>
+                        <TableHead className="w-[12%] whitespace-normal text-right">
+                          Registrar
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
