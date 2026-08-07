@@ -747,32 +747,34 @@ export function PetDetail() {
                               {v.applications.length === 0 ? (
                                 <span className="text-sm text-muted-foreground">—</span>
                               ) : (
-                                <div className="space-y-1">
+                                <div className="space-y-1.5">
                                   {v.applications.map((app) => (
-                                    <div key={app.id} className="flex items-center gap-1.5 text-xs">
-                                      <span className="font-medium">
-                                        {new Date(app.date_applied).toLocaleDateString('es-MX')}
-                                      </span>
-                                      {app.lot && (
-                                        <span className="text-muted-foreground">
-                                          · Lote {app.lot}
+                                    <div
+                                      key={app.id}
+                                      className="rounded-md border border-border/60 bg-muted/30 px-2 py-1"
+                                    >
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="font-medium">
+                                          {new Date(app.date_applied).toLocaleDateString('es-MX')}
                                         </span>
+                                        <button
+                                          type="button"
+                                          onClick={() => removeCarnetApp(app.id)}
+                                          aria-label={`Eliminar aplicación ${new Date(
+                                            app.date_applied,
+                                          ).toLocaleDateString('es-MX')}`}
+                                          className="ml-auto shrink-0 text-muted-foreground hover:text-destructive"
+                                        >
+                                          <X className="size-3" />
+                                        </button>
+                                      </div>
+                                      {(app.lot || app.vet_name) && (
+                                        <p className="mt-0.5 break-words text-xs text-muted-foreground">
+                                          {[app.lot && `Lote ${app.lot}`, app.vet_name]
+                                            .filter(Boolean)
+                                            .join(' · ')}
+                                        </p>
                                       )}
-                                      {app.vet_name && (
-                                        <span className="text-muted-foreground">
-                                          · {app.vet_name}
-                                        </span>
-                                      )}
-                                      <button
-                                        type="button"
-                                        onClick={() => removeCarnetApp(app.id)}
-                                        aria-label={`Eliminar aplicación ${new Date(
-                                          app.date_applied,
-                                        ).toLocaleDateString('es-MX')}`}
-                                        className="text-muted-foreground hover:text-destructive"
-                                      >
-                                        <X className="size-3" />
-                                      </button>
                                     </div>
                                   ))}
                                 </div>
