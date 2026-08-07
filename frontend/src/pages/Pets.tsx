@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Pencil, Plus, Search, Users } from 'lucide-react'
 
@@ -58,30 +58,41 @@ interface PetWithAlerts extends Pet {
 export function Pets() {
   const [pets, setPets] = useState<PetWithAlerts[]>([])
   const [search, setSearch] = useState('')
-  const [loading, setLoading] = useState(true)
+  const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<PetWithAlerts | null>(null)
-
-  const load = async (q = search) => {
-    setLoading(true)
-    setError(null)
-    try {
-      const params = new URLSearchParams()
-      if (q) params.set('search', q)
-      const res = await apiFetch<PetWithAlerts[]>(`/pets?${params}`)
-      setPets(res)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudieron cargar los pacientes')
-    } finally {
-      setLoading(false)
-    }
-  }
+  const [refreshKey, setRefreshKey] = useState(0)
 
   useEffect(() => {
-    load()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    let cancelled = false
+    const t = setTimeout(
+      () => {
+        ;(async () => {
+          try {
+            const params = new URLSearchParams()
+            if (search.trim()) params.set('search', search.trim())
+            const res = await apiFetch<PetWithAlerts[]>(`/pets?${params}`)
+            if (!cancelled) {
+              setPets(res)
+              setLoaded(true)
+            }
+          } catch (err) {
+            if (!cancelled) {
+              setError(err instanceof Error ? err.message : 'No se pudieron cargar los pacientes')
+            }
+          }
+        })()
+      },
+      search.trim() ? 250 : 0,
+    )
+    return () => {
+      cancelled = true
+      clearTimeout(t)
+    }
+  }, [search, refreshKey])
+
+  const refresh = useCallback(() => setRefreshKey((k) => k + 1), [])
 
   return (
     <AppLayout>
@@ -107,17 +118,17 @@ export function Pets() {
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && load(search)}
             placeholder="Buscar por nombre…"
             className="pl-9"
+            autoComplete="off"
           />
         </div>
       </div>
 
-      {error && <ErrorState description={error} onRetry={() => load()} className="mb-6" />}
-      {loading && <LoadingState label="Cargando pacientes…" />}
+      {error && <ErrorState description={error} onRetry={refresh} className="mb-6" />}
+      {!loaded && !error && <LoadingState label="Cargando pacientes…" />}
 
-      {!loading && !error && pets.length === 0 && (
+      {loaded && !error && pets.length === 0 && (
         <EmptyState
           title="Sin pacientes"
           description="Registra tu primera mascota para empezar su expediente."
@@ -136,7 +147,7 @@ export function Pets() {
         />
       )}
 
-      {!loading && !error && pets.length > 0 && (
+      {loaded && !error && pets.length > 0 && (
         <div className="overflow-hidden rounded-lg border border-border bg-card shadow-card">
           <Table>
             <TableHeader>
@@ -218,7 +229,7 @@ export function Pets() {
         onSaved={() => {
           setFormOpen(false)
           setEditing(null)
-          load()
+          refresh()
         }}
       />
     </AppLayout>
