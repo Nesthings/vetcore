@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { apiFetch } from '@/lib/api'
+import { cn } from '@/lib/utils'
 
 export interface Appointment {
   id: string
@@ -215,28 +216,38 @@ export function Agenda() {
       {!loading && !error && (
         <div className="overflow-hidden rounded-xl border border-border bg-card shadow-card">
           <div
-            className="grid"
-            style={{ gridTemplateColumns: `56px repeat(${days.length}, minmax(0, 1fr))` }}
+            className="grid border-b border-border"
+            style={{ gridTemplateColumns: `52px repeat(${days.length}, minmax(0, 1fr))` }}
           >
             <div />
-            {days.map((d) => (
-              <div key={d.toISOString()} className="border-l border-border px-2 py-2 text-center">
-                <p className="text-xs font-medium text-muted-foreground">
-                  {view === 'week'
-                    ? DAYS[(d.getDay() + 6) % 7]
-                    : d.toLocaleDateString('es-MX', { weekday: 'long' })}
-                </p>
-                <p
-                  className={`text-lg font-semibold ${
-                    d.toDateString() === new Date().toDateString()
-                      ? 'text-primary'
-                      : 'text-foreground'
-                  }`}
+            {days.map((d) => {
+              const isToday = d.toDateString() === new Date().toDateString()
+              return (
+                <div
+                  key={d.toISOString()}
+                  className={cn(
+                    'flex flex-col items-center gap-1 border-l border-border py-2.5',
+                    isToday && 'bg-primary/[0.04]',
+                  )}
                 >
-                  {d.getDate()}
-                </p>
-              </div>
-            ))}
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {view === 'week'
+                      ? DAYS[(d.getDay() + 6) % 7]
+                      : d.toLocaleDateString('es-MX', { weekday: 'long' })}
+                  </span>
+                  <span
+                    className={cn(
+                      'flex size-8 items-center justify-center rounded-full text-base font-semibold',
+                      isToday
+                        ? 'bg-primary text-primary-foreground shadow-glow'
+                        : 'text-foreground',
+                    )}
+                  >
+                    {d.getDate()}
+                  </span>
+                </div>
+              )
+            })}
           </div>
 
           <TimeGrid
