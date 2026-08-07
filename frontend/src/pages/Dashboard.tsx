@@ -97,6 +97,7 @@ export function Dashboard() {
   const [modulesDragOver, setModulesDragOver] = useState(false)
   const [trayOpen, setTrayOpen] = useState(false)
   const [gridDragOver, setGridDragOver] = useState(false)
+  const [trayBtnDragOver, setTrayBtnDragOver] = useState(false)
   const [dashData, setDashData] = useState<Record<string, unknown>>({})
 
   const load = useCallback(async () => {
@@ -148,6 +149,13 @@ export function Dashboard() {
     setGridDragOver(false)
     const slug = e.dataTransfer.getData('text/plain')
     if (slug && getDashboard(slug)) add(slug)
+  }
+
+  const handleTrayButtonDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setTrayBtnDragOver(false)
+    const slug = e.dataTransfer.getData('text/plain')
+    if (slug && getDashboard(slug)) remove(slug)
   }
 
   return (
@@ -236,7 +244,19 @@ export function Dashboard() {
           <LayoutDashboard className="size-6 text-primary" aria-hidden="true" />
           <h1 className="text-2xl font-semibold tracking-tight">Dashboards</h1>
         </div>
-        <Button variant="outline" size="sm" onClick={() => setTrayOpen((o) => !o)}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setTrayOpen((o) => !o)}
+          onDragOver={(e) => {
+            e.preventDefault()
+            e.dataTransfer.dropEffect = 'move'
+            setTrayBtnDragOver(true)
+          }}
+          onDragLeave={() => setTrayBtnDragOver(false)}
+          onDrop={handleTrayButtonDrop}
+          className={cn(trayBtnDragOver && 'border-primary/40 bg-primary/10')}
+        >
           <PanelTop className="size-4" aria-hidden="true" />
           Bandeja de dashboards
         </Button>
@@ -251,21 +271,26 @@ export function Dashboard() {
         onClose={() => setTrayOpen(false)}
       />
 
-      {active.length > 0 && (
-        <div
-          onDragOver={(e) => {
-            e.preventDefault()
-            e.dataTransfer.dropEffect = 'move'
-            setGridDragOver(true)
-          }}
-          onDragLeave={() => setGridDragOver(false)}
-          onDrop={handleGridDrop}
-          className={cn(
-            'mb-6 grid gap-4 rounded-xl sm:grid-cols-2 xl:grid-cols-3',
-            gridDragOver && 'outline-2 outline-dashed outline-primary/40',
-          )}
-        >
-          {active.map((slug) => {
+      <div
+        onDragOver={(e) => {
+          e.preventDefault()
+          e.dataTransfer.dropEffect = 'move'
+          setGridDragOver(true)
+        }}
+        onDragLeave={() => setGridDragOver(false)}
+        onDrop={handleGridDrop}
+        className={cn(
+          'mb-6 grid gap-4 rounded-xl sm:grid-cols-2 xl:grid-cols-3',
+          gridDragOver && 'outline-2 outline-dashed outline-primary/40',
+          active.length === 0 && 'border border-dashed border-border/60 bg-card/40 p-10',
+        )}
+      >
+        {active.length === 0 ? (
+          <p className="col-span-full text-center text-sm text-muted-foreground">
+            Arrastra aquí un dashboard de la bandeja para dibujarlo.
+          </p>
+        ) : (
+          active.map((slug) => {
             const def = getDashboard(slug)
             if (!def) return null
             return (
@@ -299,9 +324,9 @@ export function Dashboard() {
                 </CardContent>
               </Card>
             )
-          })}
-        </div>
-      )}
+          })
+        )}
+      </div>
 
       {error && <ErrorState description={error} onRetry={load} className="mb-6" />}
 
