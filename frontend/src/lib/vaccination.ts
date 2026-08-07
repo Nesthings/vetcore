@@ -5,6 +5,18 @@ export interface VaccinationPlanStep {
   position: number
 }
 
+/** Convierte días en una frase legible para humanos (ej. 182 → "6 meses"). */
+export function humanizeLapso(days: number): string {
+  if (days <= 0) return 'el día de la asignación'
+  if (days % 365 === 0) return `${days / 365} año${days / 365 > 1 ? 's' : ''}`
+  const months = Math.round(days / 30.44)
+  if (months >= 1 && Math.abs(days - months * 30.44) <= 8) {
+    return `${months} mes${months > 1 ? 'es' : ''}`
+  }
+  if (days % 7 === 0) return `${days / 7} semana${days / 7 > 1 ? 's' : ''}`
+  return `${days} día${days > 1 ? 's' : ''}`
+}
+
 export interface VaccinationPlan {
   id: string
   clinic_id: string

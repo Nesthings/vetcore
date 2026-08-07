@@ -11,17 +11,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { humanizeLapso } from '@/lib/vaccination'
 import { speciesLabel } from '@/lib/species'
 import type { VaccinationPlan } from '@/lib/vaccination'
-
-function formatLapso(days: number): string {
-  if (days === 0) return 'Día de la asignación'
-  if (days % 365 === 0) return `${days / 365} año${days / 365 > 1 ? 's' : ''}`
-  if (days % 30 === 0) return `${days / 30} meses`
-  if (days % 15 === 0) return `${days / 15} quincenas`
-  if (days % 7 === 0) return `${days / 7} semanas`
-  return `${days} días`
-}
 
 export function PlanViewDialog({
   plan,
@@ -109,10 +101,10 @@ export function PlanViewDialog({
                       <Fragment key={i}>
                         <tr className="border-b border-border/60 last:border-0">
                           <td className="px-3 py-2 font-medium">{s.label}</td>
-                          <td className="px-3 py-2 text-muted-foreground">
+                          <td className="px-3 py-2 capitalize text-muted-foreground">
                             {i === 0
                               ? 'Se agenda el día de la asignación'
-                              : `Después de ${formatLapso(s.offset_days)}`}
+                              : `Después de ${humanizeLapso(s.offset_days)}`}
                           </td>
                         </tr>
                       </Fragment>

@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { apiFetch } from '@/lib/api'
+import { humanizeLapso } from '@/lib/vaccination'
 import { speciesLabel } from '@/lib/species'
 import type { VaccinationPlan } from '@/lib/vaccination'
 
@@ -256,61 +257,66 @@ export function PlanFormDialog({
             </div>
             <div className="space-y-2">
               {steps.map((s, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-center gap-2 rounded-md border border-border p-2"
-                >
-                  <Input
-                    className="flex-1"
-                    placeholder={
-                      idx === 0 ? '1ª dosis (fecha de asignación)' : 'Ej. Refuerzo anual'
-                    }
-                    value={s.label}
-                    onChange={(e) => updateStep(idx, { label: e.target.value })}
-                    required
-                  />
-                  {idx === 0 ? (
-                    <span className="w-48 shrink-0 rounded-md border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
-                      Se agenda el día de la asignación
-                    </span>
-                  ) : (
-                    <>
-                      <Input
-                        type="number"
-                        min="0"
-                        className="w-24"
-                        placeholder="Cada"
-                        value={s.value}
-                        onChange={(e) => updateStep(idx, { value: e.target.value })}
-                        required
-                      />
-                      <Select
-                        value={s.unit}
-                        onValueChange={(v) => updateStep(idx, { unit: v as Unit })}
+                <div key={idx} className="rounded-md border border-border p-2">
+                  <div className="flex items-center gap-2">
+                    <Input
+                      className="flex-1"
+                      placeholder={
+                        idx === 0 ? '1ª dosis (fecha de asignación)' : 'Ej. Refuerzo anual'
+                      }
+                      value={s.label}
+                      onChange={(e) => updateStep(idx, { label: e.target.value })}
+                      required
+                    />
+                    {idx === 0 ? (
+                      <span className="shrink-0 rounded-md border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
+                        Se agenda el día de la asignación
+                      </span>
+                    ) : (
+                      <>
+                        <span className="shrink-0 text-sm text-muted-foreground">cada</span>
+                        <Input
+                          type="number"
+                          min="0"
+                          className="w-20"
+                          placeholder="1"
+                          value={s.value}
+                          onChange={(e) => updateStep(idx, { value: e.target.value })}
+                          required
+                        />
+                        <Select
+                          value={s.unit}
+                          onValueChange={(v) => updateStep(idx, { unit: v as Unit })}
+                        >
+                          <SelectTrigger className="w-32" aria-label="Unidad de tiempo">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="dias">días</SelectItem>
+                            <SelectItem value="semanas">semanas</SelectItem>
+                            <SelectItem value="quincenas">quincenas</SelectItem>
+                            <SelectItem value="meses">meses</SelectItem>
+                            <SelectItem value="anos">años</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </>
+                    )}
+                    {steps.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label="Quitar dosis"
+                        onClick={() => setSteps((list) => list.filter((_, i) => i !== idx))}
                       >
-                        <SelectTrigger className="w-32" aria-label="Unidad de tiempo">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="dias">días</SelectItem>
-                          <SelectItem value="semanas">semanas</SelectItem>
-                          <SelectItem value="quincenas">quincenas</SelectItem>
-                          <SelectItem value="meses">meses</SelectItem>
-                          <SelectItem value="anos">años</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </>
-                  )}
-                  {steps.length > 1 && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      aria-label="Quitar dosis"
-                      onClick={() => setSteps((list) => list.filter((_, i) => i !== idx))}
-                    >
-                      <Trash2 />
-                    </Button>
+                        <Trash2 />
+                      </Button>
+                    )}
+                  </div>
+                  {idx > 0 && (
+                    <p className="mt-1 pl-1 text-xs capitalize text-muted-foreground">
+                      → {humanizeLapso(toDays(s))} después de la dosis anterior
+                    </p>
                   )}
                 </div>
               ))}
