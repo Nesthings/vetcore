@@ -146,7 +146,7 @@ export function InviteOwnerDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           <div className="rounded-lg border border-border bg-muted/40 p-3">
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Enlace de la cartilla (sin login)
@@ -167,8 +167,11 @@ export function InviteOwnerDialog({
               </Button>
             ) : (
               <div className="mt-2 space-y-1.5">
-                <div className="flex items-center gap-2">
-                  <code className="min-w-0 flex-1 truncate rounded-md border border-border bg-card px-2 py-1.5 text-xs">
+                <div className="flex min-w-0 items-center gap-2">
+                  <code
+                    data-testid="share-code"
+                    className="block min-w-0 flex-1 truncate rounded-md border border-border bg-card px-2 py-1.5 text-xs"
+                  >
                     {shareFullLink}
                   </code>
                   <Button type="button" variant="outline" size="sm" onClick={copyShareLink}>

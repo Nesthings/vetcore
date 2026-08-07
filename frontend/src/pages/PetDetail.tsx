@@ -400,7 +400,6 @@ export function PetDetail() {
   const [alertType, setAlertType] = useState(ALERT_TYPES[0])
   const [alertDesc, setAlertDesc] = useState('')
   const [alertBusy, setAlertBusy] = useState(false)
-  const [ownerPhotoBusy, setOwnerPhotoBusy] = useState(false)
   const appBrandRef = useRef<HTMLDivElement>(null)
 
   const load = useCallback(async () => {
@@ -471,22 +470,6 @@ export function PetDetail() {
       await load()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo eliminar la alerta')
-    }
-  }
-
-  const uploadOwnerPhoto = async (file: File) => {
-    if (!pet) return
-    setOwnerPhotoBusy(true)
-    setError(null)
-    try {
-      const fd = new FormData()
-      fd.append('file', file)
-      await apiFetch(`/pets/${pet.id}/owner-photo`, { method: 'POST', body: fd })
-      await load()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo subir la foto del dueño')
-    } finally {
-      setOwnerPhotoBusy(false)
     }
   }
 
@@ -797,28 +780,6 @@ export function PetDetail() {
                               initials
                             )}
                           </div>
-                          <label
-                            className={`absolute -bottom-1 -right-1 flex size-7 cursor-pointer items-center justify-center rounded-full border-2 border-card bg-primary text-primary-foreground shadow-card transition-colors hover:bg-primary-hover ${
-                              ownerPhotoBusy ? 'pointer-events-none opacity-70' : ''
-                            }`}
-                            title="Subir foto de perfil del dueño"
-                          >
-                            {ownerPhotoBusy ? (
-                              <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
-                            ) : (
-                              <Camera className="size-3.5" aria-hidden="true" />
-                            )}
-                            <input
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              onChange={(e) => {
-                                const f = e.target.files?.[0]
-                                if (f) uploadOwnerPhoto(f)
-                                e.target.value = ''
-                              }}
-                            />
-                          </label>
                         </div>
 
                         <div className="min-w-0 flex-1">

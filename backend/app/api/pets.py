@@ -18,7 +18,6 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import CurrentClinic, get_current_clinic, require_clinic_roles, require_component
 from app.core.events import notify_roles, record_audit
-from app.core.images import process_cartilla_photo
 from app.core.security import create_share_token
 from app.core.seed_vaccination_plans import ensure_standard_plans
 from app.core.storage import (
@@ -573,66 +572,6 @@ def upload_pet_photo(
     db.commit()
     db.refresh(pet)
     return _pet_with_latest_weight(db, pet)
-
-
-@router.post(
-    "/{pet_id}/owner-photo",
-    summary="Sube/actualiza la foto de perfil del dueño activo de la mascota",
-)
-def upload_owner_photo(
-    pet_id: str,
-    file: UploadFile = File(...),
-    ctx: CurrentClinic = Depends(require_clinic_roles(*PET_MUTATORS)),
-    db: Session = Depends(get_db),
-) -> dict:
-    pet = _get_pet_or_404(db, ctx.clinic["id"], pet_id)
-    row = db.execute(
-        text(
-            "SELECT o.id, o.profile_photo_url FROM owner_pet_links l "
-            "JOIN owners o ON o.id = l.owner_id "
-            "WHERE l.pet_id = :pid AND l.clinic_id = :cid AND l.is_active = true "
-            "ORDER BY l.linked_at DESC LIMIT 1"
-        ),
-        {"pid": pet.id, "cid": ctx.clinic["id"]},
-    ).mappings().first()
-    if row is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="La mascota no tiene un dueño activo",
-        )
-
-    validate_extension(file.filename or "", ALLOWED_IMAGE_EXTENSIONS)
-    content = file.file.read()
-    if len(content) > MAX_IMAGE_BYTES:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail="La imagen supera el límite de 5 MB",
-        )
-    try:
-        processed = process_cartilla_photo(content)
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-
-    rel = save_media(f"owners/{row.id}", "profile.jpg", processed)
-    db.execute(
-        text(
-            "UPDATE owners SET profile_photo_prev_url = profile_photo_url, "
-            "profile_photo_url = :url WHERE id = :oid"
-        ),
-        {"url": public_url(rel), "oid": row.id},
-    )
-    record_audit(
-        db,
-        clinic_id=ctx.clinic["id"],
-        actor_type="user",
-        actor_id=ctx.user.sub,
-        action="owner_photo_uploaded",
-        entity_type="owner",
-        entity_id=row.id,
-        metadata={"pet_id": pet_id},
-    )
-    db.commit()
-    return {"profile_photo_url": public_url(rel), "revertible": bool(row.profile_photo_url)}
 
 
 @router.get("/{pet_id}/photos", summary="Fotos de la sesión del veterinario")

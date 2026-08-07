@@ -412,6 +412,59 @@ def share_upload_photo(
     return {"clinical_photo_url": pet.clinical_photo_url}
 
 
+@router.post("/cartilla/owner-photo", summary="El dueño sube/actualiza su propia foto de perfil")
+def share_upload_owner_photo(
+    token: str = Form(...),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+) -> dict:
+    pet = _pet_from_token(token, db)
+    row = db.execute(
+        text(
+            "SELECT o.id, o.profile_photo_url FROM owner_pet_links l "
+            "JOIN owners o ON o.id = l.owner_id "
+            "WHERE l.pet_id = :pid AND l.clinic_id = :cid AND l.is_active = true "
+            "ORDER BY l.linked_at DESC LIMIT 1"
+        ),
+        {"pid": pet.id, "cid": pet.clinic_id},
+    ).mappings().first()
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="La mascota no tiene un dueño activo"
+        )
+    validate_extension(file.filename or "", ALLOWED_IMAGE_EXTENSIONS)
+    content = file.file.read()
+    if len(content) > MAX_IMAGE_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="La imagen supera el límite de 5 MB",
+        )
+    try:
+        processed = process_cartilla_photo(content)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    rel = save_media(f"owners/{row.id}", f"profile_{uuid.uuid4().hex[:8]}.jpg", processed)
+    db.execute(
+        text(
+            "UPDATE owners SET profile_photo_prev_url = profile_photo_url, "
+            "profile_photo_url = :url WHERE id = :oid"
+        ),
+        {"url": public_url(rel), "oid": row.id},
+    )
+    record_audit(
+        db,
+        clinic_id=pet.clinic_id,
+        actor_type="owner",
+        actor_id=pet.id,
+        action="owner_photo_updated_owner",
+        entity_type="owner",
+        entity_id=row.id,
+        metadata={"pet_id": str(pet.id)},
+    )
+    db.commit()
+    return {"profile_photo_url": public_url(rel), "revertible": bool(row.profile_photo_url)}
+
+
 @router.post(
     "/cartilla/alerts",
     status_code=status.HTTP_201_CREATED,

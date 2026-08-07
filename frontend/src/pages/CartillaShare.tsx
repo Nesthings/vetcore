@@ -37,6 +37,14 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { EmptyState } from '@/components/ui/empty-state'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Dialog,
@@ -204,6 +212,7 @@ export function CartillaShare() {
 
   // foto de perfil
   const [photoBusy, setPhotoBusy] = useState(false)
+  const [ownerPhotoBusy, setOwnerPhotoBusy] = useState(false)
 
   // alertas
   const [alertType, setAlertType] = useState(ALERT_TYPES[0])
@@ -250,6 +259,22 @@ export function CartillaShare() {
       setError(err instanceof Error ? err.message : 'No se pudo subir la foto')
     } finally {
       setPhotoBusy(false)
+    }
+  }
+
+  const uploadOwnerPhoto = async (file: File) => {
+    setOwnerPhotoBusy(true)
+    setError(null)
+    try {
+      const fd = new FormData()
+      fd.append('token', token)
+      fd.append('file', file)
+      await apiFetch('/share/cartilla/owner-photo', { method: 'POST', body: fd })
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo subir tu foto')
+    } finally {
+      setOwnerPhotoBusy(false)
     }
   }
 
@@ -362,14 +387,9 @@ export function CartillaShare() {
 
   return (
     <div className="mx-auto min-h-screen w-full max-w-3xl bg-background pb-16">
-      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-border/70 bg-background/80 px-4 py-3 backdrop-blur">
-        <div>
-          <h1 className="text-lg font-bold">Cartilla de {pet.name}</h1>
-          <p className="text-xs text-muted-foreground">Compartida por tu clínica</p>
-        </div>
-        <Link to="/" className="text-sm font-medium text-primary hover:underline">
-          Ir al inicio
-        </Link>
+      <header className="sticky top-0 z-10 border-b border-border/70 bg-background/80 px-4 py-3 backdrop-blur">
+        <h1 className="text-lg font-bold">Cartilla de {pet.name}</h1>
+        <p className="text-xs text-muted-foreground">Compartida por tu clínica</p>
       </header>
 
       <main className="space-y-6 p-4">
@@ -488,34 +508,80 @@ export function CartillaShare() {
             {!pet.owners || pet.owners.length === 0 ? (
               <p className="text-sm text-muted-foreground">Sin dueño registrado.</p>
             ) : (
-              pet.owners.map((o) => (
-                <div
-                  key={o.owner_id}
-                  className="rounded-xl border border-border/60 bg-muted/30 px-3 py-2.5 text-sm"
-                >
-                  <p className="font-medium">{o.full_name ?? 'Dueño registrado'}</p>
-                  <div className="mt-1 space-y-0.5 text-muted-foreground">
-                    {o.phone && (
-                      <p className="flex items-center gap-2">
-                        <Phone className="size-3.5 shrink-0 text-primary" aria-hidden="true" />
-                        {o.phone}
-                      </p>
-                    )}
-                    {o.email && (
-                      <p className="flex items-center gap-2">
-                        <Mail className="size-3.5 shrink-0 text-primary" aria-hidden="true" />
-                        {o.email}
-                      </p>
-                    )}
-                    {!o.phone && !o.email && <p>Sin contacto registrado</p>}
+              pet.owners.map((o) => {
+                const initials =
+                  (o.full_name ?? 'D')
+                    .split(/\s+/)
+                    .slice(0, 2)
+                    .map((w) => w[0]?.toUpperCase() ?? '')
+                    .join('') || 'D'
+                return (
+                  <div
+                    key={o.owner_id}
+                    className="flex flex-col items-center gap-4 rounded-xl border border-border/60 bg-muted/30 p-4 sm:flex-row"
+                  >
+                    <div className="relative shrink-0">
+                      <div className="flex size-20 items-center justify-center overflow-hidden rounded-full border-2 border-primary/20 bg-secondary text-xl font-semibold text-primary shadow-card">
+                        {o.profile_photo_url ? (
+                          <img
+                            src={o.profile_photo_url}
+                            alt={o.full_name ?? 'Dueño'}
+                            className="size-full object-cover"
+                          />
+                        ) : (
+                          initials
+                        )}
+                      </div>
+                      <label
+                        className={`absolute -bottom-1 -right-1 flex size-8 cursor-pointer items-center justify-center rounded-full border-2 border-card bg-primary text-primary-foreground shadow-card transition-colors hover:bg-primary-hover ${
+                          ownerPhotoBusy ? 'pointer-events-none opacity-70' : ''
+                        }`}
+                        title="Subir tu foto de perfil"
+                      >
+                        {ownerPhotoBusy ? (
+                          <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                        ) : (
+                          <Camera className="size-4" aria-hidden="true" />
+                        )}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0]
+                            if (f) uploadOwnerPhoto(f)
+                            e.target.value = ''
+                          }}
+                        />
+                      </label>
+                    </div>
+                    <div className="min-w-0 flex-1 text-center sm:text-left">
+                      <p className="text-base font-semibold">{o.full_name ?? 'Dueño registrado'}</p>
+                      <div className="mt-1 space-y-0.5 text-sm text-muted-foreground">
+                        {o.phone && (
+                          <p className="flex items-center justify-center gap-2 sm:justify-start">
+                            <Phone className="size-3.5 shrink-0 text-primary" aria-hidden="true" />
+                            {o.phone}
+                          </p>
+                        )}
+                        {o.email && (
+                          <p className="flex items-center justify-center gap-2 sm:justify-start">
+                            <Mail className="size-3.5 shrink-0 text-primary" aria-hidden="true" />
+                            {o.email}
+                          </p>
+                        )}
+                        {!o.phone && !o.email && <p>Sin contacto registrado</p>}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              ))
+                )
+              })
             )}
             <p className="flex items-start gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2.5 text-xs text-muted-foreground">
               <Lock className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
-              Por seguridad, esta información no se puede modificar desde aquí. Si necesitas
-              actualizar tus datos de contacto, acude a la clínica o contáctala directamente.
+              Por seguridad, tu información de contacto no se puede modificar desde aquí (solo tu
+              foto de perfil). Si necesitas actualizar tus datos, acude a la clínica o contáctala
+              directamente.
             </p>
           </CardContent>
         </Card>
@@ -602,39 +668,124 @@ export function CartillaShare() {
               Esquema estándar para {speciesLabel(data.carnet.species)} · solo lectura
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent>
             {data.carnet.vaccines.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 No hay esquema estándar definido para esta especie.
               </p>
             ) : (
-              data.carnet.vaccines.map((v) => (
-                <div key={v.name} className="rounded-xl border border-border/60 bg-card p-3">
-                  <p className="text-sm font-semibold">{v.name}</p>
-                  {v.prevents && (
-                    <p className="mt-0.5 text-xs text-muted-foreground">{v.prevents}</p>
-                  )}
-                  {v.schedule && (
-                    <p className="mt-1 rounded-md bg-muted/40 px-2 py-1 text-xs text-muted-foreground">
-                      Esquema: {v.schedule}
-                    </p>
-                  )}
-                  {v.applications.length > 0 && (
-                    <div className="mt-2 space-y-1">
-                      {v.applications.map((app) => (
-                        <p key={app.id} className="text-xs text-muted-foreground">
-                          <span className="font-medium">
-                            {new Date(app.date_applied).toLocaleDateString('es-MX')}
-                          </span>
-                          {app.brand ? ` · ${app.brand}` : ''}
-                          {app.lot ? ` · Lote ${app.lot}` : ''}
-                          {app.vet_name ? ` · ${app.vet_name}` : ''}
-                        </p>
+              <>
+                {/* Tabla (escritorio) */}
+                <div className="hidden overflow-hidden rounded-lg border border-border md:block">
+                  <Table className="table-fixed [&_th]:border-l [&_th:first-child]:border-l-0 [&_td]:border-l [&_td:first-child]:border-l-0">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[24%] whitespace-normal">Vacuna</TableHead>
+                        <TableHead className="w-[13%] whitespace-normal">Marca</TableHead>
+                        <TableHead className="w-[21%] whitespace-normal">
+                          Enfermedades que previene
+                        </TableHead>
+                        <TableHead className="w-[27%] whitespace-normal">
+                          Esquema recomendado
+                        </TableHead>
+                        <TableHead className="w-[15%] whitespace-normal">Aplicaciones</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {data.carnet.vaccines.map((v) => (
+                        <TableRow key={v.name}>
+                          <TableCell className="whitespace-normal break-words font-medium">
+                            {v.name}
+                          </TableCell>
+                          <TableCell className="whitespace-normal">
+                            {v.applications.length === 0 ? (
+                              <span className="text-sm text-muted-foreground">—</span>
+                            ) : (
+                              <div className="space-y-1.5">
+                                {v.applications.map((app) => (
+                                  <p
+                                    key={app.id}
+                                    className="break-words rounded-md border border-border/60 bg-muted/30 px-2 py-1 text-xs font-medium"
+                                  >
+                                    {app.brand ?? '—'}
+                                  </p>
+                                ))}
+                              </div>
+                            )}
+                          </TableCell>
+                          <TableCell className="whitespace-normal break-words text-muted-foreground">
+                            {v.prevents ?? '—'}
+                          </TableCell>
+                          <TableCell className="whitespace-normal break-words text-xs text-muted-foreground">
+                            {v.schedule ?? '—'}
+                          </TableCell>
+                          <TableCell className="whitespace-normal">
+                            {v.applications.length === 0 ? (
+                              <span className="text-sm text-muted-foreground">—</span>
+                            ) : (
+                              <div className="space-y-1.5">
+                                {v.applications.map((app) => (
+                                  <div
+                                    key={app.id}
+                                    className="rounded-md border border-border/60 bg-muted/30 px-2 py-1"
+                                  >
+                                    <p className="font-medium">
+                                      {new Date(app.date_applied).toLocaleDateString('es-MX')}
+                                    </p>
+                                    {(app.lot || app.vet_name) && (
+                                      <p className="mt-0.5 break-words text-xs text-muted-foreground">
+                                        {[app.lot && `Lote ${app.lot}`, app.vet_name]
+                                          .filter(Boolean)
+                                          .join(' · ')}
+                                      </p>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </TableCell>
+                        </TableRow>
                       ))}
-                    </div>
-                  )}
+                    </TableBody>
+                  </Table>
                 </div>
-              ))
+
+                {/* Tarjetas (móvil) */}
+                <div className="space-y-3 md:hidden">
+                  {data.carnet.vaccines.map((v) => (
+                    <div key={v.name} className="rounded-xl border border-border/60 bg-card p-4">
+                      <p className="text-sm font-semibold">{v.name}</p>
+                      {v.prevents && (
+                        <p className="mt-0.5 text-xs text-muted-foreground">{v.prevents}</p>
+                      )}
+                      {v.schedule && (
+                        <p className="mt-2 rounded-md bg-muted/40 px-2 py-1.5 text-xs text-muted-foreground">
+                          Esquema: {v.schedule}
+                        </p>
+                      )}
+                      {v.applications.length > 0 && (
+                        <div className="mt-3">
+                          <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                            Aplicaciones
+                          </p>
+                          <div className="space-y-1.5">
+                            {v.applications.map((app) => (
+                              <p key={app.id} className="text-xs text-muted-foreground">
+                                <span className="font-medium">
+                                  {new Date(app.date_applied).toLocaleDateString('es-MX')}
+                                </span>
+                                {app.brand ? ` · ${app.brand}` : ''}
+                                {app.lot ? ` · Lote ${app.lot}` : ''}
+                                {app.vet_name ? ` · ${app.vet_name}` : ''}
+                              </p>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
