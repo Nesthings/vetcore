@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Pencil, Plus } from 'lucide-react'
+import { BadgePercent, Pencil, Plus, Stethoscope } from 'lucide-react'
 
 import { AppLayout } from '@/components/layout/AppLayout'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState } from '@/components/ui/error-state'
 import { LoadingState } from '@/components/ui/loading-state'
+import { StatChip } from '@/components/ui/stat-chip'
 import {
   Table,
   TableBody,
@@ -87,6 +88,23 @@ export function Services() {
             </Button>
           }
         />
+      )}
+
+      {!loading && !error && services.length > 0 && (
+        <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <StatChip
+            label="Servicios en catálogo"
+            value={services.length}
+            icon={Stethoscope}
+            tint="bg-info/10 text-info"
+          />
+          <StatChip
+            label="Con descuento automático"
+            value={services.filter((s) => Number(s.discount_percent) > 0).length}
+            icon={BadgePercent}
+            tint="bg-warning/10 text-warning"
+          />
+        </div>
       )}
 
       {!loading && !error && services.length > 0 && (

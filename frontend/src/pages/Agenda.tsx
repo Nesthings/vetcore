@@ -29,6 +29,7 @@ import {
 } from '@/components/ui/select'
 import { apiFetch } from '@/lib/api'
 import { cn } from '@/lib/utils'
+import { StatChip } from '@/components/ui/stat-chip'
 
 export interface Appointment {
   id: string
@@ -57,30 +58,6 @@ export interface ScheduleBlock {
 }
 
 const DAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
-
-function MiniStat({
-  label,
-  value,
-  icon: Icon,
-  tint,
-}: {
-  label: string
-  value: number
-  icon: React.ElementType
-  tint: string
-}) {
-  return (
-    <div className="flex items-center gap-3 rounded-xl border border-border bg-card p-3 shadow-card">
-      <span className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${tint}`}>
-        <Icon className="size-4" aria-hidden="true" />
-      </span>
-      <div className="min-w-0">
-        <p className="text-lg font-bold leading-none text-foreground">{value}</p>
-        <p className="mt-0.5 truncate text-xs text-muted-foreground">{label}</p>
-      </div>
-    </div>
-  )
-}
 
 function startOfWeek(d: Date): Date {
   const copy = new Date(d)
@@ -247,25 +224,25 @@ export function Agenda() {
 
       {!loading && !error && (
         <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <MiniStat
+          <StatChip
             label="Por atender"
             value={stats.scheduled + stats.confirmed}
             icon={CalendarCheck2}
             tint="bg-info/10 text-info"
           />
-          <MiniStat
+          <StatChip
             label="Pendientes de confirmar"
             value={stats.scheduled}
             icon={CalendarClock}
             tint="bg-warning/10 text-warning"
           />
-          <MiniStat
+          <StatChip
             label="Completadas"
             value={stats.completed}
             icon={CheckCircle2}
             tint="bg-success/10 text-success"
           />
-          <MiniStat
+          <StatChip
             label="Canceladas / No asistió"
             value={stats.cancelled + stats.noShow}
             icon={XCircle}

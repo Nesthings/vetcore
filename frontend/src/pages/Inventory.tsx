@@ -27,6 +27,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { StatChip } from '@/components/ui/stat-chip'
 import { apiFetch } from '@/lib/api'
 
 export interface InventoryProduct {
@@ -51,30 +52,6 @@ function stockBadge(stock: number) {
   if (stock <= 0) return <Badge variant="destructive">Agotado</Badge>
   if (stock < 5) return <Badge variant="warning">Bajo</Badge>
   return <Badge variant="success">{stock} en stock</Badge>
-}
-
-function SummaryChip({
-  label,
-  value,
-  icon: Icon,
-  tint,
-}: {
-  label: string
-  value: number
-  icon: React.ElementType
-  tint: string
-}) {
-  return (
-    <div className="flex items-center gap-3 rounded-xl border border-border bg-card p-3 shadow-card">
-      <span className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${tint}`}>
-        <Icon className="size-4" aria-hidden="true" />
-      </span>
-      <div className="min-w-0">
-        <p className="text-lg font-bold leading-none text-foreground">{value}</p>
-        <p className="mt-0.5 truncate text-xs text-muted-foreground">{label}</p>
-      </div>
-    </div>
-  )
 }
 
 export function Inventory() {
@@ -158,25 +135,25 @@ export function Inventory() {
 
       {!loading && !error && products.length > 0 && (
         <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <SummaryChip
+          <StatChip
             label="Agotados"
             value={summary.agotados}
             icon={PackageX}
             tint="bg-destructive/10 text-destructive"
           />
-          <SummaryChip
+          <StatChip
             label="Stock bajo"
             value={summary.bajos}
             icon={PackageMinus}
             tint="bg-warning/10 text-warning"
           />
-          <SummaryChip
+          <StatChip
             label="Vencidos"
             value={summary.vencidos}
             icon={CalendarX2}
             tint="bg-destructive/10 text-destructive"
           />
-          <SummaryChip
+          <StatChip
             label="Por vencer"
             value={summary.porVencer}
             icon={TriangleAlert}

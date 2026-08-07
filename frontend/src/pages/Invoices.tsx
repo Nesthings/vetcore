@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Plus, Receipt } from 'lucide-react'
+import { CircleDollarSign, Plus, Receipt, WalletCards, XCircle } from 'lucide-react'
 
 import { AppLayout } from '@/components/layout/AppLayout'
 import { InvoiceDetailDialog } from '@/components/invoices/InvoiceDetailDialog'
@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState } from '@/components/ui/error-state'
 import { LoadingState } from '@/components/ui/loading-state'
+import { StatChip } from '@/components/ui/stat-chip'
 import {
   Table,
   TableBody,
@@ -40,10 +41,13 @@ export interface Invoice {
   items: InvoiceItem[]
 }
 
-const STATUS: Record<string, { label: string; variant: 'success' | 'warning' | 'destructive' }> = {
-  paid: { label: 'Pagada', variant: 'success' },
-  pending: { label: 'Pendiente', variant: 'warning' },
-  cancelled: { label: 'Cancelada', variant: 'destructive' },
+const STATUS: Record<
+  string,
+  { label: string; variant: 'soft-success' | 'soft-warning' | 'soft-destructive' }
+> = {
+  paid: { label: 'Pagada', variant: 'soft-success' },
+  pending: { label: 'Pendiente', variant: 'soft-warning' },
+  cancelled: { label: 'Cancelada', variant: 'soft-destructive' },
 }
 
 export function Invoices() {
@@ -84,6 +88,35 @@ export function Invoices() {
         </Button>
       </div>
 
+      {!loading && !error && invoices.length > 0 && (
+        <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <StatChip
+            label="Total cobrado"
+            value={`$${invoices
+              .filter((i) => i.status === 'paid')
+              .reduce((acc, i) => acc + Number(i.total), 0)
+              .toFixed(2)}`}
+            icon={CircleDollarSign}
+            tint="bg-success/10 text-success"
+          />
+          <StatChip
+            label="Pendientes por cobrar"
+            value={`$${invoices
+              .filter((i) => i.status === 'pending')
+              .reduce((acc, i) => acc + Number(i.total), 0)
+              .toFixed(2)}`}
+            icon={WalletCards}
+            tint="bg-warning/10 text-warning"
+          />
+          <StatChip
+            label="Canceladas"
+            value={invoices.filter((i) => i.status === 'cancelled').length}
+            icon={XCircle}
+            tint="bg-destructive/10 text-destructive"
+          />
+        </div>
+      )}
+
       {error && <ErrorState description={error} onRetry={load} className="mb-6" />}
       {loading && <LoadingState label="Cargando facturas…" />}
 
@@ -107,7 +140,7 @@ export function Invoices() {
               <TableRow>
                 <TableHead>Folio</TableHead>
                 <TableHead>Paciente</TableHead>
-                <TableHead>Sucursal</TableHead>
+                <TableHead className="hidden lg:table-cell">Sucursal</TableHead>
                 <TableHead>Fecha</TableHead>
                 <TableHead>Total</TableHead>
                 <TableHead>Estado</TableHead>
@@ -125,7 +158,7 @@ export function Invoices() {
                   >
                     <TableCell className="font-mono text-xs">{inv.id.slice(0, 8)}</TableCell>
                     <TableCell className="font-medium">{inv.pet_name ?? '—'}</TableCell>
-                    <TableCell>{inv.branch_name ?? '—'}</TableCell>
+                    <TableCell className="hidden lg:table-cell">{inv.branch_name ?? '—'}</TableCell>
                     <TableCell>{new Date(inv.created_at).toLocaleDateString('es-MX')}</TableCell>
                     <TableCell className="font-semibold">${Number(inv.total).toFixed(2)}</TableCell>
                     <TableCell>
