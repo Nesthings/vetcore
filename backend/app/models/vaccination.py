@@ -122,6 +122,7 @@ class PetCarnetRecord(UUIDPkMixin, Base):
         UUID(as_uuid=True), ForeignKey("pets.id", ondelete="CASCADE"), nullable=False, index=True
     )
     vaccine: Mapped[str] = mapped_column(String(150), nullable=False)
+    brand: Mapped[str | None] = mapped_column(String(100))
     date_applied: Mapped[date] = mapped_column(Date, nullable=False)
     lot: Mapped[str | None] = mapped_column(String(100))
     vet_user_id: Mapped[uuid.UUID | None] = mapped_column(

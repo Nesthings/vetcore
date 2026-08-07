@@ -32,6 +32,7 @@ from app.data.breeds import (
     markings_for,
     species_options,
 )
+from app.data.vaccine_brands import brands_for_species
 from app.data.vaccine_carnet import carnet_for_species
 from app.db.session import get_db
 from app.models import (
@@ -86,6 +87,7 @@ class InvitationResponse(BaseModel):
 
 class CarnetCreate(BaseModel):
     vaccine: str = Field(min_length=1, max_length=150)
+    brand: str | None = Field(default=None, max_length=100)
     date_applied: date
     lot: str | None = Field(default=None, max_length=100)
     vet_user_id: uuid.UUID | None = None
@@ -547,7 +549,7 @@ def pet_carnet(
 
     rows = db.execute(
         text(
-            "SELECT r.id, r.vaccine, r.date_applied, r.lot, r.notes, "
+            "SELECT r.id, r.vaccine, r.brand, r.date_applied, r.lot, r.notes, "
             "r.vet_user_id, u.full_name AS vet_name "
             "FROM pet_carnet_records r LEFT JOIN users u ON u.id = r.vet_user_id "
             "WHERE r.pet_id = :pid ORDER BY r.date_applied DESC"
@@ -560,6 +562,7 @@ def pet_carnet(
         by_vaccine.setdefault(row["vaccine"], []).append(
             {
                 "id": str(row["id"]),
+                "brand": row["brand"],
                 "date_applied": row["date_applied"].isoformat(),
                 "lot": row["lot"],
                 "notes": row["notes"],
@@ -588,7 +591,7 @@ def pet_carnet(
                 }
             )
 
-    return {"species": pet.species, "vaccines": vaccines}
+    return {"species": pet.species, "vaccines": vaccines, "brands": brands_for_species(pet.species)}
 
 
 @router.post(
@@ -608,6 +611,7 @@ def create_carnet_record(
         clinic_id=ctx.clinic["id"],
         pet_id=pet.id,
         vaccine=body.vaccine,
+        brand=body.brand,
         date_applied=body.date_applied,
         lot=body.lot,
         vet_user_id=body.vet_user_id,
@@ -632,6 +636,7 @@ def create_carnet_record(
     return {
         "id": str(record.id),
         "vaccine": record.vaccine,
+        "brand": record.brand,
         "date_applied": record.date_applied.isoformat(),
         "lot": record.lot,
         "notes": record.notes,

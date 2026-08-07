@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useState } from 'react'
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Icon as MDIIcon } from '@mdi/react'
 import { mdiPaw } from '@mdi/js'
@@ -102,6 +102,7 @@ interface Consent {
 
 interface CarnetApp {
   id: string
+  brand?: string | null
   date_applied: string
   lot?: string | null
   notes?: string | null
@@ -190,9 +191,13 @@ export function PetDetail() {
   const [vaccination, setVaccination] = useState<PetVaccinationPlan[]>([])
   const [carnet, setCarnet] = useState<CarnetVaccine[]>([])
   const [carnetSpecies, setCarnetSpecies] = useState('')
+  const [carnetBrands, setCarnetBrands] = useState<string[]>([])
   const [vets, setVets] = useState<{ id: string; full_name: string }[]>([])
   const [addingFor, setAddingFor] = useState<string | null>(null)
   const [appDate, setAppDate] = useState('')
+  const [appBrand, setAppBrand] = useState('')
+  const [appBrandQuery, setAppBrandQuery] = useState('')
+  const [appBrandOpen, setAppBrandOpen] = useState(false)
   const [appLot, setAppLot] = useState('')
   const [appVet, setAppVet] = useState('')
   const [carnetBusy, setCarnetBusy] = useState(false)
@@ -206,6 +211,7 @@ export function PetDetail() {
   const [alertDesc, setAlertDesc] = useState('')
   const [alertBusy, setAlertBusy] = useState(false)
   const [ownerPhotoBusy, setOwnerPhotoBusy] = useState(false)
+  const appBrandRef = useRef<HTMLDivElement>(null)
 
   const load = useCallback(async () => {
     if (!id) return
@@ -220,7 +226,9 @@ export function PetDetail() {
         apiFetch<PhotoEvolutionItem[]>(`/pets/${id}/photo-evolution`),
         apiFetch<Consent[]>(`/consents/pets/${id}`),
         apiFetch<PetVaccinationPlan[]>(`/vaccination-plans/pets/${id}`),
-        apiFetch<{ species: string; vaccines: CarnetVaccine[] }>(`/pets/${id}/carnet`),
+        apiFetch<{ species: string; vaccines: CarnetVaccine[]; brands: string[] }>(
+          `/pets/${id}/carnet`,
+        ),
         apiFetch<{ id: string; full_name: string; role: string }[]>('/users'),
       ])
       setPet(p)
@@ -232,6 +240,7 @@ export function PetDetail() {
       setVaccination(vp)
       setCarnet(ca.vaccines)
       setCarnetSpecies(ca.species)
+      setCarnetBrands(ca.brands)
       setVets(us.filter((u) => u.role === 'admin' || u.role === 'veterinario'))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo cargar el paciente')
@@ -298,6 +307,7 @@ export function PetDetail() {
         method: 'POST',
         body: JSON.stringify({
           vaccine,
+          brand: appBrand || null,
           date_applied: appDate,
           lot: appLot || null,
           vet_user_id: appVet || null,
@@ -305,6 +315,8 @@ export function PetDetail() {
       })
       setAddingFor(null)
       setAppDate('')
+      setAppBrand('')
+      setAppBrandQuery('')
       setAppLot('')
       setAppVet('')
       await load()
@@ -330,6 +342,20 @@ export function PetDetail() {
     fecha: new Date(w.recorded_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' }),
     peso: Number(w.weight_kg),
   }))
+
+  const filteredBrands = carnetBrands.filter((b) =>
+    b.toLowerCase().includes(appBrandQuery.trim().toLowerCase()),
+  )
+
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (appBrandRef.current && !appBrandRef.current.contains(e.target as Node)) {
+        setAppBrandOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onClick)
+    return () => document.removeEventListener('mousedown', onClick)
+  }, [])
 
   return (
     <AppLayout>
@@ -723,11 +749,12 @@ export function PetDetail() {
                   <Table className="table-fixed [&_th]:border-l [&_th:first-child]:border-l-0 [&_td]:border-l [&_td:first-child]:border-l-0">
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-[25%]">Vacuna</TableHead>
-                        <TableHead className="w-[22%]">Enfermedades que previene</TableHead>
-                        <TableHead className="w-[28%]">Esquema recomendado</TableHead>
-                        <TableHead className="w-[14%]">Aplicaciones</TableHead>
-                        <TableHead className="w-[11%] text-right">Registrar</TableHead>
+                        <TableHead className="w-[21%]">Vacuna</TableHead>
+                        <TableHead className="w-[12%]">Marca</TableHead>
+                        <TableHead className="w-[17%]">Enfermedades que previene</TableHead>
+                        <TableHead className="w-[23%]">Esquema recomendado</TableHead>
+                        <TableHead className="w-[15%]">Aplicaciones</TableHead>
+                        <TableHead className="w-[12%] text-right">Registrar</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -736,6 +763,22 @@ export function PetDetail() {
                           <TableRow>
                             <TableCell className="whitespace-normal break-words font-medium">
                               {v.name}
+                            </TableCell>
+                            <TableCell className="whitespace-normal">
+                              {v.applications.length === 0 ? (
+                                <span className="text-sm text-muted-foreground">—</span>
+                              ) : (
+                                <div className="space-y-1.5">
+                                  {v.applications.map((app) => (
+                                    <p
+                                      key={app.id}
+                                      className="break-words rounded-md border border-border/60 bg-muted/30 px-2 py-1 text-xs font-medium"
+                                    >
+                                      {app.brand ?? '—'}
+                                    </p>
+                                  ))}
+                                </div>
+                              )}
                             </TableCell>
                             <TableCell className="whitespace-normal break-words text-muted-foreground">
                               {v.prevents ?? '—'}
@@ -787,6 +830,9 @@ export function PetDetail() {
                                 onClick={() => {
                                   setAddingFor(addingFor === v.name ? null : v.name)
                                   setAppDate('')
+                                  setAppBrand('')
+                                  setAppBrandQuery('')
+                                  setAppBrandOpen(false)
                                   setAppLot('')
                                   setAppVet('')
                                 }}
@@ -797,7 +843,7 @@ export function PetDetail() {
                           </TableRow>
                           {addingFor === v.name && (
                             <TableRow>
-                              <TableCell colSpan={5} className="bg-muted/30">
+                              <TableCell colSpan={6} className="bg-muted/30">
                                 <div className="flex flex-wrap items-end gap-3 py-1">
                                   <div className="space-y-1.5">
                                     <Label>Fecha</Label>
@@ -805,8 +851,49 @@ export function PetDetail() {
                                       type="date"
                                       value={appDate}
                                       onChange={(e) => setAppDate(e.target.value)}
-                                      className="w-40"
+                                      className="w-36"
                                     />
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <Label>Marca</Label>
+                                    <div className="relative" ref={appBrandRef}>
+                                      <Input
+                                        value={appBrand}
+                                        onChange={(e) => {
+                                          setAppBrand(e.target.value)
+                                          setAppBrandQuery(e.target.value)
+                                          setAppBrandOpen(true)
+                                        }}
+                                        onFocus={() => setAppBrandOpen(true)}
+                                        placeholder="Busca la marca…"
+                                        className="w-52"
+                                        autoComplete="off"
+                                      />
+                                      {appBrandOpen && (
+                                        <div className="absolute z-20 mt-1 max-h-44 w-full overflow-y-auto rounded-md border border-border bg-card p-1 shadow-card">
+                                          {filteredBrands.length === 0 ? (
+                                            <p className="px-2 py-1.5 text-sm text-muted-foreground">
+                                              Sin coincidencias.
+                                            </p>
+                                          ) : (
+                                            filteredBrands.map((b) => (
+                                              <button
+                                                key={b}
+                                                type="button"
+                                                onClick={() => {
+                                                  setAppBrand(b)
+                                                  setAppBrandQuery(b)
+                                                  setAppBrandOpen(false)
+                                                }}
+                                                className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
+                                              >
+                                                {b}
+                                              </button>
+                                            ))
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
                                   <div className="space-y-1.5">
                                     <Label>Lote</Label>
