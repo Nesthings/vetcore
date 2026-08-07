@@ -1,4 +1,4 @@
-import { LogOut, PawPrint, Settings2, UserRound } from 'lucide-react'
+import { History, LogOut, PawPrint, Settings2, UserRound } from 'lucide-react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
 
@@ -183,6 +183,16 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                     >
                       <Settings2 className="size-4" aria-hidden="true" />
                       Configuración de la clínica
+                    </NavLink>
+                  )}
+                  {hasComponent('audit') && (
+                    <NavLink
+                      to="/audit"
+                      onClick={() => setProfileOpen(false)}
+                      className="flex items-center gap-3 border-t border-border px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                    >
+                      <History className="size-4" aria-hidden="true" />
+                      Bitácora
                     </NavLink>
                   )}
                   <button
