@@ -35,10 +35,12 @@ import { cn } from '@/lib/utils'
 
 interface DayDashboard {
   date: string
+  period: 'day' | 'week' | 'month'
+  period_label: string
   citas_total: number
   citas_por_estado: Record<string, number>
-  citas_por_hora: { hora: number; count: number }[]
-  citas_hoy: {
+  citas_series: { label: string; count: number }[]
+  citas: {
     id: string
     pet_name?: string
     vet_name?: string
@@ -47,10 +49,18 @@ interface DayDashboard {
     end_time: string
     status: string
   }[]
-  bloques_hoy: number
+  bloques: number
   stock_alerts: { product_id: string; name: string; stock: number }[]
   pacientes_activos: number
 }
+
+type Period = 'day' | 'week' | 'month'
+
+const PERIODS: { value: Period; label: string }[] = [
+  { value: 'day', label: 'Diario' },
+  { value: 'week', label: 'Semanal' },
+  { value: 'month', label: 'Mensual' },
+]
 
 const STATUS_LABELS: Record<
   string,
@@ -99,16 +109,17 @@ export function Dashboard() {
   const [gridDragOver, setGridDragOver] = useState(false)
   const [trayBtnDragOver, setTrayBtnDragOver] = useState(false)
   const [dashData, setDashData] = useState<Record<string, unknown>>({})
+  const [period, setPeriod] = useState<Period>('day')
 
   const load = useCallback(async () => {
     setError(null)
     try {
-      const res = await apiFetch<DayDashboard>('/dashboard/day')
+      const res = await apiFetch<DayDashboard>(`/dashboard/day?period=${period}`)
       setData(res)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo cargar el dashboard')
     }
-  }, [])
+  }, [period])
 
   useEffect(() => {
     load()
@@ -269,30 +280,49 @@ export function Dashboard() {
         </p>
       </div>
 
-      <div className="mb-2 flex items-center justify-between gap-3">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <LayoutDashboard className="size-6 text-primary" aria-hidden="true" />
           <h1 className="text-2xl font-semibold tracking-tight">Dashboards</h1>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setTrayOpen((o) => !o)}
-          onDragOver={(e) => {
-            e.preventDefault()
-            e.dataTransfer.dropEffect = 'move'
-            setTrayBtnDragOver(true)
-          }}
-          onDragLeave={() => setTrayBtnDragOver(false)}
-          onDrop={handleTrayButtonDrop}
-          className={cn(trayBtnDragOver && 'border-primary/40 bg-primary/10')}
-        >
-          <PanelTop className="size-4" aria-hidden="true" />
-          Bandeja de dashboards
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex rounded-lg border border-border bg-card p-0.5">
+            {PERIODS.map((p) => (
+              <button
+                key={p.value}
+                type="button"
+                onClick={() => setPeriod(p.value)}
+                className={cn(
+                  'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+                  period === p.value
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                )}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setTrayOpen((o) => !o)}
+            onDragOver={(e) => {
+              e.preventDefault()
+              e.dataTransfer.dropEffect = 'move'
+              setTrayBtnDragOver(true)
+            }}
+            onDragLeave={() => setTrayBtnDragOver(false)}
+            onDrop={handleTrayButtonDrop}
+            className={cn(trayBtnDragOver && 'border-primary/40 bg-primary/10')}
+          >
+            <PanelTop className="size-4" aria-hidden="true" />
+            Bandeja de dashboards
+          </Button>
+        </div>
       </div>
       <p className="mb-4 text-sm text-muted-foreground">
-        {data ? `Resumen operativo del ${data.date}` : 'Resumen operativo de hoy'}
+        {data ? `Resumen operativo · ${data.period_label}` : 'Resumen operativo'}
       </p>
 
       <DashboardTray
@@ -367,19 +397,24 @@ export function Dashboard() {
           <div className="grid gap-6 lg:grid-cols-3">
             <Card className="shadow-card lg:col-span-2">
               <CardHeader>
-                <CardTitle>Citas por hora</CardTitle>
-                <CardDescription>Distribución de citas del día</CardDescription>
+                <CardTitle>{period === 'day' ? 'Citas por hora' : 'Citas por período'}</CardTitle>
+                <CardDescription>
+                  {period === 'day'
+                    ? 'Distribución de citas de hoy'
+                    : period === 'week'
+                      ? 'Citas de los últimos 7 días'
+                      : 'Citas de los últimos 30 días'}
+                </CardDescription>
               </CardHeader>
               <CardContent className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
-                    data={data.citas_por_hora}
+                    data={data.citas_series}
                     margin={{ top: 4, right: 8, left: -24, bottom: 0 }}
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                     <XAxis
-                      dataKey="hora"
-                      tickFormatter={(h: number) => `${h}:00`}
+                      dataKey="label"
                       tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }}
                       tickLine={false}
                       axisLine={false}
@@ -393,7 +428,6 @@ export function Dashboard() {
                     <Tooltip
                       cursor={{ fill: 'var(--muted)' }}
                       formatter={(v) => [`${v} citas`, 'Citas']}
-                      labelFormatter={(h) => `${h}:00 hrs`}
                     />
                     <Bar
                       dataKey="count"
@@ -455,7 +489,7 @@ export function Dashboard() {
             />
             <KpiCard
               label="Bloques de horario"
-              value={data.bloques_hoy}
+              value={data.bloques}
               icon={CalendarX2}
               hint="horario bloqueado"
             />
@@ -465,8 +499,8 @@ export function Dashboard() {
           <Card className="shadow-card">
             <CardHeader className="flex-row items-center justify-between space-y-0">
               <div>
-                <CardTitle>Citas del día</CardTitle>
-                <CardDescription>Próximas citas agendadas</CardDescription>
+                <CardTitle>Citas del período</CardTitle>
+                <CardDescription>Próximas citas agendadas en el rango</CardDescription>
               </div>
               <Link
                 to="/agenda"
@@ -476,14 +510,14 @@ export function Dashboard() {
               </Link>
             </CardHeader>
             <CardContent>
-              {data.citas_hoy.length === 0 ? (
+              {data.citas.length === 0 ? (
                 <EmptyState
-                  title="Sin citas hoy"
-                  description="Aún no hay citas agendadas para este día."
+                  title="Sin citas en el período"
+                  description="Aún no hay citas agendadas en este rango."
                 />
               ) : (
                 <div className="divide-y divide-border">
-                  {data.citas_hoy.map((c) => {
+                  {data.citas.map((c) => {
                     const st = STATUS_LABELS[c.status] ?? { label: c.status, variant: 'secondary' }
                     return (
                       <div key={c.id} className="flex items-center justify-between py-3">
@@ -501,7 +535,9 @@ export function Dashboard() {
                         </div>
                         <div className="flex items-center gap-3">
                           <span className="text-sm text-muted-foreground">
-                            {new Date(c.start_time).toLocaleTimeString('es-MX', {
+                            {new Date(c.start_time).toLocaleString('es-MX', {
+                              day: period === 'day' ? undefined : 'numeric',
+                              month: period === 'day' ? undefined : 'short',
                               hour: '2-digit',
                               minute: '2-digit',
                             })}

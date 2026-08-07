@@ -6,7 +6,7 @@ puede ver todo el staff.
 """
 
 from collections import Counter
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
@@ -25,13 +25,22 @@ router = APIRouter(
 
 STOCK_ALERT_DEFAULT_THRESHOLD = 5
 
+WEEKDAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
 
-@router.get("/day", summary="Indicadores del día (citas, alertas de stock)")
+PERIOD_WINDOWS = {
+    "day": {"days": 0, "label": "hoy"},
+    "week": {"days": 6, "label": "últimos 7 días"},
+    "month": {"days": 29, "label": "últimos 30 días"},
+}
+
+
+@router.get("/day", summary="Indicadores del dashboard (diario/semanal/mensual)")
 def dashboard_day(
     ctx: CurrentClinic = Depends(get_current_clinic),
     db: Session = Depends(get_db),
     branch_id: str | None = Query(default=None),
     day: date | None = Query(default=None, description="Fecha (YYYY-MM-DD). Default: hoy local"),
+    period: str = Query(default="day", pattern="^(day|week|month)$"),
     stock_threshold: float = Query(
         default=STOCK_ALERT_DEFAULT_THRESHOLD, ge=0, description="Umbral para alerta de stock"
     ),
@@ -40,7 +49,9 @@ def dashboard_day(
     selected_branch = branch_id or ctx.user.branch_id
     today = day or date.today()
 
-    start = datetime.combine(today, time.min)
+    window = PERIOD_WINDOWS[period]
+    start_date = today - timedelta(days=window["days"])
+    start = datetime.combine(start_date, time.min)
     end = datetime.combine(today, time.max)
 
     base = [
@@ -67,9 +78,25 @@ def dashboard_day(
     }
 
     appts = list(db.scalars(select(Appointment).where(*base).order_by(Appointment.start_time)))
-    horas = Counter(a.start_time.astimezone().hour for a in appts)
-    citas_por_hora = [{"hora": h, "count": horas.get(h, 0)} for h in range(7, 21)]
-    citas_hoy = _with_names(db, appts)
+
+    if period == "day":
+        horas = Counter(a.start_time.astimezone().hour for a in appts)
+        citas_series = [
+            {"label": f"{h:02d}:00", "count": horas.get(h, 0)} for h in range(7, 21)
+        ]
+    else:
+        days = [start_date + timedelta(days=i) for i in range(window["days"] + 1)]
+        counts = Counter(a.start_time.astimezone().date() for a in appts)
+        if period == "week":
+            citas_series = [
+                {"label": WEEKDAYS[d.weekday()], "count": counts.get(d, 0)} for d in days
+            ]
+        else:
+            citas_series = [
+                {"label": d.strftime("%d/%m"), "count": counts.get(d, 0)} for d in days
+            ]
+
+    citas = _with_names(db, appts[:50])
 
     block_base = [
         ScheduleBlock.clinic_id == clinic_id,
@@ -78,7 +105,7 @@ def dashboard_day(
     ]
     if selected_branch:
         block_base.append(ScheduleBlock.branch_id == selected_branch)
-    bloques_hoy = len(db.scalars(select(ScheduleBlock).where(*block_base)).all())
+    bloques = len(db.scalars(select(ScheduleBlock).where(*block_base)).all())
 
     inv_base = [InventoryProduct.clinic_id == clinic_id]
     if selected_branch:
@@ -114,12 +141,14 @@ def dashboard_day(
 
     return {
         "date": today.isoformat(),
+        "period": period,
+        "period_label": window["label"],
         "branch_id": str(selected_branch) if selected_branch else None,
         "citas_total": total,
         "citas_por_estado": citas_por_estado,
-        "citas_por_hora": citas_por_hora,
-        "citas_hoy": citas_hoy,
-        "bloques_hoy": bloques_hoy,
+        "citas_series": citas_series,
+        "citas": citas,
+        "bloques": bloques,
         "stock_alerts": stock_alerts,
         "pacientes_activos": pacientes_activos,
     }
