@@ -13,16 +13,17 @@ import {
   mdiSnake,
   mdiTurtle,
 } from '@mdi/js'
-import { Pencil, Plus, Search, Users } from 'lucide-react'
+import { Pencil, Plus, Users } from 'lucide-react'
 
 import { AppLayout } from '@/components/layout/AppLayout'
 import { PetFormDialog } from '@/components/pets/PetFormDialog'
+import { Avatar } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState } from '@/components/ui/error-state'
-import { Input } from '@/components/ui/input'
 import { LoadingState } from '@/components/ui/loading-state'
+import { SearchInput } from '@/components/ui/search-input'
 import {
   Table,
   TableBody,
@@ -163,18 +164,13 @@ export function Pets() {
       </div>
 
       <div className="mb-4 flex flex-col gap-3">
-        <div className="max-w-md">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar por nombre…"
-              className="pl-9"
-              autoComplete="off"
-            />
-          </div>
-        </div>
+        <SearchInput
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          onClear={() => setSearch('')}
+          placeholder="Buscar por nombre…"
+          className="max-w-md"
+        />
         {speciesOptions.length > 0 && (
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -257,11 +253,12 @@ export function Pets() {
             <TableHeader>
               <TableRow>
                 <TableHead>Paciente</TableHead>
+                <TableHead>Dueño</TableHead>
                 <TableHead>Especie</TableHead>
                 <TableHead>Raza</TableHead>
                 <TableHead>Color</TableHead>
-                <TableHead>Características</TableHead>
-                <TableHead>Sexo</TableHead>
+                <TableHead className="hidden xl:table-cell">Características</TableHead>
+                <TableHead className="hidden lg:table-cell">Sexo</TableHead>
                 <TableHead>Último peso</TableHead>
                 <TableHead>Alertas</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
@@ -277,6 +274,23 @@ export function Pets() {
                     >
                       {p.name}
                     </Link>
+                  </TableCell>
+                  <TableCell>
+                    {(() => {
+                      const owner = p.owners?.find((o) => o.is_active)
+                      return owner?.full_name ? (
+                        <span className="inline-flex items-center gap-2">
+                          <Avatar
+                            src={owner.profile_photo_url}
+                            name={owner.full_name}
+                            className="size-6"
+                          />
+                          <span className="truncate text-sm">{owner.full_name}</span>
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )
+                    })()}
                   </TableCell>
                   <TableCell className="capitalize">{p.species}</TableCell>
                   <TableCell>{p.breed ?? '—'}</TableCell>
@@ -294,8 +308,8 @@ export function Pets() {
                       '—'
                     )}
                   </TableCell>
-                  <TableCell>{p.markings ?? '—'}</TableCell>
-                  <TableCell>{p.sex ?? '—'}</TableCell>
+                  <TableCell className="hidden xl:table-cell">{p.markings ?? '—'}</TableCell>
+                  <TableCell className="hidden lg:table-cell">{p.sex ?? '—'}</TableCell>
                   <TableCell>{p.latest_weight_kg ? `${p.latest_weight_kg} kg` : '—'}</TableCell>
                   <TableCell>
                     {p.clinical_alert_text || (p.alert_count && p.alert_count > 0) ? (
