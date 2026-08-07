@@ -16,6 +16,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { PlanFormDialog } from '@/components/vaccination/PlanFormDialog'
+import { PlanViewDialog } from '@/components/vaccination/PlanViewDialog'
 import { apiFetch } from '@/lib/api'
 import { speciesLabel } from '@/lib/species'
 import { cn } from '@/lib/utils'
@@ -44,6 +45,7 @@ export function VaccinationPlans() {
   const [error, setError] = useState<string | null>(null)
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<VaccinationPlan | null>(null)
+  const [viewing, setViewing] = useState<VaccinationPlan | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -175,7 +177,7 @@ export function VaccinationPlans() {
             </TableHeader>
             <TableBody>
               {plans.map((p) => (
-                <TableRow key={p.id}>
+                <TableRow key={p.id} className="cursor-pointer" onClick={() => setViewing(p)}>
                   <TableCell className="font-medium">
                     {p.name}
                     {p.is_standard && (
@@ -194,7 +196,7 @@ export function VaccinationPlans() {
                       {p.active ? 'Activo' : 'Inactivo'}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                     <Button
                       variant="ghost"
                       size="icon-sm"
@@ -231,6 +233,19 @@ export function VaccinationPlans() {
           setFormOpen(false)
           setEditing(null)
           load()
+        }}
+      />
+
+      <PlanViewDialog
+        plan={viewing}
+        open={Boolean(viewing)}
+        onOpenChange={(open) => {
+          if (!open) setViewing(null)
+        }}
+        onEdit={() => {
+          setEditing(viewing)
+          setViewing(null)
+          setFormOpen(true)
         }}
       />
     </AppLayout>
