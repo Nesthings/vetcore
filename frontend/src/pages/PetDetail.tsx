@@ -42,9 +42,11 @@ import { ConsentDialog } from '@/components/pets/ConsentDialog'
 import { InviteOwnerDialog } from '@/components/pets/InviteOwnerDialog'
 import { PhotoComparison } from '@/components/pets/PhotoComparison'
 import { TransferOwnerDialog } from '@/components/pets/TransferOwnerDialog'
+import { Avatar } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState } from '@/components/ui/error-state'
 import { Input } from '@/components/ui/input'
@@ -401,6 +403,11 @@ export function PetDetail() {
   const [alertDesc, setAlertDesc] = useState('')
   const [alertBusy, setAlertBusy] = useState(false)
   const appBrandRef = useRef<HTMLDivElement>(null)
+  const [confirmState, setConfirmState] = useState<{
+    title: string
+    description?: string
+    onConfirm: () => void
+  } | null>(null)
 
   const load = useCallback(async () => {
     if (!id) return
@@ -463,14 +470,20 @@ export function PetDetail() {
   }
 
   const removeAlert = async (alertId: string) => {
-    if (!confirm('¿Eliminar (resolver) esta alerta?')) return
-    setError(null)
-    try {
-      await apiFetch(`/pets/${id}/alerts/${alertId}`, { method: 'DELETE' })
-      await load()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo eliminar la alerta')
-    }
+    setConfirmState({
+      title: '¿Eliminar (resolver) esta alerta?',
+      description: 'La alerta dejará de mostrarse en el expediente.',
+      onConfirm: async () => {
+        setError(null)
+        try {
+          await apiFetch(`/pets/${id}/alerts/${alertId}`, { method: 'DELETE' })
+          await load()
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'No se pudo eliminar la alerta')
+        }
+        setConfirmState(null)
+      },
+    })
   }
 
   const saveCarnetApp = async (vaccine: string) => {
@@ -503,14 +516,20 @@ export function PetDetail() {
   }
 
   const removeCarnetApp = async (recordId: string) => {
-    if (!confirm('¿Eliminar esta aplicación del carnet?')) return
-    setError(null)
-    try {
-      await apiFetch(`/pets/${id}/carnet/${recordId}`, { method: 'DELETE' })
-      await load()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo eliminar la aplicación')
-    }
+    setConfirmState({
+      title: '¿Eliminar esta aplicación del carnet?',
+      description: 'Se quitará el registro de esta dosis del carnet.',
+      onConfirm: async () => {
+        setError(null)
+        try {
+          await apiFetch(`/pets/${id}/carnet/${recordId}`, { method: 'DELETE' })
+          await load()
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'No se pudo eliminar la aplicación')
+        }
+        setConfirmState(null)
+      },
+    })
   }
 
   const toggleAddRow = (vaccine: string) => {
@@ -757,30 +776,16 @@ export function PetDetail() {
                   </p>
                 ) : (
                   pet.owners.map((o) => {
-                    const initials =
-                      (o.full_name ?? 'D')
-                        .split(/\s+/)
-                        .slice(0, 2)
-                        .map((w) => w[0]?.toUpperCase() ?? '')
-                        .join('') || 'D'
                     return (
                       <div
                         key={o.owner_id}
                         className="flex flex-col gap-4 rounded-xl border border-border/60 bg-muted/30 p-4 sm:flex-row sm:items-center"
                       >
-                        <div className="relative shrink-0 self-center">
-                          <div className="flex size-16 items-center justify-center overflow-hidden rounded-full border-2 border-primary/20 bg-secondary text-base font-semibold text-primary shadow-card">
-                            {o.profile_photo_url ? (
-                              <img
-                                src={o.profile_photo_url}
-                                alt={o.full_name ?? 'Dueño'}
-                                className="size-full object-cover"
-                              />
-                            ) : (
-                              initials
-                            )}
-                          </div>
-                        </div>
+                        <Avatar
+                          src={o.profile_photo_url}
+                          name={o.full_name ?? 'Dueño'}
+                          className="size-16 shrink-0 border-2 border-primary/20 self-center"
+                        />
 
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
@@ -1483,35 +1488,22 @@ export function PetDetail() {
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {family.map((m) => {
                     const esHermano = m.relation === 'hermano'
-                    const initials =
-                      m.name
-                        .split(/\s+/)
-                        .slice(0, 2)
-                        .map((w) => w[0]?.toUpperCase() ?? '')
-                        .join('') || 'P'
                     return (
                       <Link
                         key={m.id}
                         to={`/pets/${m.id}`}
                         className="group flex items-center gap-3 rounded-xl border border-border/60 bg-card p-3 shadow-sm transition-colors hover:border-primary/40 hover:bg-accent"
                       >
-                        <div
-                          className={`flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 ${
+                        <Avatar
+                          src={m.photo_url}
+                          name={m.name}
+                          className={cn(
+                            'size-12 shrink-0 border-2',
                             esHermano
                               ? 'border-sky-400/60 bg-sky-500/10 text-sky-600 dark:text-sky-300'
-                              : 'border-pink-400/60 bg-pink-500/10 text-pink-600 dark:text-pink-300'
-                          }`}
-                        >
-                          {m.photo_url ? (
-                            <img
-                              src={m.photo_url}
-                              alt={m.name}
-                              className="size-full object-cover"
-                            />
-                          ) : (
-                            <span className="text-sm font-semibold">{initials}</span>
+                              : 'border-pink-400/60 bg-pink-500/10 text-pink-600 dark:text-pink-300',
                           )}
-                        </div>
+                        />
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-semibold">{m.name}</p>
                           <p className="truncate text-xs capitalize text-muted-foreground">
@@ -1592,6 +1584,18 @@ export function PetDetail() {
           }}
         />
       )}
+
+      <ConfirmDialog
+        open={Boolean(confirmState)}
+        onOpenChange={(open) => {
+          if (!open) setConfirmState(null)
+        }}
+        title={confirmState?.title ?? ''}
+        description={confirmState?.description}
+        confirmLabel="Eliminar"
+        variant="destructive"
+        onConfirm={() => confirmState?.onConfirm()}
+      />
     </AppLayout>
   )
 }
