@@ -144,9 +144,26 @@ export function NewConsultation() {
 
   useEffect(() => {
     loadBase()
+  }, [loadBase])
+
+  useEffect(() => {
+    // Al cambiar de paciente (o al montar) se reinicia el formulario para
+    // no heredar los valores de la consulta anterior.
+    setReason('')
+    setWeight('')
+    setDateTime(toLocalInput(new Date()))
+    setServiceLines([])
+    setProductLines([])
+    setSendWhatsapp(false)
+    setSendEmail(false)
+    setDone(null)
+    setError(null)
+    setPet(null)
+    setOwner(null)
+    setVaccination([])
     if (petParam) loadPet(petParam)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [petParam])
 
   const search = async () => {
     if (!query.trim()) return
