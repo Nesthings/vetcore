@@ -21,6 +21,9 @@ class PlanStepRead(BaseModel):
 class VaccinationPlanCreate(BaseModel):
     name: str = Field(min_length=1, max_length=150)
     compound: str = Field(min_length=1, max_length=200)
+    species: str | None = Field(default=None, max_length=50)
+    brand: str | None = Field(default=None, max_length=100)
+    prevents: str | None = Field(default=None, max_length=255)
     notes: str | None = Field(default=None, max_length=2000)
     steps: list[PlanStepCreate] = Field(default_factory=list)
 
@@ -28,6 +31,9 @@ class VaccinationPlanCreate(BaseModel):
 class VaccinationPlanUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=150)
     compound: str | None = Field(default=None, min_length=1, max_length=200)
+    species: str | None = Field(default=None, max_length=50)
+    brand: str | None = Field(default=None, max_length=100)
+    prevents: str | None = Field(default=None, max_length=255)
     notes: str | None = Field(default=None, max_length=2000)
     active: bool | None = None
     steps: list[PlanStepCreate] | None = None
@@ -40,8 +46,12 @@ class VaccinationPlanRead(BaseModel):
     clinic_id: uuid.UUID
     name: str
     compound: str
+    species: str | None
+    brand: str | None
+    prevents: str | None
     notes: str | None
     active: bool
+    is_standard: bool
     created_at: datetime
     steps: list[PlanStepRead] = Field(default_factory=list)
 

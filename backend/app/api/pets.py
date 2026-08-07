@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import CurrentClinic, get_current_clinic, require_clinic_roles, require_component
 from app.core.events import notify_roles, record_audit
 from app.core.images import process_cartilla_photo
+from app.core.seed_vaccination_plans import ensure_standard_plans
 from app.core.storage import (
     ALLOWED_IMAGE_EXTENSIONS,
     public_url,
@@ -33,7 +34,6 @@ from app.data.breeds import (
     species_options,
 )
 from app.data.vaccine_brands import brands_for_species
-from app.data.vaccine_carnet import carnet_for_species
 from app.db.session import get_db
 from app.models import (
     Appointment,
@@ -45,6 +45,7 @@ from app.models import (
     PetCarnetRecord,
     PetWeightRecord,
     User,
+    VaccinationPlan,
 )
 from app.schemas.crm import PhotoEvolutionItem
 from app.schemas.pet import (
@@ -546,6 +547,7 @@ def pet_carnet(
     db: Session = Depends(get_db),
 ) -> dict:
     pet = _get_pet_or_404(db, ctx.clinic["id"], pet_id)
+    ensure_standard_plans(db, ctx.clinic["id"])
 
     rows = db.execute(
         text(
@@ -572,14 +574,20 @@ def pet_carnet(
 
     vaccines = [
         {
-            "name": v["name"],
-            "prevents": v["prevents"],
-            "schedule": v["schedule"],
-            "applications": by_vaccine.get(v["name"], []),
+            "name": plan.name,
+            "prevents": plan.prevents,
+            "schedule": plan.notes,
+            "applications": by_vaccine.get(plan.name, []),
         }
-        for v in carnet_for_species(pet.species)
+        for plan in db.scalars(
+            select(VaccinationPlan).where(
+                VaccinationPlan.clinic_id == ctx.clinic["id"],
+                VaccinationPlan.species == pet.species,
+                VaccinationPlan.active.is_(True),
+            )
+        )
     ]
-    # Aplicaciones de vacunas no incluidas en el esquema estándar
+    # Aplicaciones de vacunas no incluidas en los planes activos de la especie
     for vaccine, apps in by_vaccine.items():
         if vaccine not in {v["name"] for v in vaccines}:
             vaccines.append(

@@ -10,8 +10,12 @@ export interface VaccinationPlan {
   clinic_id: string
   name: string
   compound: string
+  species: string | null
+  brand: string | null
+  prevents: string | null
   notes: string | null
   active: boolean
+  is_standard: boolean
   created_at: string
   steps: VaccinationPlanStep[]
 }

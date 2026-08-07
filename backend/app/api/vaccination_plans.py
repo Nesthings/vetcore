@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import CurrentClinic, get_current_clinic, require_clinic_roles, require_component
 from app.core.events import record_audit
+from app.core.seed_vaccination_plans import ensure_standard_plans
 from app.db.session import get_db
 from app.models import (
     Appointment,
@@ -114,15 +115,19 @@ def list_plans(
     ctx: CurrentClinic = Depends(get_current_clinic),
     db: Session = Depends(get_db),
     active_only: bool = Query(default=False),
+    species: str | None = Query(default=None, max_length=50),
 ) -> list[dict]:
+    ensure_standard_plans(db, ctx.clinic["id"])
     stmt = (
         select(VaccinationPlan)
         .options(selectinload(VaccinationPlan.steps))
         .where(VaccinationPlan.clinic_id == ctx.clinic["id"])
-        .order_by(VaccinationPlan.name)
     )
     if active_only:
         stmt = stmt.where(VaccinationPlan.active.is_(True))
+    if species:
+        stmt = stmt.where(VaccinationPlan.species == species)
+    stmt = stmt.order_by(VaccinationPlan.species, VaccinationPlan.name)
     return _with_steps(db, list(db.scalars(stmt)))
 
 
@@ -146,6 +151,9 @@ def create_plan(
         clinic_id=ctx.clinic["id"],
         name=body.name,
         compound=body.compound,
+        species=body.species,
+        brand=body.brand,
+        prevents=body.prevents,
         notes=body.notes,
     )
     for i, step in enumerate(body.steps):

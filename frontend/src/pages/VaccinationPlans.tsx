@@ -17,7 +17,11 @@ import {
 } from '@/components/ui/table'
 import { PlanFormDialog } from '@/components/vaccination/PlanFormDialog'
 import { apiFetch } from '@/lib/api'
+import { speciesLabel } from '@/lib/species'
+import { cn } from '@/lib/utils'
 import type { VaccinationPlan } from '@/lib/vaccination'
+
+const SPECIES_ORDER = ['perro', 'gato', 'equino', 'hurones', 'conejo']
 
 function stepsSummary(steps: VaccinationPlan['steps']): string {
   if (steps.length === 0) return 'Sin dosis'
@@ -35,6 +39,7 @@ function stepsSummary(steps: VaccinationPlan['steps']): string {
 
 export function VaccinationPlans() {
   const [plans, setPlans] = useState<VaccinationPlan[]>([])
+  const [speciesFilter, setSpeciesFilter] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [formOpen, setFormOpen] = useState(false)
@@ -44,14 +49,16 @@ export function VaccinationPlans() {
     setLoading(true)
     setError(null)
     try {
-      const res = await apiFetch<VaccinationPlan[]>('/vaccination-plans')
+      const params = new URLSearchParams()
+      if (speciesFilter) params.set('species', speciesFilter)
+      const res = await apiFetch<VaccinationPlan[]>(`/vaccination-plans?${params}`)
       setPlans(res)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudieron cargar los planes')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [speciesFilter])
 
   useEffect(() => {
     load()
@@ -67,13 +74,22 @@ export function VaccinationPlans() {
     }
   }
 
+  const speciesInPlans = [
+    ...new Set(plans.map((p) => p.species).filter((s): s is string => Boolean(s))),
+  ].sort((a, b) => {
+    const ia = SPECIES_ORDER.indexOf(a)
+    const ib = SPECIES_ORDER.indexOf(b)
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib)
+  })
+
   return (
     <AppLayout>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Planes de vacunación</h1>
           <p className="text-sm text-muted-foreground">
-            Esquemas de vacunación que generan citas automáticas al asignarlos a una mascota
+            Esquemas estándar y personalizados por especie; se editan aquí y alimentan el carnet de
+            la cartilla
           </p>
         </div>
         <Button
@@ -87,13 +103,48 @@ export function VaccinationPlans() {
         </Button>
       </div>
 
+      {speciesInPlans.length > 0 && (
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Especie
+          </span>
+          <button
+            type="button"
+            onClick={() => setSpeciesFilter(null)}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors',
+              !speciesFilter
+                ? 'border-primary bg-primary text-primary-foreground shadow-glow'
+                : 'border-border bg-card text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+            )}
+          >
+            Todas
+          </button>
+          {speciesInPlans.map((sp) => (
+            <button
+              key={sp}
+              type="button"
+              onClick={() => setSpeciesFilter(speciesFilter === sp ? null : sp)}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium capitalize transition-colors',
+                speciesFilter === sp
+                  ? 'border-primary bg-primary text-primary-foreground shadow-glow'
+                  : 'border-border bg-card text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+              )}
+            >
+              {speciesLabel(sp)}
+            </button>
+          ))}
+        </div>
+      )}
+
       {error && <ErrorState description={error} onRetry={load} className="mb-6" />}
       {loading && <LoadingState label="Cargando planes…" />}
 
       {!loading && !error && plans.length === 0 && (
         <EmptyState
           title="Sin planes de vacunación"
-          description="Crea tu primer esquema (ej. vacuna quintuple) para poder asignarlo a las mascotas."
+          description="Crea tu primer esquema o deja que se siembren los estándar para esta especie."
           icon={Syringe}
           action={
             <Button
@@ -115,7 +166,8 @@ export function VaccinationPlans() {
             <TableHeader>
               <TableRow>
                 <TableHead>Plan</TableHead>
-                <TableHead>Compuesto activo</TableHead>
+                <TableHead>Especie</TableHead>
+                <TableHead>Marca</TableHead>
                 <TableHead>Esquema</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
@@ -124,8 +176,18 @@ export function VaccinationPlans() {
             <TableBody>
               {plans.map((p) => (
                 <TableRow key={p.id}>
-                  <TableCell className="font-medium">{p.name}</TableCell>
-                  <TableCell>{p.compound}</TableCell>
+                  <TableCell className="font-medium">
+                    {p.name}
+                    {p.is_standard && (
+                      <Badge variant="outline" className="ml-2 bg-primary/5 text-primary">
+                        Estándar
+                      </Badge>
+                    )}
+                  </TableCell>
+                  <TableCell className="capitalize">
+                    {p.species ? speciesLabel(p.species) : '—'}
+                  </TableCell>
+                  <TableCell>{p.brand ?? '—'}</TableCell>
                   <TableCell className="max-w-md">{stepsSummary(p.steps)}</TableCell>
                   <TableCell>
                     <Badge variant={p.active ? 'default' : 'outline'}>

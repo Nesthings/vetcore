@@ -21,7 +21,22 @@ import {
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { apiFetch } from '@/lib/api'
+import { speciesLabel } from '@/lib/species'
 import type { VaccinationPlan } from '@/lib/vaccination'
+
+const SPECIES_OPTIONS = [
+  'perro',
+  'gato',
+  'ave',
+  'conejo',
+  'reptil',
+  'roedor',
+  'hurones',
+  'peces',
+  'anfibio',
+  'equino',
+  'otro',
+]
 
 interface StepDraft {
   label: string
@@ -63,6 +78,9 @@ export function PlanFormDialog({
 }) {
   const [name, setName] = useState('')
   const [compound, setCompound] = useState('')
+  const [species, setSpecies] = useState('')
+  const [brand, setBrand] = useState('')
+  const [prevents, setPrevents] = useState('')
   const [notes, setNotes] = useState('')
   const [active, setActive] = useState(true)
   const [steps, setSteps] = useState<StepDraft[]>([emptyStep()])
@@ -73,6 +91,9 @@ export function PlanFormDialog({
     if (!open) return
     setName(plan?.name ?? '')
     setCompound(plan?.compound ?? '')
+    setSpecies(plan?.species ?? '')
+    setBrand(plan?.brand ?? '')
+    setPrevents(plan?.prevents ?? '')
     setNotes(plan?.notes ?? '')
     setActive(plan?.active ?? true)
     if (plan && plan.steps.length > 0) {
@@ -114,6 +135,9 @@ export function PlanFormDialog({
       const body = JSON.stringify({
         name,
         compound,
+        species: species || null,
+        brand: brand || null,
+        prevents: prevents || null,
         notes: notes || null,
         active,
         steps: steps.map((s, i) => ({
@@ -171,8 +195,45 @@ export function PlanFormDialog({
             </div>
           </div>
 
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="vp-species">Especie</Label>
+              <Select value={species} onValueChange={setSpecies}>
+                <SelectTrigger id="vp-species">
+                  <SelectValue placeholder="Todas / general" />
+                </SelectTrigger>
+                <SelectContent>
+                  {SPECIES_OPTIONS.map((sp) => (
+                    <SelectItem key={sp} value={sp}>
+                      {speciesLabel(sp)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="vp-brand">Marca sugerida</Label>
+              <Input
+                id="vp-brand"
+                value={brand}
+                onChange={(e) => setBrand(e.target.value)}
+                placeholder="Ej. Canigen MHA"
+              />
+            </div>
+          </div>
+
           <div className="space-y-2">
-            <Label htmlFor="vp-notes">Notas</Label>
+            <Label htmlFor="vp-prevents">Enfermedades que previene</Label>
+            <Input
+              id="vp-prevents"
+              value={prevents}
+              onChange={(e) => setPrevents(e.target.value)}
+              placeholder="Ej. Moquillo, parvovirus, hepatitis…"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="vp-notes">Esquema recomendado / notas</Label>
             <Textarea
               id="vp-notes"
               value={notes}
