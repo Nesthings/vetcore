@@ -13,7 +13,7 @@ import {
   mdiSnake,
   mdiTurtle,
 } from '@mdi/js'
-import { Pencil, Plus, Users } from 'lucide-react'
+import { ArrowUpRight, Pencil, Plus, Users } from 'lucide-react'
 
 import { AppLayout } from '@/components/layout/AppLayout'
 import { PetFormDialog } from '@/components/pets/PetFormDialog'
@@ -135,7 +135,7 @@ export function Pets() {
           }
         })()
       },
-      search.trim() || speciesFilter ? 250 : 0,
+      search.trim() || speciesFilter ? 120 : 0,
     )
     return () => {
       cancelled = true
@@ -144,6 +144,9 @@ export function Pets() {
   }, [search, speciesFilter, refreshKey])
 
   const refresh = useCallback(() => setRefreshKey((k) => k + 1), [])
+
+  const term = search.trim().toLowerCase()
+  const visible = term ? pets.filter((p) => p.name.toLowerCase().includes(term)) : pets
 
   return (
     <AppLayout>
@@ -228,7 +231,23 @@ export function Pets() {
       {error && <ErrorState description={error} onRetry={refresh} className="mb-6" />}
       {!loaded && !error && <LoadingState label="Cargando pacientes…" />}
 
-      {loaded && !error && pets.length === 0 && (
+      {loaded && !error && pets.length > 0 && visible.length === 0 && (
+        <EmptyState
+          title="Sin resultados"
+          description={`Ningún paciente coincide con «${search.trim()}».`}
+          icon={Users}
+        />
+      )}
+
+      {loaded && !error && pets.length === 0 && search.trim() && (
+        <EmptyState
+          title="Sin resultados"
+          description={`Ningún paciente coincide con «${search.trim()}».`}
+          icon={Users}
+        />
+      )}
+
+      {loaded && !error && pets.length === 0 && !search.trim() && (
         <EmptyState
           title="Sin pacientes"
           description="Registra tu primera mascota para empezar su expediente."
@@ -247,7 +266,7 @@ export function Pets() {
         />
       )}
 
-      {loaded && !error && pets.length > 0 && (
+      {loaded && !error && visible.length > 0 && (
         <div className="overflow-hidden rounded-lg border border-border bg-card shadow-card">
           <Table>
             <TableHeader>
@@ -265,14 +284,16 @@ export function Pets() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {pets.map((p) => (
+              {visible.map((p) => (
                 <TableRow key={p.id}>
                   <TableCell>
                     <Link
                       to={`/pets/${p.id}`}
-                      className="font-medium text-foreground hover:text-primary"
+                      title="Abrir cartilla de la mascota"
+                      className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-primary/30 bg-primary/5 px-2.5 py-1 text-sm font-medium text-primary transition-colors hover:border-primary/60 hover:bg-primary/10 hover:underline hover:underline-offset-2"
                     >
-                      {p.name}
+                      <span className="truncate">{p.name}</span>
+                      <ArrowUpRight className="size-3.5 shrink-0" aria-hidden="true" />
                     </Link>
                   </TableCell>
                   <TableCell>
