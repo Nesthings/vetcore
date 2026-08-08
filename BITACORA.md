@@ -1408,8 +1408,10 @@ verde clínico profundo, tipografía Plus Jakarta Sans (display) / Geist (UI) / 
     guardada por el dueño en su cartilla); si no se elige, firma quien confirma.
   - **Adjuntar documento** (opcional): PDF o imagen ≤ 10 MB, visible para el dueño en su
     cartilla y para el staff (link en ambas listas).
-- El dueño guarda su firma desde su cartilla ("Mi firma (si eres médico)", `POST/DELETE
-  /share/cartilla/signature`), reutilizada cuando se le selecciona como médico.
+- El dueño guarda su firma desde su cartilla ("Mi firma (si eres médico)" en la pestaña
+  Consentimientos, `POST/DELETE /share/cartilla/signature`), reutilizada cuando se le
+  selecciona como médico. (Movido desde la sección de contacto del dueño, donde causaba
+  confusión, a la pestaña Consentimientos.)
 - `POST /consents/pending` ahora es multipart (pet_id, title, body, vet_user_id|owner_id,
   attachment) y guarda el médico elegido en `vet_user_id`/`owner_id`.
 - Confirmación: firma del personal = médico seleccionado (staff → dueño-médico → quien

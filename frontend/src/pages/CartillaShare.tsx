@@ -635,67 +635,6 @@ export function CartillaShare() {
                 foto de perfil). Si necesitas actualizar tus datos, acude a la clínica o contáctala
                 directamente.
               </p>
-
-              <div className="rounded-xl border border-border/60 bg-card p-4 shadow-sm">
-                <div className="mb-3 flex items-center gap-2">
-                  <PenLine className="size-4 text-primary" aria-hidden="true" />
-                  <p className="text-sm font-medium">Mi firma (si eres médico)</p>
-                </div>
-                {(() => {
-                  const activeOwner = pet.owners?.find((o) => o.is_active) ?? pet.owners?.[0]
-                  if (activeOwner?.signature_url) {
-                    return (
-                      <>
-                        <div className="flex items-center justify-center rounded-md border border-border bg-white p-3">
-                          <img
-                            src={activeOwner.signature_url}
-                            alt="Tu firma guardada"
-                            className="h-28 w-full max-w-xs object-contain"
-                          />
-                        </div>
-                        <div className="mt-3 flex gap-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setMySignature('')}
-                            disabled={sigBusy}
-                          >
-                            Cambiar firma
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={deleteMySignature}
-                            disabled={sigBusy}
-                          >
-                            <Trash2 /> Eliminar
-                          </Button>
-                        </div>
-                      </>
-                    )
-                  }
-                  return null
-                })()}
-                {!pet.owners?.find((o) => o.is_active)?.signature_url || mySignature !== null ? (
-                  <div className="space-y-3">
-                    <SignaturePad onDataUrl={setMySignature} />
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={saveMySignature}
-                      disabled={!mySignature || sigBusy}
-                    >
-                      {sigBusy ? <Loader2 className="animate-spin" /> : <Save />} Guardar firma
-                    </Button>
-                  </div>
-                ) : null}
-                <p className="mt-3 text-xs text-muted-foreground">
-                  Si el veterinario te selecciona como médico que firma, se usará esta firma en los
-                  documentos.
-                </p>
-              </div>
             </div>
           </div>
 
@@ -1090,6 +1029,66 @@ export function CartillaShare() {
               </TabsContent>
 
               <TabsContent value="consents" className="space-y-4">
+                <div className="rounded-xl border border-border/60 bg-card p-4 shadow-sm">
+                  <div className="mb-3 flex items-center gap-2">
+                    <PenLine className="size-4 text-primary" aria-hidden="true" />
+                    <p className="text-sm font-medium">Mi firma (si eres médico)</p>
+                  </div>
+                  {(() => {
+                    const activeOwner = pet.owners?.find((o) => o.is_active) ?? pet.owners?.[0]
+                    if (activeOwner?.signature_url) {
+                      return (
+                        <>
+                          <div className="flex items-center justify-center rounded-md border border-border bg-white p-3">
+                            <img
+                              src={activeOwner.signature_url}
+                              alt="Tu firma guardada"
+                              className="h-28 w-full max-w-xs object-contain"
+                            />
+                          </div>
+                          <div className="mt-3 flex gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setMySignature('')}
+                              disabled={sigBusy}
+                            >
+                              Cambiar firma
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={deleteMySignature}
+                              disabled={sigBusy}
+                            >
+                              <Trash2 /> Eliminar
+                            </Button>
+                          </div>
+                        </>
+                      )
+                    }
+                    return null
+                  })()}
+                  {!pet.owners?.find((o) => o.is_active)?.signature_url || mySignature !== null ? (
+                    <div className="space-y-3">
+                      <SignaturePad onDataUrl={setMySignature} />
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={saveMySignature}
+                        disabled={!mySignature || sigBusy}
+                      >
+                        {sigBusy ? <Loader2 className="animate-spin" /> : <Save />} Guardar firma
+                      </Button>
+                    </div>
+                  ) : null}
+                  <p className="mt-3 text-xs text-muted-foreground">
+                    Si el veterinario te selecciona como médico que firma, se usará esta firma en
+                    los documentos.
+                  </p>
+                </div>
                 {pendingConsents.length > 0 && (
                   <div className="rounded-lg border border-warning/40 bg-warning/5 px-3 py-2 text-sm text-warning">
                     Tienes {pendingConsents.length} consentimiento
