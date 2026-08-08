@@ -690,7 +690,7 @@ export function PetDetail() {
                         placeholder={
                           <PawPrint className="size-20 text-primary" aria-hidden="true" />
                         }
-                        containerClassName="size-56"
+                        containerClassName="size-[235px]"
                         frontClassName={`rounded-[2rem] border-4 ${accent.ring} bg-secondary/60 shadow-elevated ${accent.glow}`}
                         frontOverlay={
                           <span
