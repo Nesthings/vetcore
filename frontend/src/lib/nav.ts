@@ -78,7 +78,7 @@ export const MODULE_META: Record<string, ModuleMeta> = {
     text: 'text-sky-700 dark:text-sky-300',
     iconBg: 'bg-sky-500/15',
     img: '/module_pics/pacientes.jpeg',
-    imgClass: 'origin-bottom scale-[1.24] group-hover:scale-[1.3]',
+    imgClass: 'origin-bottom scale-[1.36] group-hover:scale-[1.43]',
     tint: 'bg-sky-100 dark:bg-sky-500/15',
     glow: 'hover:shadow-[0_10px_30px_-6px_rgba(14,165,233,0.5)]',
     pageBg: 'from-sky-100/80 dark:from-sky-500/[0.12]',
