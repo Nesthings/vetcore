@@ -1430,6 +1430,15 @@ verde clínico profundo, tipografía Plus Jakarta Sans (display) / Geist (UI) / 
 - Verificado E2E: al firmar llega la notificación (unread) y al hacer clic abre el
   expediente con el diálogo de confirmación listo.
 
+### Fix: panel "Mi firma" fuera de la cartilla del dueño
+- El panel "Mi firma (si eres médico)" se movió a la pestaña Consentimientos de la
+  cartilla y ahí seguía confundiendo: parecía el panel para firmar el consentimiento
+  (no mostraba título, descripción ni adjunto). Se ELIMINÓ de la cartilla por completo.
+- El diálogo "Firmar consentimiento" ahora muestra el título, la descripción y el
+  documento adjunto (link) antes del pad de firma.
+- La selección de "dueño (médico)" en el modal del staff se mantiene; si el dueño no
+  tiene firma guardada, el PDF deja "(pendiente)" en la firma del personal.
+
 ---
 
 **Siguiente subfase:** por decidir (Fase 3 en hold).

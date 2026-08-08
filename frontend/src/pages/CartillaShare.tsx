@@ -14,13 +14,10 @@ import {
   Mail,
   Paperclip,
   PawPrint,
-  PenLine,
   Phone,
   Plus,
-  Save,
   Stethoscope,
   Syringe,
-  Trash2,
   TriangleAlert,
   Users,
   Weight,
@@ -232,8 +229,6 @@ export function CartillaShare() {
   const [signing, setSigning] = useState<ShareConsent | null>(null)
   const [signature, setSignature] = useState<string | null>(null)
   const [signBusy, setSignBusy] = useState(false)
-  const [mySignature, setMySignature] = useState<string | null>(null)
-  const [sigBusy, setSigBusy] = useState(false)
   const [confirm, setConfirm] = useState<{ title: string; onConfirm: () => void } | null>(null)
 
   const load = useCallback(async () => {
@@ -287,40 +282,6 @@ export function CartillaShare() {
       setError(err instanceof Error ? err.message : 'No se pudo subir tu foto')
     } finally {
       setOwnerPhotoBusy(false)
-    }
-  }
-
-  const saveMySignature = async () => {
-    if (!mySignature) return
-    setSigBusy(true)
-    setError(null)
-    try {
-      const blob = await (await fetch(mySignature)).blob()
-      const fd = new FormData()
-      fd.append('token', token)
-      fd.append('file', new File([blob], 'firma.png', { type: 'image/png' }))
-      await apiFetch('/share/cartilla/signature', { method: 'POST', body: fd })
-      setMySignature(null)
-      await load()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo guardar tu firma')
-    } finally {
-      setSigBusy(false)
-    }
-  }
-
-  const deleteMySignature = async () => {
-    setSigBusy(true)
-    setError(null)
-    try {
-      const fd = new FormData()
-      fd.append('token', token)
-      await apiFetch('/share/cartilla/signature', { method: 'DELETE', body: fd })
-      await load()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo eliminar tu firma')
-    } finally {
-      setSigBusy(false)
     }
   }
 
@@ -1029,66 +990,6 @@ export function CartillaShare() {
               </TabsContent>
 
               <TabsContent value="consents" className="space-y-4">
-                <div className="rounded-xl border border-border/60 bg-card p-4 shadow-sm">
-                  <div className="mb-3 flex items-center gap-2">
-                    <PenLine className="size-4 text-primary" aria-hidden="true" />
-                    <p className="text-sm font-medium">Mi firma (si eres médico)</p>
-                  </div>
-                  {(() => {
-                    const activeOwner = pet.owners?.find((o) => o.is_active) ?? pet.owners?.[0]
-                    if (activeOwner?.signature_url) {
-                      return (
-                        <>
-                          <div className="flex items-center justify-center rounded-md border border-border bg-white p-3">
-                            <img
-                              src={activeOwner.signature_url}
-                              alt="Tu firma guardada"
-                              className="h-28 w-full max-w-xs object-contain"
-                            />
-                          </div>
-                          <div className="mt-3 flex gap-2">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setMySignature('')}
-                              disabled={sigBusy}
-                            >
-                              Cambiar firma
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={deleteMySignature}
-                              disabled={sigBusy}
-                            >
-                              <Trash2 /> Eliminar
-                            </Button>
-                          </div>
-                        </>
-                      )
-                    }
-                    return null
-                  })()}
-                  {!pet.owners?.find((o) => o.is_active)?.signature_url || mySignature !== null ? (
-                    <div className="space-y-3">
-                      <SignaturePad onDataUrl={setMySignature} />
-                      <Button
-                        type="button"
-                        size="sm"
-                        onClick={saveMySignature}
-                        disabled={!mySignature || sigBusy}
-                      >
-                        {sigBusy ? <Loader2 className="animate-spin" /> : <Save />} Guardar firma
-                      </Button>
-                    </div>
-                  ) : null}
-                  <p className="mt-3 text-xs text-muted-foreground">
-                    Si el veterinario te selecciona como médico que firma, se usará esta firma en
-                    los documentos.
-                  </p>
-                </div>
                 {pendingConsents.length > 0 && (
                   <div className="rounded-lg border border-warning/40 bg-warning/5 px-3 py-2 text-sm text-warning">
                     Tienes {pendingConsents.length} consentimiento
@@ -1258,9 +1159,23 @@ export function CartillaShare() {
           </DialogHeader>
           {signing && (
             <div className="space-y-4">
-              <p className="max-h-40 overflow-y-auto rounded-md bg-muted/40 p-3 text-sm text-muted-foreground">
-                {signing.body}
-              </p>
+              <div>
+                <p className="text-sm font-semibold">{signing.title}</p>
+                <p className="max-h-40 overflow-y-auto rounded-md bg-muted/40 p-3 text-sm text-muted-foreground">
+                  {signing.body}
+                </p>
+              </div>
+              {signing.attachment_url && (
+                <a
+                  href={signing.attachment_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-accent"
+                >
+                  <Paperclip className="size-3.5" aria-hidden="true" />
+                  {signing.attachment_name ?? 'Documento adjunto'}
+                </a>
+              )}
               <div className="rounded-md border border-border p-4">
                 <SignaturePad onDataUrl={setSignature} />
               </div>
