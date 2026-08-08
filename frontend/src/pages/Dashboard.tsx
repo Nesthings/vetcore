@@ -310,7 +310,8 @@ export function Dashboard() {
       return
     }
     let cancelled = false
-    apiFetch<Record<string, unknown>>(`/dashboards/data?slugs=${active.join(',')}`)
+    setDashData({})
+    apiFetch<Record<string, unknown>>(`/dashboards/data?slugs=${active.join(',')}&period=${period}`)
       .then((res) => {
         if (!cancelled) setDashData(res)
       })
@@ -318,7 +319,7 @@ export function Dashboard() {
     return () => {
       cancelled = true
     }
-  }, [active])
+  }, [active, period])
 
   const moduleItems = NAV_ROUTES.filter(
     (r) =>

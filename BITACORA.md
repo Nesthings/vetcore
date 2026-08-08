@@ -1499,6 +1499,17 @@ verde clínico profundo, tipografía Plus Jakarta Sans (display) / Geist (UI) / 
   cartilla (excluye el header).
 - Verificado headless: header con la clínica, sin "Cartilla de", y descarga de PNG (~550 KB).
 
+### Fix: el toggle de período del Inicio no afectaba a los dashboards
+- Los widgets de la sección "Dashboards" se cargaban una sola vez (dependencia solo de `active`),
+  por lo que el toggle Diario/Semanal/Mensual solo actualizaba "Citas por hora".
+- El endpoint `/dashboards/data` ahora acepta `period` (day|week|month) y filtra los rangos de
+  los builders con ventana temporal (new_pets, appt_heatmap, appt_funnel, procedures, vet_load,
+  inv_movements, reasons). Los demográficos/actuales (species, breeds, vaccination,
+  upcoming_doses, stock_levels) se mantienen sin filtro temporal.
+- El frontend re-fetcha los dashboards al cambiar `period` (y muestra loading mientras).
+- Verificado: API cambia datos por período (agendadas 184→226, puntos new_pets 2/3/16) e
+  inválido da 422; UI re-fetcha con `period=week/month/day` en cada toggle.
+
 ---
 
 **Siguiente subfase:** por decidir (Fase 3 en hold).

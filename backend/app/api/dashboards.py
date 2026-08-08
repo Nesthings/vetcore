@@ -18,10 +18,16 @@ PERIOD_30D = "now() - interval '30 days'"
 PERIOD_14D = "now() - interval '14 days'"
 PERIOD_6M = "now() - interval '6 months'"
 
+PERIOD_WINDOW = {
+    "day": "now() - interval '1 day'",
+    "week": "now() - interval '7 days'",
+    "month": "now() - interval '30 days'",
+}
+
 _HEATMAP_DAYS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"]
 
 
-def _species(db: Session, cid: str) -> list[dict]:
+def _species(db: Session, cid: str, period: str) -> list[dict]:
     rows = db.execute(
         text(
             "SELECT species AS name, count(*) AS value FROM pets "
@@ -32,7 +38,7 @@ def _species(db: Session, cid: str) -> list[dict]:
     return [{"name": r.name, "value": r.value} for r in rows]
 
 
-def _breeds(db: Session, cid: str) -> list[dict]:
+def _breeds(db: Session, cid: str, period: str) -> list[dict]:
     rows = db.execute(
         text(
             "SELECT COALESCE(NULLIF(breed, ''), 'Sin raza') AS name, count(*) AS value "
@@ -44,26 +50,30 @@ def _breeds(db: Session, cid: str) -> list[dict]:
     return [{"name": r.name, "value": r.value} for r in rows]
 
 
-def _new_pets(db: Session, cid: str) -> list[dict]:
+def _new_pets(db: Session, cid: str, period: str) -> list[dict]:
+    window = PERIOD_WINDOW[period]
+    trunc, label = ("hour", "HH24:00") if period == "day" else ("day", "DD/MM")
     rows = db.execute(
         text(
-            "SELECT to_char(date_trunc('month', created_at), 'YYYY-MM') AS label, "
-            "count(*) AS value "
-            "FROM pets WHERE clinic_id = :c AND is_active = true AND created_at >= "
-            f"{PERIOD_6M} GROUP BY 1 ORDER BY 1"
+            f"SELECT to_char(date_trunc('{trunc}', created_at), '{label}') AS label, "
+            f"count(*) AS value "
+            f"FROM pets WHERE clinic_id = :c AND is_active = true AND created_at >= {window} "
+            f"GROUP BY date_trunc('{trunc}', created_at) "
+            f"ORDER BY date_trunc('{trunc}', created_at)"
         ),
         {"c": cid},
     ).all()
     return [{"label": r.label, "value": r.value} for r in rows]
 
 
-def _appt_heatmap(db: Session, cid: str) -> dict:
+def _appt_heatmap(db: Session, cid: str, period: str) -> dict:
+    window = PERIOD_WINDOW[period]
     rows = db.execute(
         text(
             "SELECT extract(dow from start_time)::int AS day, "
             "extract(hour from start_time)::int AS hour, count(*) AS value "
             "FROM appointments WHERE clinic_id = :c AND start_time >= "
-            f"{PERIOD_14D} AND status <> 'cancelled' GROUP BY 1, 2"
+            f"{window} AND status <> 'cancelled' GROUP BY 1, 2"
         ),
         {"c": cid},
     ).all()
@@ -74,25 +84,26 @@ def _appt_heatmap(db: Session, cid: str) -> dict:
     }
 
 
-def _appt_funnel(db: Session, cid: str) -> list[dict]:
+def _appt_funnel(db: Session, cid: str, period: str) -> list[dict]:
+    window = PERIOD_WINDOW[period]
     total = db.execute(
         text(
             "SELECT count(*) FROM appointments WHERE clinic_id = :c AND start_time >= "
-            f"{PERIOD_30D} AND status <> 'cancelled'"
+            f"{window} AND status <> 'cancelled'"
         ),
         {"c": cid},
     ).scalar() or 0
     confirmed = db.execute(
         text(
             "SELECT count(*) FROM appointments WHERE clinic_id = :c AND start_time >= "
-            f"{PERIOD_30D} AND status = 'confirmed'"
+            f"{window} AND status = 'confirmed'"
         ),
         {"c": cid},
     ).scalar() or 0
     completed = db.execute(
         text(
             "SELECT count(*) FROM appointments WHERE clinic_id = :c AND start_time >= "
-            f"{PERIOD_30D} AND status = 'completed'"
+            f"{window} AND status = 'completed'"
         ),
         {"c": cid},
     ).scalar() or 0
@@ -100,7 +111,7 @@ def _appt_funnel(db: Session, cid: str) -> list[dict]:
         text(
             "SELECT count(*) FROM consultation_surveys s "
             "JOIN consultations c ON c.id = s.consultation_id "
-            "WHERE c.clinic_id = :cid AND c.created_at >= " + PERIOD_30D
+            "WHERE c.clinic_id = :cid AND c.created_at >= " + window
         ),
         {"cid": cid},
     ).scalar() or 0
@@ -112,12 +123,13 @@ def _appt_funnel(db: Session, cid: str) -> list[dict]:
     ]
 
 
-def _procedures(db: Session, cid: str) -> list[dict]:
+def _procedures(db: Session, cid: str, period: str) -> list[dict]:
+    window = PERIOD_WINDOW[period]
     rows = db.execute(
         text(
             "SELECT procedure_type AS name, count(*) AS value FROM appointments "
             "WHERE clinic_id = :c AND start_time >= "
-            f"{PERIOD_30D} AND status <> 'cancelled' "
+            f"{window} AND status <> 'cancelled' "
             "GROUP BY 1 ORDER BY value DESC LIMIT 8"
         ),
         {"c": cid},
@@ -125,12 +137,13 @@ def _procedures(db: Session, cid: str) -> list[dict]:
     return [{"name": r.name, "value": r.value} for r in rows]
 
 
-def _vet_load(db: Session, cid: str) -> dict:
+def _vet_load(db: Session, cid: str, period: str) -> dict:
+    window = PERIOD_WINDOW[period]
     citas = db.execute(
         text(
             "SELECT vet_user_id, count(*) AS value FROM appointments "
             "WHERE clinic_id = :c AND vet_user_id IS NOT NULL AND start_time >= "
-            f"{PERIOD_30D} GROUP BY 1"
+            f"{window} GROUP BY 1"
         ),
         {"c": cid},
     ).all()
@@ -138,7 +151,7 @@ def _vet_load(db: Session, cid: str) -> dict:
         text(
             "SELECT vet_user_id, count(*) AS value FROM appointments "
             "WHERE clinic_id = :c AND vet_user_id IS NOT NULL AND start_time >= "
-            f"{PERIOD_30D} AND status = 'completed' GROUP BY 1"
+            f"{window} AND status = 'completed' GROUP BY 1"
         ),
         {"c": cid},
     ).all()
@@ -146,7 +159,7 @@ def _vet_load(db: Session, cid: str) -> dict:
         text(
             "SELECT vet_user_id, count(*) AS value FROM appointments "
             "WHERE clinic_id = :c AND vet_user_id IS NOT NULL AND start_time >= "
-            f"{PERIOD_30D} AND status = 'no_show' GROUP BY 1"
+            f"{window} AND status = 'no_show' GROUP BY 1"
         ),
         {"c": cid},
     ).all()
@@ -154,7 +167,7 @@ def _vet_load(db: Session, cid: str) -> dict:
         text(
             "SELECT vet_user_id, count(*) AS value FROM consultations "
             "WHERE clinic_id = :c AND vet_user_id IS NOT NULL AND created_at >= "
-            f"{PERIOD_30D} GROUP BY 1"
+            f"{window} GROUP BY 1"
         ),
         {"c": cid},
     ).all()
@@ -209,7 +222,7 @@ def _vet_load(db: Session, cid: str) -> dict:
     }
 
 
-def _vaccination(db: Session, cid: str) -> list[dict]:
+def _vaccination(db: Session, cid: str, period: str) -> list[dict]:
     labels = {"completed": "Completadas", "scheduled": "Programadas", "skipped": "Omitidas"}
     rows = db.execute(
         text(
@@ -222,7 +235,7 @@ def _vaccination(db: Session, cid: str) -> list[dict]:
     return [{"name": labels.get(r.name, r.name), "value": r.value} for r in rows]
 
 
-def _upcoming_doses(db: Session, cid: str) -> list[dict]:
+def _upcoming_doses(db: Session, cid: str, period: str) -> list[dict]:
     rows = db.execute(
         text(
             "SELECT to_char(due_date, 'MM-DD') AS label, count(*) AS value "
@@ -237,7 +250,7 @@ def _upcoming_doses(db: Session, cid: str) -> list[dict]:
     return [{"label": r.label, "value": r.value} for r in rows]
 
 
-def _stock_levels(db: Session, cid: str) -> list[dict]:
+def _stock_levels(db: Session, cid: str, period: str) -> list[dict]:
     rows = db.execute(
         text(
             "SELECT CASE WHEN stock_quantity <= 0 THEN 'Agotado' "
@@ -249,28 +262,32 @@ def _stock_levels(db: Session, cid: str) -> list[dict]:
     return [{"name": r.name, "value": r.value} for r in rows]
 
 
-def _inv_movements(db: Session, cid: str) -> list[dict]:
+def _inv_movements(db: Session, cid: str, period: str) -> list[dict]:
+    window = PERIOD_WINDOW[period]
+    trunc, label = ("hour", "HH24:00") if period == "day" else ("day", "DD/MM")
     rows = db.execute(
         text(
-            "SELECT to_char(date_trunc('month', m.created_at), 'YYYY-MM') AS label, "
+            f"SELECT to_char(date_trunc('{trunc}', m.created_at), '{label}') AS label, "
             "sum(CASE WHEN m.quantity_delta > 0 THEN m.quantity_delta ELSE 0 END) AS fin, "
             "abs(sum(CASE WHEN m.quantity_delta < 0 THEN m.quantity_delta ELSE 0 END)) AS fout "
             "FROM inventory_movements m "
             "JOIN inventory_products p ON p.id = m.product_id "
-            "WHERE p.clinic_id = :c AND m.created_at >= "
-            f"{PERIOD_6M} GROUP BY 1 ORDER BY 1"
+            f"WHERE p.clinic_id = :c AND m.created_at >= {window} "
+            f"GROUP BY date_trunc('{trunc}', m.created_at) "
+            f"ORDER BY date_trunc('{trunc}', m.created_at)"
         ),
         {"c": cid},
     ).all()
     return [{"label": r.label, "in": float(r.fin or 0), "out": float(r.fout or 0)} for r in rows]
 
 
-def _reasons(db: Session, cid: str) -> list[dict]:
+def _reasons(db: Session, cid: str, period: str) -> list[dict]:
+    window = PERIOD_WINDOW[period]
     rows = db.execute(
         text(
             "SELECT COALESCE(NULLIF(reason, ''), 'Sin motivo') AS name, count(*) AS value "
             "FROM consultations WHERE clinic_id = :c AND created_at >= "
-            f"{PERIOD_30D} AND reason IS NOT NULL GROUP BY reason ORDER BY value DESC LIMIT 8"
+            f"{window} AND reason IS NOT NULL GROUP BY reason ORDER BY value DESC LIMIT 8"
         ),
         {"c": cid},
     ).all()
@@ -298,7 +315,8 @@ def dashboard_data(
     ctx: CurrentClinic = Depends(get_current_clinic),
     db: Session = Depends(get_db),
     slugs: str | None = Query(default=None),
+    period: str = Query(default="month", pattern="^(day|week|month)$"),
 ) -> dict:
-    """Devuelve el dataset de cada dashboard pedido (o de todos)."""
+    """Devuelve el dataset de cada dashboard pedido (o de todos), filtrado al período."""
     wanted = [s for s in slugs.split(",") if s in _BUILDERS] if slugs else list(_BUILDERS)
-    return {slug: _BUILDERS[slug](db, ctx.clinic["id"]) for slug in wanted}
+    return {slug: _BUILDERS[slug](db, ctx.clinic["id"], period) for slug in wanted}
