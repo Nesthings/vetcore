@@ -21,21 +21,14 @@ import { PlanViewDialog } from '@/components/vaccination/PlanViewDialog'
 import { apiFetch } from '@/lib/api'
 import { speciesLabel } from '@/lib/species'
 import { cn } from '@/lib/utils'
-import type { VaccinationPlan } from '@/lib/vaccination'
+import { humanizeLapso, type VaccinationPlan } from '@/lib/vaccination'
 
 const SPECIES_ORDER = ['perro', 'gato', 'equino', 'hurones', 'conejo']
 
 function stepsSummary(steps: VaccinationPlan['steps']): string {
   if (steps.length === 0) return 'Sin dosis'
   if (steps.length === 1) return '1 dosis'
-  const parts = steps.slice(1).map((s) => {
-    if (s.offset_days % 365 === 0)
-      return `${s.offset_days / 365} año${s.offset_days / 365 > 1 ? 's' : ''}`
-    if (s.offset_days % 30 === 0) return `${s.offset_days / 30} meses`
-    if (s.offset_days % 15 === 0) return `${s.offset_days / 15} quincenas`
-    if (s.offset_days % 7 === 0) return `${s.offset_days / 7} semanas`
-    return `${s.offset_days} días`
-  })
+  const parts = steps.slice(1).map((s) => humanizeLapso(s.offset_days))
   return `${steps.length} dosis · cada ${parts.join(' → ')}`
 }
 

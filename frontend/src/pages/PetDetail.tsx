@@ -8,6 +8,7 @@ import {
   Cake,
   CalendarDays,
   Camera,
+  CheckCheck,
   ClipboardPlus,
   FileSignature,
   FileText,
@@ -19,6 +20,7 @@ import {
   PawPrint,
   Phone,
   Plus,
+  RotateCcw,
   Send,
   Stethoscope,
   Syringe,
@@ -28,6 +30,7 @@ import {
   Users,
   Weight,
   X,
+  XCircle,
 } from 'lucide-react'
 import {
   CartesianGrid,
@@ -43,6 +46,8 @@ import { AppLayout } from '@/components/layout/AppLayout'
 import { ConsentDialog } from '@/components/pets/ConsentDialog'
 import { InviteOwnerDialog } from '@/components/pets/InviteOwnerDialog'
 import { PetQrCard } from '@/components/pets/PetQrCard'
+import { DoseStamps } from '@/components/pets/DoseStamps'
+import { AssignPlanDialog } from '@/components/pets/AssignPlanDialog'
 import { PhotoComparison } from '@/components/pets/PhotoComparison'
 import { TransferOwnerDialog } from '@/components/pets/TransferOwnerDialog'
 import { Avatar } from '@/components/ui/avatar'
@@ -124,12 +129,23 @@ interface CarnetApp {
   lot?: string | null
   notes?: string | null
   vet_name?: string | null
+  source?: string | null
+}
+
+interface CarnetDose {
+  id: string
+  label: string
+  due_date: string
+  status: string
+  appointment_id?: string | null
 }
 
 interface CarnetVaccine {
   name: string
   prevents?: string | null
   schedule?: string | null
+  steps: { label: string; offset_days: number }[]
+  doses: CarnetDose[]
   applications: CarnetApp[]
 }
 
@@ -180,19 +196,24 @@ function CarnetApps({ apps, onRemove }: { apps: CarnetApp[]; onRemove: (id: stri
             <span className="font-medium">
               {new Date(app.date_applied).toLocaleDateString('es-MX')}
             </span>
-            <button
-              type="button"
-              onClick={() => onRemove(app.id)}
-              aria-label={`Eliminar aplicación ${new Date(app.date_applied).toLocaleDateString('es-MX')}`}
-              className="ml-auto shrink-0 text-muted-foreground hover:text-destructive"
-            >
-              <X className="size-3" />
-            </button>
+            {app.source !== 'plan' && (
+              <button
+                type="button"
+                onClick={() => onRemove(app.id)}
+                aria-label={`Eliminar aplicación ${new Date(app.date_applied).toLocaleDateString('es-MX')}`}
+                className="ml-auto shrink-0 text-muted-foreground hover:text-destructive"
+              >
+                <X className="size-3" />
+              </button>
+            )}
           </div>
           {(app.lot || app.vet_name) && (
             <p className="mt-0.5 break-words text-xs text-muted-foreground">
               {[app.lot && `Lote ${app.lot}`, app.vet_name].filter(Boolean).join(' · ')}
             </p>
+          )}
+          {app.notes && (
+            <p className="mt-0.5 break-words text-xs text-muted-foreground">{app.notes}</p>
           )}
         </div>
       ))}
@@ -409,6 +430,13 @@ export function PetDetail() {
   const [consentOpen, setConsentOpen] = useState(false)
   const [qrUrl, setQrUrl] = useState<string | null>(null)
   const [confirmConsent, setConfirmConsent] = useState<Consent | null>(null)
+  const [assignOpen, setAssignOpen] = useState(false)
+  const [doseAction, setDoseAction] = useState<{
+    id: string
+    action: string
+    title: string
+    description: string
+  } | null>(null)
   const [searchParams] = useSearchParams()
   const [activeTab, setActiveTab] = useState(
     searchParams.get('tab') === 'consents' ? 'consents' : 'timeline',
@@ -475,6 +503,20 @@ export function PetDetail() {
       load()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo confirmar el consentimiento')
+    }
+  }
+
+  const runDoseAction = async () => {
+    if (!doseAction) return
+    try {
+      await apiFetch(`/vaccination-plans/doses/${doseAction.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: doseAction.action }),
+      })
+      setDoseAction(null)
+      load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo actualizar la dosis')
     }
   }
 
@@ -1003,6 +1045,9 @@ export function PetDetail() {
                               </TableCell>
                               <TableCell className="whitespace-normal break-words text-xs text-muted-foreground">
                                 {v.schedule ?? '—'}
+                                <div className="mt-2">
+                                  <DoseStamps vaccine={v} />
+                                </div>
                               </TableCell>
                               <TableCell className="whitespace-normal">
                                 <CarnetApps apps={v.applications} onRemove={removeCarnetApp} />
@@ -1050,6 +1095,9 @@ export function PetDetail() {
                             Esquema: {v.schedule}
                           </p>
                         )}
+                        <div className="mt-2.5">
+                          <DoseStamps vaccine={v} />
+                        </div>
                         {v.applications.length > 0 && (
                           <div className="mt-3">
                             <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -1436,11 +1484,24 @@ export function PetDetail() {
                 </TabsContent>
 
                 <TabsContent value="vacunacion" className="space-y-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm text-muted-foreground">
+                      Dosis del plan con sus citas automáticas en la agenda.
+                    </p>
+                    <Button size="sm" onClick={() => setAssignOpen(true)}>
+                      <Plus /> Asignar plan
+                    </Button>
+                  </div>
                   {vaccination.length === 0 ? (
                     <EmptyState
                       title="Sin plan de vacunación"
-                      description="Asigna un plan al dar de alta a la mascota para generar sus citas de vacunación automáticamente."
+                      description="Asigna un plan para generar sus dosis y citas de vacunación automáticamente."
                       icon={Syringe}
+                      action={
+                        <Button size="sm" onClick={() => setAssignOpen(true)}>
+                          <Plus /> Asignar plan
+                        </Button>
+                      }
                     />
                   ) : (
                     vaccination.map((vp) => (
@@ -1503,21 +1564,76 @@ export function PetDetail() {
                                   </p>
                                 </div>
                               </div>
-                              <Badge
-                                variant={
-                                  d.status === 'completed'
-                                    ? 'success'
+                              <div className="flex shrink-0 items-center gap-1.5">
+                                <Badge
+                                  variant={
+                                    d.status === 'completed'
+                                      ? 'success'
+                                      : d.status === 'skipped'
+                                        ? 'outline'
+                                        : 'warning'
+                                  }
+                                >
+                                  {d.status === 'completed'
+                                    ? 'Completada'
                                     : d.status === 'skipped'
-                                      ? 'outline'
-                                      : 'warning'
-                                }
-                              >
-                                {d.status === 'completed'
-                                  ? 'Completada'
-                                  : d.status === 'skipped'
-                                    ? 'Omitida'
-                                    : 'Programada'}
-                              </Badge>
+                                      ? 'Omitida'
+                                      : 'Programada'}
+                                </Badge>
+                                {d.status === 'completed' ? (
+                                  <button
+                                    type="button"
+                                    title="Desmarcar (volver a programada)"
+                                    aria-label={`Desmarcar ${d.label}`}
+                                    onClick={() =>
+                                      setDoseAction({
+                                        id: d.id,
+                                        action: 'scheduled',
+                                        title: 'Desmarcar dosis',
+                                        description: `La dosis "${d.label}" volverá a estado programada.`,
+                                      })
+                                    }
+                                    className="flex size-7 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-accent"
+                                  >
+                                    <RotateCcw className="size-3.5" aria-hidden="true" />
+                                  </button>
+                                ) : (
+                                  <>
+                                    <button
+                                      type="button"
+                                      title="Marcar como aplicada"
+                                      aria-label={`Completar ${d.label}`}
+                                      onClick={() =>
+                                        setDoseAction({
+                                          id: d.id,
+                                          action: 'completed',
+                                          title: 'Marcar dosis como aplicada',
+                                          description: `La dosis "${d.label}" se marcará aplicada y aparecerá en el carnet.`,
+                                        })
+                                      }
+                                      className="flex size-7 items-center justify-center rounded-md border border-success/40 bg-success/10 text-success transition-colors hover:bg-success/20"
+                                    >
+                                      <CheckCheck className="size-3.5" aria-hidden="true" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      title="Marcar como omitida"
+                                      aria-label={`Omitir ${d.label}`}
+                                      onClick={() =>
+                                        setDoseAction({
+                                          id: d.id,
+                                          action: 'skipped',
+                                          title: 'Marcar dosis como omitida',
+                                          description: `La dosis "${d.label}" se marcará omitida.`,
+                                        })
+                                      }
+                                      className="flex size-7 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-accent"
+                                    >
+                                      <XCircle className="size-3.5" aria-hidden="true" />
+                                    </button>
+                                  </>
+                                )}
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -1656,6 +1772,31 @@ export function PetDetail() {
         confirmLabel="Eliminar"
         variant="destructive"
         onConfirm={() => confirmState?.onConfirm()}
+      />
+
+      {pet && (
+        <AssignPlanDialog
+          petId={pet.id}
+          petName={pet.name}
+          species={pet.species}
+          open={assignOpen}
+          onOpenChange={setAssignOpen}
+          onAssigned={() => {
+            setAssignOpen(false)
+            load()
+          }}
+        />
+      )}
+
+      <ConfirmDialog
+        open={Boolean(doseAction)}
+        onOpenChange={(open) => {
+          if (!open) setDoseAction(null)
+        }}
+        title={doseAction?.title ?? ''}
+        description={doseAction?.description}
+        confirmLabel="Confirmar"
+        onConfirm={runDoseAction}
       />
     </AppLayout>
   )

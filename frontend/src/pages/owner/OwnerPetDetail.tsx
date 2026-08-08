@@ -9,6 +9,7 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState } from '@/components/ui/error-state'
 import { LoadingState } from '@/components/ui/loading-state'
 import type { OwnerPet } from '@/pages/owner/OwnerPortal'
+import { DoseStamps } from '@/components/pets/DoseStamps'
 import { apiFetch } from '@/lib/api'
 
 interface ConsultationView {
@@ -31,9 +32,39 @@ interface AppointmentView {
   status: string
 }
 
+interface OwnerDose {
+  id: string
+  label: string
+  due_date: string
+  status: string
+  appointment_start?: string | null
+}
+
+interface OwnerVaccPlan {
+  id: string
+  plan_name?: string | null
+  prevents?: string | null
+  branch_name?: string | null
+  vet_name?: string | null
+  start_date: string
+  start_time: string
+  doses: OwnerDose[]
+}
+
+interface OwnerCarnetVaccine {
+  name: string
+  prevents?: string | null
+  schedule?: string | null
+  steps: { label: string; offset_days: number }[]
+  doses: OwnerDose[]
+  applications: { id: string; brand?: string | null; date_applied: string; lot?: string | null }[]
+}
+
 interface OwnerPetDetailData extends OwnerPet {
   consultations: ConsultationView[]
   appointments: AppointmentView[]
+  vaccination: OwnerVaccPlan[]
+  carnet: { species: string; vaccines: OwnerCarnetVaccine[] }
 }
 
 export function OwnerPetDetail() {
@@ -319,6 +350,86 @@ export function OwnerPetDetail() {
                         </span>
                       </div>
                     ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+            <Card className="shadow-card">
+              <CardHeader>
+                <CardTitle>Vacunación</CardTitle>
+                <CardDescription>Planes asignados y esquema de vacunación</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                {data.vaccination.length === 0 ? (
+                  <EmptyState
+                    title="Sin planes asignados"
+                    description="Cuando la clínica asigne un plan, verás aquí sus dosis."
+                  />
+                ) : (
+                  data.vaccination.map((plan) => (
+                    <div key={plan.id} className="rounded-md border border-border p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-sm font-semibold">{plan.plan_name}</p>
+                        <Badge variant="outline">
+                          {plan.doses.filter((d) => d.status === 'completed').length}/
+                          {plan.doses.length} aplicadas
+                        </Badge>
+                      </div>
+                      {plan.prevents && (
+                        <p className="mt-0.5 text-xs text-muted-foreground">{plan.prevents}</p>
+                      )}
+                      <div className="mt-3 space-y-2">
+                        {plan.doses.map((d) => (
+                          <div
+                            key={d.id}
+                            className="flex items-center justify-between gap-2 rounded-md border border-border/60 bg-muted/30 px-3 py-2"
+                          >
+                            <div>
+                              <p className="text-sm font-medium">{d.label}</p>
+                              <p className="text-xs text-muted-foreground">
+                                Programada para el{' '}
+                                {new Date(`${d.due_date}T00:00:00`).toLocaleDateString('es-MX', {
+                                  day: 'numeric',
+                                  month: 'short',
+                                  year: 'numeric',
+                                })}
+                              </p>
+                            </div>
+                            <Badge
+                              variant={
+                                d.status === 'completed'
+                                  ? 'success'
+                                  : d.status === 'skipped'
+                                    ? 'warning'
+                                    : 'secondary'
+                              }
+                            >
+                              {d.status === 'completed'
+                                ? 'Aplicada'
+                                : d.status === 'skipped'
+                                  ? 'Omitida'
+                                  : 'Pendiente'}
+                            </Badge>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))
+                )}
+
+                {data.carnet.vaccines.length > 0 && (
+                  <div className="rounded-md border border-border p-4">
+                    <p className="mb-3 text-sm font-semibold">Esquema del carnet</p>
+                    <div className="space-y-3">
+                      {data.carnet.vaccines.map((v) => (
+                        <div key={v.name}>
+                          <p className="text-sm font-medium">{v.name}</p>
+                          <div className="mt-1.5">
+                            <DoseStamps vaccine={v} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </CardContent>

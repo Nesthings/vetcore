@@ -126,6 +126,10 @@ export function PlanFormDialog({
       return
     }
     for (let i = 1; i < steps.length; i++) {
+      if (!steps[i].label.trim()) {
+        setError(`La dosis ${i + 1} necesita un nombre.`)
+        return
+      }
       if (toDays(steps[i]) <= 0) {
         setError('Cada dosis debe tener un intervalo mayor a cero.')
         return

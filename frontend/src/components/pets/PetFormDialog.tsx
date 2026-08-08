@@ -279,6 +279,10 @@ export function PetFormDialog({
           body: JSON.stringify(payload),
         })
       } else {
+        if (assignPlan && (!planId || !planBranchId)) {
+          setError('Selecciona el plan de vacunación y la sucursal.')
+          return
+        }
         const owner =
           ownerName || ownerPhone || ownerEmail
             ? {
@@ -295,10 +299,6 @@ export function PetFormDialog({
           body: JSON.stringify({ ...payload, owner }),
         })
         if (assignPlan) {
-          if (!planId) {
-            setError('Selecciona un plan de vacunación.')
-            return
-          }
           await apiFetch('/vaccination-plans/assign', {
             method: 'POST',
             body: JSON.stringify({

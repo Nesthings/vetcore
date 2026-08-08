@@ -38,6 +38,7 @@ import {
 
 import { SignaturePad } from '@/components/pets/SignaturePad'
 import { PetQrCard } from '@/components/pets/PetQrCard'
+import { DoseStamps } from '@/components/pets/DoseStamps'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -104,13 +105,37 @@ interface ShareApp {
   lot?: string | null
   notes?: string | null
   vet_name?: string | null
+  source?: string | null
+}
+
+interface ShareDose {
+  id: string
+  label: string
+  due_date: string
+  status: string
+  appointment_start?: string | null
 }
 
 interface ShareVaccine {
   name: string
   prevents?: string | null
   schedule?: string | null
+  steps: { label: string; offset_days: number }[]
+  doses: ShareDose[]
   applications: ShareApp[]
+}
+
+interface ShareVaccinationPlan {
+  id: string
+  plan_id: string
+  plan_name?: string | null
+  compound?: string | null
+  prevents?: string | null
+  branch_name?: string | null
+  vet_name?: string | null
+  start_date: string
+  start_time: string
+  doses: ShareDose[]
 }
 
 interface ShareConsent {
@@ -164,6 +189,7 @@ interface ShareData {
   qr_url?: string | null
   alerts: ShareAlert[]
   carnet: { species: string; vaccines: ShareVaccine[] }
+  vaccination: ShareVaccinationPlan[]
   consents: ShareConsent[]
   weights: ShareWeight[]
   timeline: ShareTimelineEvent[]
@@ -188,45 +214,6 @@ const ALERT_STYLES: Record<string, string> = {
 }
 
 const ALERT_LIMIT = 20
-
-/** Cuenta las dosis del esquema recomendado a partir de su texto. */
-function countSchemeDoses(schedule?: string | null): number {
-  if (!schedule) return 0
-  const s = schedule.toLowerCase()
-  const nums: number[] = []
-  const rango = s.match(/(\d+)\s*[-–]\s*(\d+)\s*dosis/)
-  if (rango) nums.push(Math.max(Number(rango[1]), Number(rango[2])))
-  const unica = s.match(/(\d+)\s*dosis/)
-  if (unica) nums.push(Number(unica[1]))
-  nums.push((s.match(/\d+[ªa]/g) ?? []).length)
-  nums.push((s.match(/refuerzo/g) ?? []).length)
-  return Math.max(0, ...nums) || 1
-}
-
-/** Sellos de dosis: llenos (aplicadas) o vacíos (pendientes). */
-function DoseStamps({ applied, total }: { applied: number; total: number }) {
-  const count = Math.max(total, applied)
-  return (
-    <div className="flex flex-wrap gap-1.5">
-      {Array.from({ length: count }).map((_, i) => {
-        const done = i < applied
-        return (
-          <span
-            key={i}
-            title={done ? `Dosis ${i + 1} aplicada` : `Dosis ${i + 1} pendiente`}
-            className={`flex size-8 items-center justify-center rounded-full border-2 text-xs font-bold ${
-              done
-                ? 'border-primary bg-primary text-primary-foreground'
-                : 'border-dashed border-muted-foreground/60 text-muted-foreground'
-            }`}
-          >
-            {done ? <Check className="size-4" aria-hidden="true" /> : i + 1}
-          </span>
-        )
-      })}
-    </div>
-  )
-}
 
 const CITA_STATUS: Record<
   string,
@@ -839,10 +826,7 @@ export function CartillaShare() {
                             <TableCell className="whitespace-normal break-words text-xs text-muted-foreground">
                               {v.schedule ?? '—'}
                               <div className="mt-2">
-                                <DoseStamps
-                                  applied={v.applications.length}
-                                  total={countSchemeDoses(v.schedule)}
-                                />
+                                <DoseStamps vaccine={v} />
                               </div>
                             </TableCell>
                             <TableCell className="whitespace-normal">
@@ -890,10 +874,7 @@ export function CartillaShare() {
                           </p>
                         )}
                         <div className="mt-2.5">
-                          <DoseStamps
-                            applied={v.applications.length}
-                            total={countSchemeDoses(v.schedule)}
-                          />
+                          <DoseStamps vaccine={v} />
                         </div>
                         {v.applications.length > 0 && (
                           <div className="mt-3">
@@ -1200,11 +1181,68 @@ export function CartillaShare() {
               </TabsContent>
 
               <TabsContent value="vacunacion" className="space-y-4">
-                <EmptyState
-                  title="Planes de vacunación"
-                  description="Los planes asignados a la mascota se muestran aquí (solo lectura)."
-                  icon={Syringe}
-                />
+                {data.vaccination.length === 0 ? (
+                  <EmptyState
+                    title="Sin planes de vacunación asignados"
+                    description="Cuando la clínica asigne un plan a la mascota, aquí verás sus dosis."
+                    icon={Syringe}
+                  />
+                ) : (
+                  <div className="space-y-3">
+                    {data.vaccination.map((plan) => (
+                      <div
+                        key={plan.id}
+                        className="rounded-xl border border-border/60 bg-card p-4 shadow-sm"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <p className="text-sm font-semibold">{plan.plan_name}</p>
+                          <Badge variant="outline">
+                            {plan.doses.filter((d) => d.status === 'completed').length}/
+                            {plan.doses.length} aplicadas
+                          </Badge>
+                        </div>
+                        {plan.prevents && (
+                          <p className="mt-0.5 text-xs text-muted-foreground">{plan.prevents}</p>
+                        )}
+                        <div className="mt-3 space-y-2">
+                          {plan.doses.map((d) => (
+                            <div
+                              key={d.id}
+                              className="flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2"
+                            >
+                              <div>
+                                <p className="text-sm font-medium">{d.label}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  Programada para el{' '}
+                                  {new Date(d.due_date).toLocaleDateString('es-MX', {
+                                    day: 'numeric',
+                                    month: 'short',
+                                    year: 'numeric',
+                                  })}
+                                </p>
+                              </div>
+                              <Badge
+                                variant={
+                                  d.status === 'completed'
+                                    ? 'success'
+                                    : d.status === 'skipped'
+                                      ? 'warning'
+                                      : 'secondary'
+                                }
+                              >
+                                {d.status === 'completed'
+                                  ? 'Aplicada'
+                                  : d.status === 'skipped'
+                                    ? 'Omitida'
+                                    : 'Pendiente'}
+                              </Badge>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </TabsContent>
 
               <TabsContent value="familia">

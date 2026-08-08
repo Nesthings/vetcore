@@ -195,6 +195,7 @@ export function NewConsultation() {
   }, [serviceLines, productLines])
 
   const nextDose = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10)
     return vaccination
       .flatMap((vp) =>
         vp.doses.map((d) => ({
@@ -203,7 +204,7 @@ export function NewConsultation() {
           compound: vp.compound,
         })),
       )
-      .filter((d) => d.status === 'scheduled')
+      .filter((d) => d.status === 'scheduled' && d.due_date >= today)
       .sort((a, b) => a.due_date.localeCompare(b.due_date))[0]
   }, [vaccination])
 

@@ -1553,6 +1553,25 @@ verde clínico profundo, tipografía Plus Jakarta Sans (display) / Geist (UI) / 
 - Verificado E2E: dosis skipped/completed con lote/marca, edición de carnet manual, 409 al
   borrar plan asignado, dashboards por período/sucursal, y desasignación que limpia todo.
 
+### Refactor vacunación — Fase 3: frontend consistente
+- **Cartilla del dueño**: los sellos de dosis ya NO se calculan parseando el texto del esquema
+  (se eliminó `countSchemeDoses`). Usan `components/pets/DoseStamps` (compartido): si la mascota
+  tiene el plan asignado, reflejan sus dosis reales con estado (aplicada/omitida/pendiente); si
+  no, los pasos del esquema estándar. La pestaña "Vacunación" ya muestra los planes asignados
+  con sus dosis y estados (antes era un placeholder vacío).
+- **Expediente (PetDetail)**: mismo carnet con sellos; botón **"Asignar plan"** para mascotas
+  existentes (`AssignPlanDialog` filtrado por especie); acciones por dosis (aplicada/omitida/
+  desmarcar vía PATCH de dosis); se muestra `notes` de las aplicaciones y no se puede borrar una
+  aplicación proveniente de una dosis (se edita desde la dosis).
+- **Portal del dueño (OwnerPetDetail)**: nueva sección de Vacunación (planes + dosis + esquema
+  del carnet) con el mismo payload.
+- **NewConsultation**: "Próxima vacunación" excluye dosis vencidas.
+- **PetFormDialog**: valida el plan ANTES de crear la mascota (ya no queda creada sin plan).
+- **VaccinationPlans/PlanViewDialog/PlanFormDialog**: lapsos unificados con `humanizeLapso`;
+  `PlanFormDialog` valida el nombre de TODAS las dosis.
+- Verificado E2E: asignar plan desde el expediente, marcar dosis completada, y verlo en la
+  cartilla (pestaña Vacunación + sellos del carnet).
+
 ---
 
 **Siguiente subfase:** por decidir (Fase 3 en hold).
