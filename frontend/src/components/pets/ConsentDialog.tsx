@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Loader2, Send } from 'lucide-react'
+import { useRef, useState } from 'react'
+import { Loader2, Paperclip, Send, X } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -12,38 +12,77 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { apiFetch } from '@/lib/api'
+
+interface VetOption {
+  id: string
+  full_name: string
+  professional_title?: string | null
+}
+
+interface OwnerOption {
+  owner_id: string
+  full_name?: string | null
+}
 
 export function ConsentDialog({
   petId,
   petName,
+  vets,
+  owner,
   open,
   onOpenChange,
   onSaved,
 }: {
   petId: string
   petName: string
+  vets: VetOption[]
+  owner: OwnerOption | null
   open: boolean
   onOpenChange: (open: boolean) => void
   onSaved: () => void
 }) {
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
+  const [signingDoctor, setSigningDoctor] = useState('')
+  const [file, setFile] = useState<File | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const reset = () => {
+    setTitle('')
+    setBody('')
+    setSigningDoctor('')
+    setFile(null)
+    setError(null)
+  }
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
     setSubmitting(true)
     try {
-      await apiFetch('/consents/pending', {
-        method: 'POST',
-        body: JSON.stringify({ pet_id: petId, title, body }),
-      })
-      setTitle('')
-      setBody('')
+      const fd = new FormData()
+      fd.append('pet_id', petId)
+      fd.append('title', title)
+      fd.append('body', body)
+      if (signingDoctor.startsWith('vet:')) {
+        fd.append('vet_user_id', signingDoctor.slice(4))
+      } else if (signingDoctor.startsWith('owner:')) {
+        fd.append('owner_id', signingDoctor.slice(6))
+      }
+      if (file) fd.append('attachment', file)
+      await apiFetch('/consents/pending', { method: 'POST', body: fd })
+      reset()
       onSaved()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo enviar el consentimiento')
@@ -75,7 +114,7 @@ export function ConsentDialog({
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="consent-body">Texto del consentimiento *</Label>
+            <Label htmlFor="consent-body">Descripción del consentimiento *</Label>
             <Textarea
               id="consent-body"
               value={body}
@@ -84,6 +123,75 @@ export function ConsentDialog({
               placeholder="Se informa al dueño sobre el procedimiento, riesgos y alternativas…"
               required
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Médico que firma (opcional)</Label>
+            <Select value={signingDoctor} onValueChange={setSigningDoctor}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Sin especificar" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Sin especificar</SelectItem>
+                {vets.map((v) => (
+                  <SelectItem key={v.id} value={`vet:${v.id}`}>
+                    {v.full_name}
+                    {v.professional_title ? ` · ${v.professional_title}` : ''}
+                  </SelectItem>
+                ))}
+                {owner?.owner_id ? (
+                  <SelectItem value={`owner:${owner.owner_id}`}>
+                    {owner.full_name ?? 'Dueño'} · dueño (médico)
+                  </SelectItem>
+                ) : null}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Se usará la firma guardada en su perfil; también puedes elegir al dueño cuando él
+              mismo es médico.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Adjuntar documento explicativo (opcional)</Label>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*,.pdf"
+              className="hidden"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            />
+            {file ? (
+              <div className="flex items-center justify-between gap-2 rounded-md border border-border bg-muted/40 px-3 py-2">
+                <span className="flex min-w-0 items-center gap-2 text-sm">
+                  <Paperclip className="size-4 shrink-0 text-primary" />
+                  <span className="truncate">{file.name}</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFile(null)
+                    if (fileRef.current) fileRef.current.value = ''
+                  }}
+                  className="text-muted-foreground transition-colors hover:text-destructive"
+                  aria-label="Quitar archivo"
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => fileRef.current?.click()}
+              >
+                <Paperclip /> Elegir archivo
+              </Button>
+            )}
+            <p className="text-xs text-muted-foreground">
+              PDF o imagen · máx. 10 MB. El dueño podrá verlo en su cartilla.
+            </p>
           </div>
 
           {error && <p className="text-sm text-destructive">{error}</p>}

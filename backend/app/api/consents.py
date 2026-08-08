@@ -12,21 +12,30 @@ Flujo (3.2):
 import uuid
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.api.deps import CurrentClinic, get_current_clinic, require_clinic_roles
 from app.core.events import record_audit
-from app.core.storage import public_url, read_media_bytes, save_media
+from app.core.storage import (
+    ALLOWED_IMAGE_EXTENSIONS,
+    ALLOWED_PDF_EXTENSIONS,
+    public_url,
+    read_media_bytes,
+    save_media,
+    validate_extension,
+)
 from app.db.session import get_db
 from app.models import Clinic, DigitalConsent, Pet, User
-from app.schemas.consent import ConsentRead, PendingConsentCreate
+from app.schemas.consent import ConsentRead
 from app.services.pdf import build_consent_pdf
 
 router = APIRouter(prefix="/consents", tags=["consents"])
 
 CONSENT_MUTATORS = ("admin", "veterinario", "recepcion")
+
+MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
 
 
 def _owner_display(db: Session, pet_id: str) -> str:
@@ -41,30 +50,82 @@ def _owner_display(db: Session, pet_id: str) -> str:
     return row or "Dueño"
 
 
+def _owner_row(db: Session, owner_id: str) -> dict | None:
+    row = db.execute(
+        text("SELECT id, full_name, signature_url FROM owners WHERE id = :oid"),
+        {"oid": owner_id},
+    ).mappings().first()
+    return dict(row) if row else None
+
+
 @router.post(
     "/pending",
     response_model=ConsentRead,
     status_code=status.HTTP_201_CREATED,
-    summary="Crea un consentimiento pendiente de firma del dueño (remoto)",
+    summary="Envía un consentimiento al dueño (firma remota)",
 )
 def create_pending_consent(
-    body: PendingConsentCreate,
+    pet_id: str = Form(...),
+    title: str = Form(...),
+    body: str = Form(...),
+    vet_user_id: uuid.UUID | None = Form(
+        default=None, description="Médico que firma (staff con firma guardada)"
+    ),
+    owner_id: uuid.UUID | None = Form(
+        default=None, description="Dueño que también es médico y firmará"
+    ),
+    attachment: UploadFile | None = File(default=None),
     ctx: CurrentClinic = Depends(require_clinic_roles(*CONSENT_MUTATORS)),
     db: Session = Depends(get_db),
 ) -> DigitalConsent:
     pet = db.scalar(
-        select(Pet).where(Pet.id == body.pet_id, Pet.clinic_id == ctx.clinic["id"])
+        select(Pet).where(Pet.id == pet_id, Pet.clinic_id == ctx.clinic["id"])
     )
     if pet is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Paciente no encontrado")
+    if vet_user_id is not None and owner_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Selecciona un solo médico que firma",
+        )
+
+    attachment_url = None
+    attachment_name = None
+    if attachment is not None and attachment.filename:
+        validate_extension(
+            attachment.filename, ALLOWED_IMAGE_EXTENSIONS | ALLOWED_PDF_EXTENSIONS
+        )
+        content = attachment.file.read()
+        if len(content) > MAX_ATTACHMENT_BYTES:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail="El documento supera el límite de 10 MB",
+            )
+        rel = save_media(f"consents/{pet.id}", attachment.filename, content)
+        attachment_url = public_url(rel)
+        attachment_name = attachment.filename
+
+    # Médico que firma: staff elegido → dueño médico → quien envía por defecto
+    if vet_user_id is not None:
+        signing_vet = vet_user_id
+        signing_owner = None
+    elif owner_id is not None:
+        signing_vet = None
+        signing_owner = owner_id
+    else:
+        signing_vet = ctx.user.sub
+        signing_owner = None
 
     consent = DigitalConsent(
         clinic_id=ctx.clinic["id"],
         pet_id=pet.id,
-        vet_user_id=ctx.user.sub,
-        title=body.title,
-        body=body.body,
+        vet_user_id=signing_vet,
+        owner_id=signing_owner,
+        title=title,
+        body=body,
         status="pending",
+        attachment_url=attachment_url,
+        attachment_name=attachment_name,
     )
     db.add(consent)
     db.flush()
@@ -76,7 +137,7 @@ def create_pending_consent(
         action="consent_pending_created",
         entity_type="consent",
         entity_id=consent.id,
-        metadata={"pet_id": str(pet.id), "title": body.title},
+        metadata={"pet_id": str(pet.id), "title": title},
     )
     db.commit()
     db.refresh(consent)
@@ -109,15 +170,24 @@ def confirm_consent(
 
     owner_signature_bytes = read_media_bytes(consent.signature_url)
 
-    confirming_user = db.get(User, ctx.user.sub)
-    staff_signature_bytes = read_media_bytes(confirming_user.signature_url)
-    staff_name = confirming_user.full_name if confirming_user is not None else None
-    # Si quien confirma no tiene firma guardada, usa la del médico que emitió
-    if not staff_signature_bytes and consent.vet_user_id:
-        vet_user = db.get(User, consent.vet_user_id)
-        if vet_user is not None:
-            staff_signature_bytes = read_media_bytes(vet_user.signature_url)
-            staff_name = vet_user.full_name
+    # Firma del personal: médico seleccionado (staff) → dueño-médico → quien confirma
+    staff_signature_bytes = None
+    staff_name = None
+    if consent.vet_user_id is not None:
+        doctor = db.get(User, consent.vet_user_id)
+        if doctor is not None:
+            staff_signature_bytes = read_media_bytes(doctor.signature_url)
+            staff_name = doctor.full_name
+    elif consent.owner_id is not None:
+        owner_row = _owner_row(db, str(consent.owner_id))
+        if owner_row is not None:
+            staff_signature_bytes = read_media_bytes(owner_row.get("signature_url"))
+            staff_name = owner_row.get("full_name")
+    if not staff_signature_bytes:
+        confirming_user = db.get(User, ctx.user.sub)
+        if confirming_user is not None:
+            staff_signature_bytes = read_media_bytes(confirming_user.signature_url)
+            staff_name = confirming_user.full_name
 
     clinic = db.get(Clinic, consent.clinic_id)
     pet = db.get(Pet, consent.pet_id)

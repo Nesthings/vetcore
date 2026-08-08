@@ -69,7 +69,7 @@ def _with_owners(db: Session, pet: Pet) -> list[dict]:
         db.execute(
             text(
                 "SELECT o.id AS owner_id, o.full_name, o.phone, o.email, "
-                "o.profile_photo_url, o.alt_contact_name, o.alt_phone, "
+                "o.profile_photo_url, o.signature_url, o.alt_contact_name, o.alt_phone, "
                 "l.linked_at, l.is_active "
                 "FROM owner_pet_links l JOIN owners o ON o.id = l.owner_id "
                 "WHERE l.pet_id = :pid AND l.clinic_id = :cid "
@@ -181,6 +181,8 @@ def share_cartilla(
             "status": c.status,
             "signature_url": c.signature_url,
             "pdf_url": c.pdf_url,
+            "attachment_url": c.attachment_url,
+            "attachment_name": c.attachment_name,
             "signed_at": c.signed_at.isoformat(),
         }
         for c in consents
@@ -466,6 +468,100 @@ def share_upload_owner_photo(
     )
     db.commit()
     return {"profile_photo_url": public_url(rel), "revertible": bool(row.profile_photo_url)}
+
+
+def _active_owner_row(db: Session, pet: Pet) -> dict:
+    row = db.execute(
+        text(
+            "SELECT o.id, o.full_name, o.signature_url FROM owner_pet_links l "
+            "JOIN owners o ON o.id = l.owner_id "
+            "WHERE l.pet_id = :pid AND l.clinic_id = :cid AND l.is_active = true "
+            "ORDER BY l.linked_at DESC LIMIT 1"
+        ),
+        {"pid": pet.id, "cid": pet.clinic_id},
+    ).mappings().first()
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="La mascota no tiene un dueño activo"
+        )
+    return dict(row)
+
+
+@router.post(
+    "/cartilla/signature",
+    summary="El dueño guarda su firma (por si también es médico y firma documentos)",
+)
+def share_upload_owner_signature(
+    token: str = Form(...),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+) -> dict:
+    pet = _pet_from_token(token, db)
+    row = _active_owner_row(db, pet)
+    validate_extension(file.filename or "", ALLOWED_IMAGE_EXTENSIONS)
+    content = file.file.read()
+    if len(content) > MAX_IMAGE_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="La imagen supera el límite de 5 MB",
+        )
+    import io
+
+    from PIL import Image
+
+    try:
+        with Image.open(io.BytesIO(content)) as img:
+            img.verify()
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="El archivo no es una imagen válida"
+        ) from exc
+
+    rel = save_media(f"owners/{row['id']}", "firma.png", content)
+    db.execute(
+        text("UPDATE owners SET signature_url = :url WHERE id = :oid"),
+        {"url": public_url(rel), "oid": row["id"]},
+    )
+    record_audit(
+        db,
+        clinic_id=pet.clinic_id,
+        actor_type="owner",
+        actor_id=pet.id,
+        action="owner_signature_updated_owner",
+        entity_type="owner",
+        entity_id=row["id"],
+        metadata={"pet_id": str(pet.id)},
+    )
+    db.commit()
+    return {"signature_url": public_url(rel)}
+
+
+@router.delete(
+    "/cartilla/signature",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="El dueño elimina su firma guardada",
+)
+def share_delete_owner_signature(
+    token: str = Form(...),
+    db: Session = Depends(get_db),
+) -> None:
+    pet = _pet_from_token(token, db)
+    row = _active_owner_row(db, pet)
+    db.execute(
+        text("UPDATE owners SET signature_url = NULL WHERE id = :oid"),
+        {"oid": row["id"]},
+    )
+    record_audit(
+        db,
+        clinic_id=pet.clinic_id,
+        actor_type="owner",
+        actor_id=pet.id,
+        action="owner_signature_deleted_owner",
+        entity_type="owner",
+        entity_id=row["id"],
+        metadata={"pet_id": str(pet.id)},
+    )
+    db.commit()
 
 
 @router.post(

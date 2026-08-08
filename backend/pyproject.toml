@@ -11,6 +11,7 @@ ignore = []
 extend-immutable-calls = [
     "fastapi.Depends",
     "fastapi.File",
+    "fastapi.Form",
     "fastapi.Query",
     "app.api.deps.require_clinic_roles",
     "app.api.deps.require_roles",

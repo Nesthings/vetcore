@@ -36,6 +36,8 @@ class DigitalConsent(UUIDPkMixin, Base):
     )
     signature_url: Mapped[str | None] = mapped_column(Text)
     pdf_url: Mapped[str | None] = mapped_column(Text)
+    attachment_url: Mapped[str | None] = mapped_column(Text)
+    attachment_name: Mapped[str | None] = mapped_column(String(255))
     signed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

@@ -15,6 +15,7 @@ import {
   Loader2,
   Mail,
   MailPlus,
+  Paperclip,
   PawPrint,
   Phone,
   Plus,
@@ -109,6 +110,8 @@ interface Consent {
   status: string
   signature_url?: string | null
   pdf_url?: string | null
+  attachment_url?: string | null
+  attachment_name?: string | null
   signed_at: string
   confirmed_at?: string | null
 }
@@ -386,7 +389,9 @@ export function PetDetail() {
   const [carnetSpecies, setCarnetSpecies] = useState('')
   const [carnetBrands, setCarnetBrands] = useState<string[]>([])
   const [family, setFamily] = useState<FamilyMember[]>([])
-  const [vets, setVets] = useState<{ id: string; full_name: string }[]>([])
+  const [vets, setVets] = useState<
+    { id: string; full_name: string; professional_title?: string | null }[]
+  >([])
   const [addingFor, setAddingFor] = useState<string | null>(null)
   const [appDate, setAppDate] = useState('')
   const [appBrand, setAppBrand] = useState('')
@@ -429,7 +434,9 @@ export function PetDetail() {
           `/pets/${id}/carnet`,
         ),
         apiFetch<FamilyMember[]>(`/pets/${id}/family`),
-        apiFetch<{ id: string; full_name: string; role: string }[]>('/users'),
+        apiFetch<
+          { id: string; full_name: string; role: string; professional_title?: string | null }[]
+        >('/users'),
       ])
       setPet(p)
       setTimeline(tl)
@@ -1371,23 +1378,36 @@ export function PetDetail() {
                             </p>
                           </div>
                         </div>
-                        {c.status === 'pending' ? (
-                          <Badge variant="warning">Enviado</Badge>
-                        ) : c.status === 'owner_signed' ? (
-                          <Button size="sm" onClick={() => setConfirmConsent(c)}>
-                            <BadgeCheck /> Confirmar
-                          </Button>
-                        ) : (
-                          <a
-                            href={c.pdf_url ?? '#'}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-accent"
-                          >
-                            <FileText className="size-3.5" aria-hidden="true" />
-                            Ver PDF
-                          </a>
-                        )}
+                        <div className="flex shrink-0 items-center gap-2">
+                          {c.attachment_url && (
+                            <a
+                              href={c.attachment_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent"
+                            >
+                              <Paperclip className="size-3.5" aria-hidden="true" />
+                              {c.attachment_name?.slice(0, 24) ?? 'Adjunto'}
+                            </a>
+                          )}
+                          {c.status === 'pending' ? (
+                            <Badge variant="warning">Enviado</Badge>
+                          ) : c.status === 'owner_signed' ? (
+                            <Button size="sm" onClick={() => setConfirmConsent(c)}>
+                              <BadgeCheck /> Confirmar
+                            </Button>
+                          ) : (
+                            <a
+                              href={c.pdf_url ?? '#'}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-accent"
+                            >
+                              <FileText className="size-3.5" aria-hidden="true" />
+                              Ver PDF
+                            </a>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -1571,6 +1591,15 @@ export function PetDetail() {
         <ConsentDialog
           petId={pet.id}
           petName={pet.name}
+          vets={vets}
+          owner={
+            pet.owners?.find((o) => o.is_active)
+              ? {
+                  owner_id: pet.owners.find((o) => o.is_active)!.owner_id,
+                  full_name: pet.owners.find((o) => o.is_active)!.full_name,
+                }
+              : null
+          }
           open={consentOpen}
           onOpenChange={setConsentOpen}
           onSaved={() => {

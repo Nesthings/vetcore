@@ -12,11 +12,15 @@ import {
   Loader2,
   Lock,
   Mail,
+  Paperclip,
   PawPrint,
+  PenLine,
   Phone,
   Plus,
+  Save,
   Stethoscope,
   Syringe,
+  Trash2,
   TriangleAlert,
   Users,
   Weight,
@@ -65,6 +69,7 @@ interface ShareOwner {
   phone?: string | null
   email?: string | null
   profile_photo_url?: string | null
+  signature_url?: string | null
   alt_contact_name?: string | null
   alt_phone?: string | null
   linked_at: string
@@ -114,6 +119,8 @@ interface ShareConsent {
   status: string
   signature_url?: string | null
   pdf_url?: string | null
+  attachment_url?: string | null
+  attachment_name?: string | null
   signed_at: string
 }
 
@@ -225,6 +232,8 @@ export function CartillaShare() {
   const [signing, setSigning] = useState<ShareConsent | null>(null)
   const [signature, setSignature] = useState<string | null>(null)
   const [signBusy, setSignBusy] = useState(false)
+  const [mySignature, setMySignature] = useState<string | null>(null)
+  const [sigBusy, setSigBusy] = useState(false)
   const [confirm, setConfirm] = useState<{ title: string; onConfirm: () => void } | null>(null)
 
   const load = useCallback(async () => {
@@ -278,6 +287,40 @@ export function CartillaShare() {
       setError(err instanceof Error ? err.message : 'No se pudo subir tu foto')
     } finally {
       setOwnerPhotoBusy(false)
+    }
+  }
+
+  const saveMySignature = async () => {
+    if (!mySignature) return
+    setSigBusy(true)
+    setError(null)
+    try {
+      const blob = await (await fetch(mySignature)).blob()
+      const fd = new FormData()
+      fd.append('token', token)
+      fd.append('file', new File([blob], 'firma.png', { type: 'image/png' }))
+      await apiFetch('/share/cartilla/signature', { method: 'POST', body: fd })
+      setMySignature(null)
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo guardar tu firma')
+    } finally {
+      setSigBusy(false)
+    }
+  }
+
+  const deleteMySignature = async () => {
+    setSigBusy(true)
+    setError(null)
+    try {
+      const fd = new FormData()
+      fd.append('token', token)
+      await apiFetch('/share/cartilla/signature', { method: 'DELETE', body: fd })
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo eliminar tu firma')
+    } finally {
+      setSigBusy(false)
     }
   }
 
@@ -592,6 +635,67 @@ export function CartillaShare() {
                 foto de perfil). Si necesitas actualizar tus datos, acude a la clínica o contáctala
                 directamente.
               </p>
+
+              <div className="rounded-xl border border-border/60 bg-card p-4 shadow-sm">
+                <div className="mb-3 flex items-center gap-2">
+                  <PenLine className="size-4 text-primary" aria-hidden="true" />
+                  <p className="text-sm font-medium">Mi firma (si eres médico)</p>
+                </div>
+                {(() => {
+                  const activeOwner = pet.owners?.find((o) => o.is_active) ?? pet.owners?.[0]
+                  if (activeOwner?.signature_url) {
+                    return (
+                      <>
+                        <div className="flex items-center justify-center rounded-md border border-border bg-white p-3">
+                          <img
+                            src={activeOwner.signature_url}
+                            alt="Tu firma guardada"
+                            className="h-28 w-full max-w-xs object-contain"
+                          />
+                        </div>
+                        <div className="mt-3 flex gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setMySignature('')}
+                            disabled={sigBusy}
+                          >
+                            Cambiar firma
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={deleteMySignature}
+                            disabled={sigBusy}
+                          >
+                            <Trash2 /> Eliminar
+                          </Button>
+                        </div>
+                      </>
+                    )
+                  }
+                  return null
+                })()}
+                {!pet.owners?.find((o) => o.is_active)?.signature_url || mySignature !== null ? (
+                  <div className="space-y-3">
+                    <SignaturePad onDataUrl={setMySignature} />
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={saveMySignature}
+                      disabled={!mySignature || sigBusy}
+                    >
+                      {sigBusy ? <Loader2 className="animate-spin" /> : <Save />} Guardar firma
+                    </Button>
+                  </div>
+                ) : null}
+                <p className="mt-3 text-xs text-muted-foreground">
+                  Si el veterinario te selecciona como médico que firma, se usará esta firma en los
+                  documentos.
+                </p>
+              </div>
             </div>
           </div>
 
@@ -1029,28 +1133,41 @@ export function CartillaShare() {
                             </p>
                           </div>
                         </div>
-                        {c.status === 'pending' ? (
-                          <Button
-                            size="sm"
-                            onClick={() => {
-                              setSigning(c)
-                              setSignature(null)
-                            }}
-                          >
-                            <FileSignature /> Firmar
-                          </Button>
-                        ) : c.status === 'owner_signed' ? (
-                          <Badge variant="info">En espera</Badge>
-                        ) : (
-                          <a
-                            href={c.pdf_url ?? '#'}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-accent"
-                          >
-                            <FileText className="size-3.5" aria-hidden="true" /> Ver PDF
-                          </a>
-                        )}
+                        <div className="flex shrink-0 items-center gap-2">
+                          {c.attachment_url && (
+                            <a
+                              href={c.attachment_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent"
+                            >
+                              <Paperclip className="size-3.5" aria-hidden="true" />
+                              {c.attachment_name?.slice(0, 24) ?? 'Adjunto'}
+                            </a>
+                          )}
+                          {c.status === 'pending' ? (
+                            <Button
+                              size="sm"
+                              onClick={() => {
+                                setSigning(c)
+                                setSignature(null)
+                              }}
+                            >
+                              <FileSignature /> Firmar
+                            </Button>
+                          ) : c.status === 'owner_signed' ? (
+                            <Badge variant="info">En espera</Badge>
+                          ) : (
+                            <a
+                              href={c.pdf_url ?? '#'}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-accent"
+                            >
+                              <FileText className="size-3.5" aria-hidden="true" /> Ver PDF
+                            </a>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>

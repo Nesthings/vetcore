@@ -20,5 +20,6 @@ owners = Table(
     Column("password_hash", Text),
     Column("profile_photo_url", Text),
     Column("profile_photo_prev_url", Text),
+    Column("signature_url", Text),
     Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
 )

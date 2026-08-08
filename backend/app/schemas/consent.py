@@ -1,13 +1,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
-
-
-class PendingConsentCreate(BaseModel):
-    pet_id: uuid.UUID
-    title: str = Field(min_length=1, max_length=200)
-    body: str = Field(min_length=1)
+from pydantic import BaseModel, ConfigDict
 
 
 class ConsentRead(BaseModel):
@@ -22,5 +16,7 @@ class ConsentRead(BaseModel):
     status: str
     signature_url: str | None
     pdf_url: str | None
+    attachment_url: str | None
+    attachment_name: str | None
     signed_at: datetime
     confirmed_at: datetime | None

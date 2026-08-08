@@ -1400,6 +1400,22 @@ verde clínico profundo, tipografía Plus Jakarta Sans (display) / Geist (UI) / 
 - Verificado E2E (API + UI headless): pending → dueño firma → "En espera" en cartilla →
   staff confirma → "Confirmado" + "Ver PDF" en ambas vistas, PDF con 2 imágenes RGBA.
 
+### Médico que firma + adjunto en consentimientos
+- Migración `0031`: `owners.signature_url`, `digital_consents.attachment_url/name`.
+- El modal "Enviar consentimiento" ahora permite:
+  - **Médico que firma** (opcional): selector con el personal veterinario (usa la firma
+    guardada en su perfil) **incluyendo al dueño** cuando también es médico (usa la firma
+    guardada por el dueño en su cartilla); si no se elige, firma quien confirma.
+  - **Adjuntar documento** (opcional): PDF o imagen ≤ 10 MB, visible para el dueño en su
+    cartilla y para el staff (link en ambas listas).
+- El dueño guarda su firma desde su cartilla ("Mi firma (si eres médico)", `POST/DELETE
+  /share/cartilla/signature`), reutilizada cuando se le selecciona como médico.
+- `POST /consents/pending` ahora es multipart (pet_id, title, body, vet_user_id|owner_id,
+  attachment) y guarda el médico elegido en `vet_user_id`/`owner_id`.
+- Confirmación: firma del personal = médico seleccionado (staff → dueño-médico → quien
+  confirma). Verificado E2E (staff doctor y dueño-médico generan PDF con 2 firmas) y UI
+  headless (opciones del selector + adjunto visible tras enviar).
+
 ---
 
 **Siguiente subfase:** por decidir (Fase 3 en hold).
