@@ -1510,6 +1510,16 @@ verde clínico profundo, tipografía Plus Jakarta Sans (display) / Geist (UI) / 
 - Verificado: API cambia datos por período (agendadas 184→226, puntos new_pets 2/3/16) e
   inválido da 422; UI re-fetcha con `period=week/month/day` en cada toggle.
 
+### Cartilla del dueño: título, colores de alertas y sellos del carnet
+- Header: el subtexto ahora dice "Cartilla digital".
+- Las alertas clínicas usan color según su tipo (igual que el expediente): Alergia rojo,
+  Enfermedad crónica ámbar, Comportamiento violeta, Medidas especiales celeste, Otra gris.
+- Carnet de vacunación: cada vacuna muestra "sellos" de dosis — llenos (✓) para las
+  aplicadas y vacíos punteados para las pendientes, derivados del esquema recomendado y de
+  las aplicaciones registradas; con leyenda. En la tabla (escritorio) y en las tarjetas (móvil).
+- Verificado headless: header, colores distintos por tipo de alerta, y sellos que se llenan
+  con las aplicaciones (0→2 al crear una).
+
 ---
 
 **Siguiente subfase:** por decidir (Fase 3 en hold).

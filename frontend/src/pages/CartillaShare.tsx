@@ -7,6 +7,7 @@ import {
   Camera,
   Cake,
   CalendarDays,
+  Check,
   Download,
   FileSignature,
   FileText,
@@ -178,7 +179,54 @@ const ALERT_TYPES = [
   'Otra',
 ]
 
+const ALERT_STYLES: Record<string, string> = {
+  Alergia: 'border-destructive/40 bg-destructive/10 text-destructive',
+  'Enfermedad crónica': 'border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300',
+  Comportamiento: 'border-violet-500/40 bg-violet-500/10 text-violet-700 dark:text-violet-300',
+  'Medidas especiales': 'border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-300',
+  Otra: 'border-slate-500/40 bg-slate-500/10 text-slate-700 dark:text-slate-300',
+}
+
 const ALERT_LIMIT = 20
+
+/** Cuenta las dosis del esquema recomendado a partir de su texto. */
+function countSchemeDoses(schedule?: string | null): number {
+  if (!schedule) return 0
+  const s = schedule.toLowerCase()
+  const nums: number[] = []
+  const rango = s.match(/(\d+)\s*[-–]\s*(\d+)\s*dosis/)
+  if (rango) nums.push(Math.max(Number(rango[1]), Number(rango[2])))
+  const unica = s.match(/(\d+)\s*dosis/)
+  if (unica) nums.push(Number(unica[1]))
+  nums.push((s.match(/\d+[ªa]/g) ?? []).length)
+  nums.push((s.match(/refuerzo/g) ?? []).length)
+  return Math.max(0, ...nums) || 1
+}
+
+/** Sellos de dosis: llenos (aplicadas) o vacíos (pendientes). */
+function DoseStamps({ applied, total }: { applied: number; total: number }) {
+  const count = Math.max(total, applied)
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {Array.from({ length: count }).map((_, i) => {
+        const done = i < applied
+        return (
+          <span
+            key={i}
+            title={done ? `Dosis ${i + 1} aplicada` : `Dosis ${i + 1} pendiente`}
+            className={`flex size-8 items-center justify-center rounded-full border-2 text-xs font-bold ${
+              done
+                ? 'border-primary bg-primary text-primary-foreground'
+                : 'border-dashed border-muted-foreground/60 text-muted-foreground'
+            }`}
+          >
+            {done ? <Check className="size-4" aria-hidden="true" /> : i + 1}
+          </span>
+        )
+      })}
+    </div>
+  )
+}
 
 const CITA_STATUS: Record<
   string,
@@ -440,7 +488,7 @@ export function CartillaShare() {
           )}
           <div className="min-w-0">
             <p className="truncate text-sm font-bold">{data.clinic?.name ?? 'VetCore'}</p>
-            <p className="truncate text-xs text-muted-foreground">Cartilla veterinaria</p>
+            <p className="truncate text-xs text-muted-foreground">Cartilla digital</p>
           </div>
         </div>
         <Button
@@ -670,7 +718,9 @@ export function CartillaShare() {
                   {data.alerts.map((a) => (
                     <span
                       key={a.id}
-                      className="inline-flex items-center gap-2 rounded-full border border-warning/40 bg-warning/10 px-3 py-1.5 text-sm font-medium text-warning"
+                      className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium ${
+                        ALERT_STYLES[a.type] ?? ALERT_STYLES.Otra
+                      }`}
                     >
                       <TriangleAlert className="size-3.5" aria-hidden="true" />
                       <span>
@@ -726,6 +776,18 @@ export function CartillaShare() {
               title="Carnet de vacunación"
               subtitle={`Esquema estándar para ${speciesLabel(data.carnet.species)} · solo lectura`}
             />
+            <p className="mt-2 flex items-center gap-4 text-xs text-muted-foreground">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="flex size-4 items-center justify-center rounded-full border-2 border-primary bg-primary text-primary-foreground">
+                  <Check className="size-2.5" aria-hidden="true" />
+                </span>
+                Dosis aplicada
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="inline-block size-4 rounded-full border-2 border-dashed border-muted-foreground/60" />
+                Dosis pendiente
+              </span>
+            </p>
             <div className="mt-3">
               {data.carnet.vaccines.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
@@ -776,6 +838,12 @@ export function CartillaShare() {
                             </TableCell>
                             <TableCell className="whitespace-normal break-words text-xs text-muted-foreground">
                               {v.schedule ?? '—'}
+                              <div className="mt-2">
+                                <DoseStamps
+                                  applied={v.applications.length}
+                                  total={countSchemeDoses(v.schedule)}
+                                />
+                              </div>
                             </TableCell>
                             <TableCell className="whitespace-normal">
                               {v.applications.length === 0 ? (
@@ -821,6 +889,12 @@ export function CartillaShare() {
                             Esquema: {v.schedule}
                           </p>
                         )}
+                        <div className="mt-2.5">
+                          <DoseStamps
+                            applied={v.applications.length}
+                            total={countSchemeDoses(v.schedule)}
+                          />
+                        </div>
                         {v.applications.length > 0 && (
                           <div className="mt-3">
                             <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
