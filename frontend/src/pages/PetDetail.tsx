@@ -48,6 +48,7 @@ import { InviteOwnerDialog } from '@/components/pets/InviteOwnerDialog'
 import { PetQrCard } from '@/components/pets/PetQrCard'
 import { DoseStamps } from '@/components/pets/DoseStamps'
 import { AssignPlanDialog } from '@/components/pets/AssignPlanDialog'
+import { BrandCombobox } from '@/components/pets/BrandCombobox'
 import { PhotoComparison } from '@/components/pets/PhotoComparison'
 import { TransferOwnerDialog } from '@/components/pets/TransferOwnerDialog'
 import { Avatar } from '@/components/ui/avatar'
@@ -227,12 +228,7 @@ interface CarnetAppFormProps {
   setAppDate: (v: string) => void
   appBrand: string
   setAppBrand: (v: string) => void
-  appBrandQuery: string
-  setAppBrandQuery: (v: string) => void
-  appBrandOpen: boolean
-  setAppBrandOpen: (v: boolean) => void
-  appBrandRef: React.RefObject<HTMLDivElement | null>
-  filteredBrands: string[]
+  brands: string[]
   appLot: string
   setAppLot: (v: string) => void
   appVet: string
@@ -249,11 +245,7 @@ function CarnetAppForm(props: CarnetAppFormProps) {
     setAppDate,
     appBrand,
     setAppBrand,
-    setAppBrandQuery,
-    appBrandOpen,
-    setAppBrandOpen,
-    appBrandRef,
-    filteredBrands,
+    brands,
     appLot,
     setAppLot,
     appVet,
@@ -275,45 +267,7 @@ function CarnetAppForm(props: CarnetAppFormProps) {
           className="w-36"
         />
       </div>
-      <div className="space-y-1.5">
-        <Label>Marca</Label>
-        <div className="relative" ref={appBrandRef}>
-          <Input
-            value={appBrand}
-            onChange={(e) => {
-              setAppBrand(e.target.value)
-              setAppBrandQuery(e.target.value)
-              setAppBrandOpen(true)
-            }}
-            onFocus={() => setAppBrandOpen(true)}
-            placeholder="Busca la marca…"
-            className="w-52"
-            autoComplete="off"
-          />
-          {appBrandOpen && (
-            <div className="absolute z-20 mt-1 max-h-44 w-full overflow-y-auto rounded-md border border-border bg-card p-1 shadow-card">
-              {filteredBrands.length === 0 ? (
-                <p className="px-2 py-1.5 text-sm text-muted-foreground">Sin coincidencias.</p>
-              ) : (
-                filteredBrands.map((b) => (
-                  <button
-                    key={b}
-                    type="button"
-                    onClick={() => {
-                      setAppBrand(b)
-                      setAppBrandQuery(b)
-                      setAppBrandOpen(false)
-                    }}
-                    className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
-                  >
-                    {b}
-                  </button>
-                ))
-              )}
-            </div>
-          )}
-        </div>
-      </div>
+      <BrandCombobox value={appBrand} onChange={setAppBrand} brands={brands} />
       <div className="space-y-1.5">
         <Label>Lote</Label>
         <Input
@@ -417,8 +371,6 @@ export function PetDetail() {
   const [addingFor, setAddingFor] = useState<string | null>(null)
   const [appDate, setAppDate] = useState('')
   const [appBrand, setAppBrand] = useState('')
-  const [appBrandQuery, setAppBrandQuery] = useState('')
-  const [appBrandOpen, setAppBrandOpen] = useState(false)
   const [appLot, setAppLot] = useState('')
   const [appVet, setAppVet] = useState('')
   const [carnetBusy, setCarnetBusy] = useState(false)
@@ -446,7 +398,6 @@ export function PetDetail() {
   const [alertType, setAlertType] = useState(ALERT_TYPES[0])
   const [alertDesc, setAlertDesc] = useState('')
   const [alertBusy, setAlertBusy] = useState(false)
-  const appBrandRef = useRef<HTMLDivElement>(null)
   const [confirmState, setConfirmState] = useState<{
     title: string
     description?: string
@@ -568,7 +519,10 @@ export function PetDetail() {
   }
 
   const saveCarnetApp = async (vaccine: string) => {
-    if (!appDate) return
+    if (!appDate) {
+      setError('Selecciona la fecha de aplicación.')
+      return
+    }
     setCarnetBusy(true)
     setError(null)
     try {
@@ -585,7 +539,6 @@ export function PetDetail() {
       setAddingFor(null)
       setAppDate('')
       setAppBrand('')
-      setAppBrandQuery('')
       setAppLot('')
       setAppVet('')
       await load()
@@ -617,8 +570,6 @@ export function PetDetail() {
     setAddingFor(addingFor === vaccine ? null : vaccine)
     setAppDate('')
     setAppBrand('')
-    setAppBrandQuery('')
-    setAppBrandOpen(false)
     setAppLot('')
     setAppVet('')
   }
@@ -629,12 +580,7 @@ export function PetDetail() {
     setAppDate,
     appBrand,
     setAppBrand,
-    appBrandQuery,
-    setAppBrandQuery,
-    appBrandOpen,
-    setAppBrandOpen,
-    appBrandRef,
-    filteredBrands,
+    brands: carnetBrands,
     appLot,
     setAppLot,
     appVet,
@@ -653,20 +599,6 @@ export function PetDetail() {
   const latestWeight = weights.length > 0 ? Number(weights[0].weight_kg) : null
   const prevWeight = weights.length > 1 ? Number(weights[1].weight_kg) : null
   const weightDelta = latestWeight != null && prevWeight != null ? latestWeight - prevWeight : null
-
-  const filteredBrands = carnetBrands.filter((b) =>
-    b.toLowerCase().includes(appBrandQuery.trim().toLowerCase()),
-  )
-
-  useEffect(() => {
-    const onClick = (e: MouseEvent) => {
-      if (appBrandRef.current && !appBrandRef.current.contains(e.target as Node)) {
-        setAppBrandOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', onClick)
-    return () => document.removeEventListener('mousedown', onClick)
-  }, [])
 
   return (
     <AppLayout>

@@ -1572,6 +1572,16 @@ verde clínico profundo, tipografía Plus Jakarta Sans (display) / Geist (UI) / 
 - Verificado E2E: asignar plan desde el expediente, marcar dosis completada, y verlo en la
   cartilla (pestaña Vacunación + sellos del carnet).
 
+### Fix: selector de marca del carnet no dejaba elegir (Cuádruple)
+- El formulario "Añadir" del carnet se renderiza DOS veces (tabla de escritorio + tarjetas
+  móviles, una oculta) y compartía el mismo `appBrandRef` y estado del dropdown: al hacer clic
+  en el input de marca, el manejador de "clic externo" de la instancia oculta cerraba el
+  dropdown al instante → no se podía seleccionar ninguna marca.
+- Se creó `BrandCombobox` autocontenido (open/query/ref y cierre por clic externo por
+  instancia) y se eliminó el estado/ref compartido. Ahora la marca funciona en todas las filas.
+- También se muestra error si falta la fecha (antes guardaba silenciosamente) y se verificó
+  que al guardar una aplicación sin marca el sello del carnet sí se llena.
+
 ---
 
 **Siguiente subfase:** por decidir (Fase 3 en hold).
