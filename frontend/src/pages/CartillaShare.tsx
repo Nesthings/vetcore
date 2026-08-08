@@ -34,6 +34,7 @@ import {
 } from 'recharts'
 
 import { SignaturePad } from '@/components/pets/SignaturePad'
+import { PetQrCard } from '@/components/pets/PetQrCard'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -156,6 +157,7 @@ interface ShareFamily {
 
 interface ShareData {
   pet: SharePet
+  qr_url?: string | null
   alerts: ShareAlert[]
   carnet: { species: string; vaccines: ShareVaccine[] }
   consents: ShareConsent[]
@@ -412,41 +414,38 @@ export function CartillaShare() {
             />
             <div className="relative flex flex-col items-center p-8 text-center">
               <div className="relative">
-                <div
-                  className={`flex size-48 items-center justify-center overflow-hidden rounded-[2rem] border-4 ${accent.ring} bg-secondary/60 shadow-elevated`}
-                >
-                  {pet.clinical_photo_url ? (
-                    <img
-                      src={pet.clinical_photo_url}
-                      alt={pet.name}
-                      className="size-full object-cover"
-                    />
-                  ) : (
-                    <PawPrint className="size-16 text-primary" aria-hidden="true" />
-                  )}
-                </div>
-                <label
-                  className={`absolute -bottom-2 -right-2 flex size-10 cursor-pointer items-center justify-center rounded-full border-4 border-card bg-primary text-primary-foreground shadow-card transition-colors hover:bg-primary-hover ${
-                    photoBusy ? 'pointer-events-none opacity-70' : ''
-                  }`}
-                  title="Subir foto de perfil de la mascota"
-                >
-                  {photoBusy ? (
-                    <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-                  ) : (
-                    <Camera className="size-4" aria-hidden="true" />
-                  )}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0]
-                      if (f) uploadPhoto(f)
-                      e.target.value = ''
-                    }}
-                  />
-                </label>
+                <PetQrCard
+                  photoUrl={pet.clinical_photo_url}
+                  petName={pet.name}
+                  qrUrl={data.qr_url ?? ''}
+                  placeholder={<PawPrint className="size-16 text-primary" aria-hidden="true" />}
+                  containerClassName="size-48"
+                  frontClassName={`rounded-[2rem] border-4 ${accent.ring} bg-secondary/60 shadow-elevated`}
+                  frontOverlay={
+                    <label
+                      className={`flex size-10 cursor-pointer items-center justify-center rounded-full border-4 border-card bg-primary text-primary-foreground shadow-card transition-colors hover:bg-primary-hover ${
+                        photoBusy ? 'pointer-events-none opacity-70' : ''
+                      }`}
+                      title="Subir foto de perfil de la mascota"
+                    >
+                      {photoBusy ? (
+                        <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                      ) : (
+                        <Camera className="size-4" aria-hidden="true" />
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0]
+                          if (f) uploadPhoto(f)
+                          e.target.value = ''
+                        }}
+                      />
+                    </label>
+                  }
+                />
               </div>
 
               <h2 className="mt-5 text-3xl font-bold tracking-tight">{pet.name}</h2>

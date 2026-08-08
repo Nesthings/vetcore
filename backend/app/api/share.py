@@ -22,6 +22,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Upload
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
+from app.api.pets import ensure_qr_token
 from app.core.events import notify_roles, record_audit
 from app.core.images import process_cartilla_photo
 from app.core.security import InvalidTokenError, decode_share_token
@@ -54,11 +55,12 @@ ALERT_LIMIT = 20
 
 
 def _pet_from_token(token: str, db: Session) -> Pet:
+    pet = None
     try:
         pet_id = decode_share_token(token)
-    except InvalidTokenError as exc:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
-    pet = db.get(Pet, pet_id)
+        pet = db.get(Pet, pet_id)
+    except InvalidTokenError:
+        pet = db.scalar(select(Pet).where(Pet.qr_token == token))
     if pet is None or not pet.is_active:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Paciente no encontrado")
     return pet
@@ -355,6 +357,7 @@ def share_cartilla(
 
     return {
         "pet": _pet_dict(db, pet),
+        "qr_url": f"/cartilla?token={ensure_qr_token(db, pet)}",
         "alerts": [
             {
                 "id": str(a.id),

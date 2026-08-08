@@ -1440,6 +1440,23 @@ verde clínico profundo, tipografía Plus Jakarta Sans (display) / Geist (UI) / 
 - La selección de "dueño (médico)" en el modal del staff se mantiene; si el dueño no
   tiene firma guardada, el PDF deja "(pendiente)" en la firma del personal.
 
+### QR permanente por mascota + lector integrado
+- Migración `0033`: `pets.qr_token` (único, opaco, SIN expiración; `secrets.token_urlsafe`,
+  generado perezosamente).
+- La cartilla (`_pet_from_token`) acepta el token JWT actual o el `qr_token` permanente.
+- Endpoints: `GET /pets/{id}/qr` (cualquier staff), `POST /pets/{id}/qr/regenerate` (revoca),
+  `POST /pets/resolve-qr` (staff: token → `pet_id`/`pet_name`); el `GET /cartilla` devuelve
+  `qr_url` para que el dueño muestre su QR.
+- Frontend: dependencias `qrcode` (generar) y `qr-scanner` (leer). `PetQrCard` = foto de la
+  mascota con efecto FLIP 3D: al hacer click se voltea y muestra el QR de la cartilla en el
+  reverso (otro click regresa a la foto), en el expediente y en la cartilla del dueño.
+- Botón "Escanear QR" en el header (global): modal con cámara en vivo + fallback de "subir
+  imagen del QR"; al leer resuelve el token y navega al expediente `/pets/<id>`.
+- Verificado: token estable y cartilla por `qr_token` (API), `resolve-qr` (válido e inválido),
+  flip en ambas cartillas (rotateY 180°), y escaneo por imagen que navega al expediente.
+- Nota: el `qr_token` es equivalente al token de cartilla (lectura + acciones puntuales de esa
+  mascota); al ser permanente, `regenerate` permite revocarlo si se compromete.
+
 ---
 
 **Siguiente subfase:** por decidir (Fase 3 en hold).

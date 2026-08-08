@@ -17,9 +17,20 @@ from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.deps import CurrentClinic, get_current_clinic, require_clinic_roles, require_component
+from app.api.deps import (
+    CurrentClinic,
+    CurrentUser,
+    get_current_clinic,
+    require_clinic_roles,
+    require_component,
+    require_staff,
+)
 from app.core.events import notify_roles, record_audit
-from app.core.security import create_share_token
+from app.core.security import (
+    InvalidTokenError,
+    create_share_token,
+    decode_share_token,
+)
 from app.core.seed_vaccination_plans import ensure_standard_plans
 from app.core.storage import (
     ALLOWED_IMAGE_EXTENSIONS,
@@ -390,6 +401,24 @@ def _get_pet_or_404(db: Session, clinic_id: str, pet_id: str) -> Pet:
     if pet is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Paciente no encontrado")
     return pet
+
+
+def ensure_qr_token(db: Session, pet: Pet) -> str:
+    """Devuelve (y genera si falta) el token QR permanente de la mascota."""
+    if not pet.qr_token:
+        pet.qr_token = secrets.token_urlsafe(32)
+        db.commit()
+        db.refresh(pet)
+    return pet.qr_token
+
+
+def _pet_from_qr_or_share_token(db: Session, token: str) -> Pet | None:
+    """Resuelve una mascota desde un token de cartilla JWT o un qr_token."""
+    try:
+        pet_id = decode_share_token(token)
+        return db.get(Pet, pet_id)
+    except InvalidTokenError:
+        return db.scalar(select(Pet).where(Pet.qr_token == token))
 
 
 @router.get("/{pet_id}", response_model=PetRead)
@@ -1036,6 +1065,55 @@ def create_share_link(
     )
     db.commit()
     return {"url": f"/cartilla?token={token}", "expires_at": expires_at.isoformat()}
+
+
+class QrResolveRequest(BaseModel):
+    token: str = Field(min_length=1)
+
+
+@router.get("/{pet_id}/qr", summary="Token QR permanente de la mascota")
+def get_pet_qr(
+    pet_id: str,
+    me: CurrentUser = Depends(require_staff),
+    db: Session = Depends(get_db),
+) -> dict:
+    pet = _get_pet_or_404(db, str(me.clinic_id), pet_id)
+    token = ensure_qr_token(db, pet)
+    return {"token": token, "url": f"/cartilla?token={token}"}
+
+
+@router.post("/{pet_id}/qr/regenerate", summary="Regenera (revoca) el QR permanente")
+def regenerate_pet_qr(
+    pet_id: str,
+    ctx: CurrentClinic = Depends(require_clinic_roles(*PET_MUTATORS)),
+    db: Session = Depends(get_db),
+) -> dict:
+    pet = _get_pet_or_404(db, ctx.clinic["id"], pet_id)
+    pet.qr_token = secrets.token_urlsafe(32)
+    record_audit(
+        db,
+        clinic_id=ctx.clinic["id"],
+        actor_type="user",
+        actor_id=ctx.user.sub,
+        action="pet_qr_regenerated",
+        entity_type="pet",
+        entity_id=pet.id,
+    )
+    db.commit()
+    db.refresh(pet)
+    return {"token": pet.qr_token, "url": f"/cartilla?token={pet.qr_token}"}
+
+
+@router.post("/resolve-qr", summary="Resuelve un QR escaneado y devuelve el paciente")
+def resolve_pet_qr(
+    body: QrResolveRequest,
+    me: CurrentUser = Depends(require_staff),
+    db: Session = Depends(get_db),
+) -> dict:
+    pet = _pet_from_qr_or_share_token(db, body.token.strip())
+    if pet is None or not pet.is_active or str(pet.clinic_id) != me.clinic_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Paciente no encontrado")
+    return {"pet_id": str(pet.id), "pet_name": pet.name}
 
 
 @router.get(

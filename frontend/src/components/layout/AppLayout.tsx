@@ -6,6 +6,7 @@ import {
   PanelLeftOpen,
   PawPrint,
   Receipt,
+  ScanLine,
   Settings2,
   Smartphone,
   UserRound,
@@ -20,6 +21,7 @@ import { usePermissions } from '@/lib/permissions'
 import { useNavConfig } from '@/lib/nav-config'
 import { MODULE_META, NAV_ROUTES } from '@/lib/nav'
 import { NotificationBell } from '@/components/layout/NotificationBell'
+import { QrScannerModal } from '@/components/layout/QrScannerModal'
 import { ThemeToggle } from '@/components/layout/ThemeToggle'
 
 const SIDEBAR_KEY = 'vetcore_sidebar_collapsed'
@@ -35,6 +37,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const [clinicName, setClinicName] = useState<string>('')
   const [clinicLogoUrl, setClinicLogoUrl] = useState<string | null>(null)
   const [profileOpen, setProfileOpen] = useState(false)
+  const [qrOpen, setQrOpen] = useState(false)
   const [navDragOver, setNavDragOver] = useState(false)
   const [collapsed, setCollapsed] = useState(() => {
     try {
@@ -259,6 +262,15 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
           <div className="flex items-center gap-2">
             <ThemeToggle />
+            <button
+              type="button"
+              onClick={() => setQrOpen(true)}
+              className="flex size-9 items-center justify-center rounded-md border border-border bg-card text-muted-foreground transition-colors hover:bg-accent"
+              title="Escanear QR de la cartilla"
+              aria-label="Escanear QR"
+            >
+              <ScanLine className="size-4" aria-hidden="true" />
+            </button>
             <NotificationBell />
             <div ref={profileRef} className="relative">
               <button
@@ -347,6 +359,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </header>
         <div className="flex-1 p-4 sm:p-6">{children}</div>
       </main>
+
+      <QrScannerModal open={qrOpen} onOpenChange={setQrOpen} />
     </div>
   )
 }

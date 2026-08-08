@@ -42,6 +42,7 @@ import {
 import { AppLayout } from '@/components/layout/AppLayout'
 import { ConsentDialog } from '@/components/pets/ConsentDialog'
 import { InviteOwnerDialog } from '@/components/pets/InviteOwnerDialog'
+import { PetQrCard } from '@/components/pets/PetQrCard'
 import { PhotoComparison } from '@/components/pets/PhotoComparison'
 import { TransferOwnerDialog } from '@/components/pets/TransferOwnerDialog'
 import { Avatar } from '@/components/ui/avatar'
@@ -406,6 +407,7 @@ export function PetDetail() {
   const [inviteOpen, setInviteOpen] = useState(false)
   const [transferOpen, setTransferOpen] = useState(false)
   const [consentOpen, setConsentOpen] = useState(false)
+  const [qrUrl, setQrUrl] = useState<string | null>(null)
   const [confirmConsent, setConfirmConsent] = useState<Consent | null>(null)
   const [searchParams] = useSearchParams()
   const [activeTab, setActiveTab] = useState(
@@ -428,7 +430,7 @@ export function PetDetail() {
     setLoading(true)
     setError(null)
     try {
-      const [p, tl, w, al, ph, cs, vp, ca, fm, us] = await Promise.all([
+      const [p, tl, w, al, ph, cs, vp, ca, fm, us, qr] = await Promise.all([
         apiFetch<Pet>(`/pets/${id}`),
         apiFetch<TimelineEvent[]>(`/pets/${id}/timeline`),
         apiFetch<WeightRecord[]>(`/pets/${id}/weights`),
@@ -443,6 +445,7 @@ export function PetDetail() {
         apiFetch<
           { id: string; full_name: string; role: string; professional_title?: string | null }[]
         >('/users'),
+        apiFetch<{ url: string }>(`/pets/${id}/qr`).catch(() => null),
       ])
       setPet(p)
       setTimeline(tl)
@@ -456,6 +459,7 @@ export function PetDetail() {
       setCarnetBrands(ca.brands)
       setFamily(fm)
       setVets(us.filter((u) => u.role === 'admin' || u.role === 'veterinario'))
+      setQrUrl(qr?.url ?? null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo cargar el paciente')
     } finally {
@@ -679,29 +683,28 @@ export function PetDetail() {
                   />
                   <div className="relative flex flex-col items-center p-6 pt-8 text-center sm:p-8">
                     <div className="relative">
-                      <div
-                        className={`flex size-56 items-center justify-center overflow-hidden rounded-[2rem] border-4 ${accent.ring} bg-secondary/60 shadow-elevated ${accent.glow}`}
-                      >
-                        {pet.clinical_photo_url ? (
-                          <img
-                            src={pet.clinical_photo_url}
-                            alt={pet.name}
-                            className="size-full object-cover"
-                          />
-                        ) : (
+                      <PetQrCard
+                        photoUrl={pet.clinical_photo_url}
+                        petName={pet.name}
+                        qrUrl={qrUrl ?? ''}
+                        placeholder={
                           <PawPrint className="size-20 text-primary" aria-hidden="true" />
-                        )}
-                      </div>
-                      <span
-                        className={`absolute -bottom-2 -right-2 flex size-11 items-center justify-center rounded-full border-4 border-card ${accent.speciesBg} text-white shadow-glow`}
-                        title={speciesLabel(pet.species)}
-                      >
-                        <MDIIcon
-                          path={SPECIES_ICONS[pet.species] ?? mdiPaw}
-                          size={0.7}
-                          aria-hidden="true"
-                        />
-                      </span>
+                        }
+                        containerClassName="size-56"
+                        frontClassName={`rounded-[2rem] border-4 ${accent.ring} bg-secondary/60 shadow-elevated ${accent.glow}`}
+                        frontOverlay={
+                          <span
+                            className={`flex size-11 items-center justify-center rounded-full border-4 border-card ${accent.speciesBg} text-white shadow-glow`}
+                            title={speciesLabel(pet.species)}
+                          >
+                            <MDIIcon
+                              path={SPECIES_ICONS[pet.species] ?? mdiPaw}
+                              size={0.7}
+                              aria-hidden="true"
+                            />
+                          </span>
+                        }
+                      />
                     </div>
 
                     <h1 className="mt-5 text-3xl font-bold tracking-tight text-foreground">
