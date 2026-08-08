@@ -6,6 +6,7 @@ import {
   FileText,
   Loader2,
   Package,
+  Plus,
   Printer,
   Search,
   ShieldCheck,
@@ -23,6 +24,7 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { BrandCombobox } from '@/components/pets/BrandCombobox'
 import type { Pet, PetOwner } from '@/pages/Pets'
 import { apiFetch } from '@/lib/api'
 import type { SaleProduct } from '@/lib/product'
@@ -87,10 +89,22 @@ export function NewConsultation() {
   const [pet, setPet] = useState<Pet | null>(null)
   const [owner, setOwner] = useState<PetOwner | null>(null)
   const [vaccination, setVaccination] = useState<PetVaccinationPlan[]>([])
+  const [carnetVaccines, setCarnetVaccines] = useState<string[]>([])
+  const [carnetBrands, setCarnetBrands] = useState<string[]>([])
 
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<Pet[]>([])
   const [searching, setSearching] = useState(false)
+
+  // registro de vacunación durante la consulta
+  const [vaccOpen, setVaccOpen] = useState(false)
+  const [vaccName, setVaccName] = useState('')
+  const [vaccBrand, setVaccBrand] = useState('')
+  const [vaccLot, setVaccLot] = useState('')
+  const [vaccVet, setVaccVet] = useState('')
+  const [vaccDate, setVaccDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [vaccBusy, setVaccBusy] = useState(false)
+  const [vaccMsg, setVaccMsg] = useState<string | null>(null)
 
   const [branchId, setBranchId] = useState('')
   const [vetUserId, setVetUserId] = useState('')
@@ -128,12 +142,19 @@ export function NewConsultation() {
   const loadPet = useCallback(async (id: string) => {
     setError(null)
     try {
-      const [p, vac] = await Promise.all([
+      const [p, vac, carnet] = await Promise.all([
         apiFetch<Pet>(`/pets/${id}`),
         apiFetch<PetVaccinationPlan[]>(`/vaccination-plans/pets/${id}`),
+        apiFetch<{ species: string; vaccines: { name: string }[]; brands: string[] }>(
+          `/pets/${id}/carnet`,
+        ),
       ])
       setPet(p)
       setVaccination(vac)
+      setCarnetVaccines(carnet.vaccines.map((v) => v.name))
+      setCarnetBrands(carnet.brands ?? [])
+      setVaccOpen(false)
+      setVaccMsg(null)
       const ow = p.owners?.find((o) => o.is_active) ?? null
       setOwner(ow)
       setWeight(p.latest_weight_kg ? String(p.latest_weight_kg) : '')
@@ -141,6 +162,23 @@ export function NewConsultation() {
       setError(err instanceof Error ? err.message : 'No se pudo cargar el paciente')
     }
   }, [])
+
+  const reloadVaccination = useCallback(async () => {
+    if (!pet) return
+    try {
+      const [vac, carnet] = await Promise.all([
+        apiFetch<PetVaccinationPlan[]>(`/vaccination-plans/pets/${pet.id}`),
+        apiFetch<{ species: string; vaccines: { name: string }[]; brands: string[] }>(
+          `/pets/${pet.id}/carnet`,
+        ),
+      ])
+      setVaccination(vac)
+      setCarnetVaccines(carnet.vaccines.map((v) => v.name))
+      setCarnetBrands(carnet.brands ?? [])
+    } catch {
+      // sin cambios si falla
+    }
+  }, [pet])
 
   useEffect(() => {
     loadBase()
@@ -176,6 +214,79 @@ export function NewConsultation() {
       setError(err instanceof Error ? err.message : 'No se pudo buscar la mascota')
     } finally {
       setSearching(false)
+    }
+  }
+
+  // Búsqueda en tiempo real mientras se escribe (como en el módulo Pacientes).
+  useEffect(() => {
+    const term = query.trim()
+    if (!term) {
+      setResults([])
+      return
+    }
+    setSearching(true)
+    const t = setTimeout(async () => {
+      try {
+        const res = await apiFetch<Pet[]>(`/pets?search=${encodeURIComponent(term)}`)
+        setResults(res)
+      } catch {
+        // sin resultados
+      } finally {
+        setSearching(false)
+      }
+    }, 200)
+    return () => {
+      clearTimeout(t)
+    }
+  }, [query])
+
+  const registerVacc = async () => {
+    if (!pet || !vaccName || !vaccDate) {
+      setVaccMsg('Selecciona la vacuna y la fecha.')
+      return
+    }
+    setVaccBusy(true)
+    setVaccMsg(null)
+    setError(null)
+    try {
+      // Si la vacuna aplicada corresponde a una dosis programada del plan,
+      // se completa esa dosis (refleja el sello y el carnet); si no, se
+      // registra como aplicación manual.
+      const dose = vaccination
+        .flatMap((vp) => vp.doses.map((d) => ({ ...d, planName: vp.plan_name })))
+        .find((d) => d.status === 'scheduled' && d.planName === vaccName)
+      if (dose) {
+        await apiFetch(`/vaccination-plans/doses/${dose.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({
+            status: 'completed',
+            date_applied: vaccDate,
+            brand: vaccBrand || null,
+            lot: vaccLot || null,
+          }),
+        })
+      } else {
+        await apiFetch(`/pets/${pet.id}/carnet`, {
+          method: 'POST',
+          body: JSON.stringify({
+            vaccine: vaccName,
+            brand: vaccBrand || null,
+            date_applied: vaccDate,
+            lot: vaccLot || null,
+            vet_user_id: vaccVet || null,
+          }),
+        })
+      }
+      setVaccOpen(false)
+      setVaccBrand('')
+      setVaccLot('')
+      setVaccVet('')
+      await reloadVaccination()
+      setVaccMsg('Vacunación registrada.')
+    } catch (err) {
+      setVaccMsg(err instanceof Error ? err.message : 'No se pudo registrar la vacunación')
+    } finally {
+      setVaccBusy(false)
     }
   }
 
@@ -702,14 +813,30 @@ export function NewConsultation() {
             </Card>
 
             <Card className="border-info/40 shadow-card">
-              <CardHeader className="flex-row items-center gap-2 space-y-0">
-                <Syringe className="size-4 text-info" aria-hidden="true" />
-                <div>
-                  <CardTitle>Próxima vacunación</CardTitle>
-                  <CardDescription>Según el esquema de la mascota</CardDescription>
+              <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
+                <div className="flex items-center gap-2">
+                  <Syringe className="size-4 text-info" aria-hidden="true" />
+                  <div>
+                    <CardTitle>Próxima vacunación</CardTitle>
+                    <CardDescription>Según el esquema de la mascota</CardDescription>
+                  </div>
                 </div>
+                {pet && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setVaccOpen((o) => !o)
+                      setVaccMsg(null)
+                      setVaccName(nextDose?.plan ?? carnetVaccines[0] ?? '')
+                      setVaccDate(new Date().toISOString().slice(0, 10))
+                    }}
+                  >
+                    <Plus /> Registrar vacunación
+                  </Button>
+                )}
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-3">
                 {nextDose ? (
                   <div className="space-y-1">
                     <p className="text-sm">
@@ -731,6 +858,84 @@ export function NewConsultation() {
                   <p className="text-sm text-muted-foreground">
                     Sin dosis de vacunación programadas.
                   </p>
+                )}
+
+                {vaccOpen && (
+                  <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-3">
+                    <div className="space-y-1.5">
+                      <Label>Vacuna *</Label>
+                      <select
+                        value={vaccName}
+                        onChange={(e) => setVaccName(e.target.value)}
+                        className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                      >
+                        <option value="">Selecciona…</option>
+                        {[
+                          ...new Set([
+                            ...(nextDose?.plan ? [nextDose.plan] : []),
+                            ...carnetVaccines,
+                          ]),
+                        ].map((n) => (
+                          <option key={n} value={n}>
+                            {n}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <Label>Fecha *</Label>
+                        <Input
+                          type="date"
+                          value={vaccDate}
+                          onChange={(e) => setVaccDate(e.target.value)}
+                          className="w-full"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label>Lote</Label>
+                        <Input
+                          value={vaccLot}
+                          onChange={(e) => setVaccLot(e.target.value)}
+                          placeholder="Ej. L-2026"
+                        />
+                      </div>
+                    </div>
+                    <BrandCombobox
+                      value={vaccBrand}
+                      onChange={setVaccBrand}
+                      brands={carnetBrands}
+                    />
+                    <div className="space-y-1.5">
+                      <Label>Veterinario</Label>
+                      <select
+                        value={vaccVet}
+                        onChange={(e) => setVaccVet(e.target.value)}
+                        className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                      >
+                        <option value="">—</option>
+                        {vets.map((u) => (
+                          <option key={u.id} value={u.id}>
+                            {u.full_name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    {vaccMsg && <p className="text-sm text-muted-foreground">{vaccMsg}</p>}
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setVaccOpen(false)}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button type="button" size="sm" onClick={registerVacc} disabled={vaccBusy}>
+                        {vaccBusy ? <Loader2 className="animate-spin" /> : <Syringe />} Registrar
+                      </Button>
+                    </div>
+                  </div>
                 )}
               </CardContent>
             </Card>

@@ -1591,6 +1591,17 @@ verde clínico profundo, tipografía Plus Jakarta Sans (display) / Geist (UI) / 
   (1 de 2), editar steps a 3 lo refleja (sellos 1 de 3) y se elimina sin asignaciones.
 - Limpieza posterior: registros de prueba eliminados; datos de semilla intactos.
 
+### Nueva consulta: búsqueda en tiempo real + registro de vacunación
+- El buscador de mascota ahora **filtra en tiempo real** mientras se escribe (debounce 200ms),
+  igual que en el módulo Pacientes; ya no es obligatorio pulsar "Buscar".
+- La tarjeta **"Próxima vacunación"** ahora permite **registrar la vacunación** durante la
+  consulta: formulario con vacuna (de las del carnet, prellenada con la próxima dosis), fecha,
+  lote, marca (BrandCombobox) y veterinario. Si la vacuna corresponde a una dosis programada
+  del plan, se completa esa dosis (sincroniza sello + carnet con marca/lote); si no, se
+  registra como aplicación manual.
+- Verificado E2E: escribir "almendra" muestra resultados sin clic; registrar la vacuna completó
+  la dosis y apareció en el carnet con marca y lote.
+
 ---
 
 **Siguiente subfase:** por decidir (Fase 3 en hold).
