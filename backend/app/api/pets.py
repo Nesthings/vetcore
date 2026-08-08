@@ -106,6 +106,15 @@ class CarnetCreate(BaseModel):
     notes: str | None = Field(default=None, max_length=255)
 
 
+class CarnetUpdate(BaseModel):
+    vaccine: str | None = Field(default=None, min_length=1, max_length=150)
+    brand: str | None = Field(default=None, max_length=100)
+    date_applied: date | None = None
+    lot: str | None = Field(default=None, max_length=100)
+    vet_user_id: uuid.UUID | None = None
+    notes: str | None = Field(default=None, max_length=255)
+
+
 @router.get(
     "/breeds-catalog",
     summary="Catálogo de especies y razas (base + personalizadas de la clínica)",
@@ -835,6 +844,52 @@ def create_carnet_record(
         "lot": record.lot,
         "notes": record.notes,
         "vet_name": vet_name,
+    }
+
+
+@router.patch("/{pet_id}/carnet/{record_id}")
+def update_carnet_record(
+    pet_id: str,
+    record_id: str,
+    body: CarnetUpdate,
+    ctx: CurrentClinic = Depends(require_clinic_roles(*PET_MUTATORS)),
+    db: Session = Depends(get_db),
+) -> dict:
+    pet = _get_pet_or_404(db, ctx.clinic["id"], pet_id)
+    record = db.scalar(
+        select(PetCarnetRecord).where(
+            PetCarnetRecord.id == record_id, PetCarnetRecord.pet_id == pet.id
+        )
+    )
+    if record is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro no encontrado")
+    data = body.model_dump(exclude_unset=True)
+    for field, value in data.items():
+        setattr(record, field, value)
+    record_audit(
+        db,
+        clinic_id=ctx.clinic["id"],
+        actor_type="user",
+        actor_id=ctx.user.sub,
+        action="carnet_record_updated",
+        entity_type="carnet_record",
+        entity_id=record.id,
+        metadata={"pet_id": str(pet.id), "fields": list(data.keys())},
+    )
+    db.commit()
+    db.refresh(record)
+    vet_name = None
+    if record.vet_user_id:
+        vet_name = db.scalar(select(User.full_name).where(User.id == record.vet_user_id))
+    return {
+        "id": str(record.id),
+        "vaccine": record.vaccine,
+        "brand": record.brand,
+        "date_applied": record.date_applied.isoformat(),
+        "lot": record.lot,
+        "notes": record.notes,
+        "vet_name": vet_name,
+        "source": "plan" if record.dose_id else "manual",
     }
 
 

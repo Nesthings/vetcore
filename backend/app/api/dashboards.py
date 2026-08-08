@@ -222,30 +222,46 @@ def _vet_load(db: Session, cid: str, period: str) -> dict:
     }
 
 
-def _vaccination(db: Session, cid: str, period: str) -> list[dict]:
+def _vaccination(db: Session, cid: str, period: str, branch_id: str | None = None) -> list[dict]:
     labels = {"completed": "Completadas", "scheduled": "Programadas", "skipped": "Omitidas"}
+    days = {"day": 1, "week": 7, "month": 30}[period]
+    where = (
+        "p.clinic_id = :c "
+        f"AND d.due_date >= (current_date - interval '{days} days')"
+    )
+    params: dict = {"c": cid}
+    if branch_id:
+        where += " AND p.branch_id = :b"
+        params["b"] = branch_id
     rows = db.execute(
         text(
             "SELECT d.status AS name, count(*) AS value FROM pet_vaccination_doses d "
             "JOIN pet_vaccination_plans p ON p.id = d.pet_vaccination_plan_id "
-            "WHERE p.clinic_id = :c GROUP BY d.status"
+            f"WHERE {where} GROUP BY d.status"
         ),
-        {"c": cid},
+        params,
     ).all()
     return [{"name": labels.get(r.name, r.name), "value": r.value} for r in rows]
 
 
-def _upcoming_doses(db: Session, cid: str, period: str) -> list[dict]:
+def _upcoming_doses(db: Session, cid: str, period: str, branch_id: str | None = None) -> list[dict]:
+    days = {"day": 1, "week": 7, "month": 30}[period]
+    where = (
+        "p.clinic_id = :c AND d.status = 'scheduled' "
+        f"AND d.due_date BETWEEN current_date AND current_date + {days}"
+    )
+    params: dict = {"c": cid}
+    if branch_id:
+        where += " AND p.branch_id = :b"
+        params["b"] = branch_id
     rows = db.execute(
         text(
             "SELECT to_char(due_date, 'MM-DD') AS label, count(*) AS value "
             "FROM pet_vaccination_doses d "
             "JOIN pet_vaccination_plans p ON p.id = d.pet_vaccination_plan_id "
-            "WHERE p.clinic_id = :c AND d.status = 'scheduled' "
-            "AND d.due_date BETWEEN current_date AND current_date + 60 "
-            "GROUP BY due_date ORDER BY due_date"
+            f"WHERE {where} GROUP BY due_date ORDER BY due_date"
         ),
-        {"c": cid},
+        params,
     ).all()
     return [{"label": r.label, "value": r.value} for r in rows]
 
@@ -316,7 +332,15 @@ def dashboard_data(
     db: Session = Depends(get_db),
     slugs: str | None = Query(default=None),
     period: str = Query(default="month", pattern="^(day|week|month)$"),
+    branch_id: str | None = Query(default=None),
 ) -> dict:
     """Devuelve el dataset de cada dashboard pedido (o de todos), filtrado al período."""
     wanted = [s for s in slugs.split(",") if s in _BUILDERS] if slugs else list(_BUILDERS)
-    return {slug: _BUILDERS[slug](db, ctx.clinic["id"], period) for slug in wanted}
+    out: dict = {}
+    for slug in wanted:
+        fn = _BUILDERS[slug]
+        if fn in (_vaccination, _upcoming_doses):
+            out[slug] = fn(db, ctx.clinic["id"], period, branch_id)
+        else:
+            out[slug] = fn(db, ctx.clinic["id"], period)
+    return out

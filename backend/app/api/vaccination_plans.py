@@ -9,7 +9,7 @@ from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import CurrentClinic, get_current_clinic, require_clinic_roles, require_component
@@ -27,12 +27,15 @@ from app.models import (
     VaccinationPlanStep,
 )
 from app.schemas.vaccination import (
+    DoseRead,
+    DoseUpdate,
     PetVaccinationPlanRead,
     VaccinationAssignRequest,
     VaccinationPlanCreate,
     VaccinationPlanRead,
     VaccinationPlanUpdate,
 )
+from app.services.carnet import sync_dose_to_carnet, unsync_dose_from_carnet
 
 router = APIRouter(
     prefix="/vaccination-plans",
@@ -171,6 +174,7 @@ def create_plan(
         brand=body.brand,
         prevents=body.prevents,
         notes=body.notes,
+        active=body.active,
     )
     for i, step in enumerate(body.steps):
         plan.steps.append(
@@ -233,6 +237,19 @@ def delete_plan(
     db: Session = Depends(get_db),
 ) -> None:
     plan = _get_plan_or_404(db, ctx.clinic["id"], plan_id)
+    has_assignments = (
+        db.scalar(
+            select(func.count())
+            .select_from(PetVaccinationPlan)
+            .where(PetVaccinationPlan.plan_id == plan.id)
+        )
+        or 0
+    )
+    if has_assignments:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="No se puede borrar: el plan está asignado a mascotas. Desasigna primero.",
+        )
     record_audit(
         db,
         clinic_id=ctx.clinic["id"],
@@ -372,3 +389,139 @@ def pet_vaccination_history(
         )
     )
     return [_enrich_assignment(db, a) for a in assignments]
+
+
+@router.patch("/doses/{dose_id}", response_model=DoseRead)
+def update_dose(
+    dose_id: str,
+    body: DoseUpdate,
+    ctx: CurrentClinic = Depends(require_clinic_roles(*ASSIGN_MUTATORS)),
+    db: Session = Depends(get_db),
+) -> dict:
+    dose = db.scalar(
+        select(PetVaccinationDose)
+        .join(
+            PetVaccinationPlan,
+            PetVaccinationPlan.id == PetVaccinationDose.pet_vaccination_plan_id,
+        )
+        .where(
+            PetVaccinationDose.id == dose_id,
+            PetVaccinationPlan.clinic_id == ctx.clinic["id"],
+        )
+    )
+    if dose is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dosis no encontrada")
+
+    data = body.model_dump(exclude_unset=True)
+    new_status = data.get("status", dose.status)
+
+    if new_status == "completed":
+        dose.status = "completed"
+        if data.get("date_applied") is not None:
+            dose.date_applied = data["date_applied"]
+        elif dose.date_applied is None:
+            dose.date_applied = dose.due_date
+        dose.applied_by = ctx.user.sub
+        if data.get("due_date") is not None:
+            dose.due_date = data["due_date"]
+        if data.get("lot") is not None:
+            dose.lot = data["lot"]
+        if data.get("brand") is not None:
+            dose.brand = data["brand"]
+    else:
+        dose.status = new_status
+        if data.get("due_date") is not None:
+            dose.due_date = data["due_date"]
+        if data.get("date_applied") is not None:
+            dose.date_applied = data["date_applied"]
+        if data.get("lot") is not None:
+            dose.lot = data["lot"]
+        if data.get("brand") is not None:
+            dose.brand = data["brand"]
+        if new_status == "scheduled":
+            dose.applied_by = None
+
+    assignment = db.get(PetVaccinationPlan, dose.pet_vaccination_plan_id)
+    if dose.status == "completed":
+        sync_dose_to_carnet(
+            db,
+            dose,
+            dose.date_applied,
+            ctx.user.sub,
+            assignment.clinic_id,
+            assignment.pet_id,
+        )
+        if dose.appointment_id:
+            appt = db.get(Appointment, dose.appointment_id)
+            if appt is not None and appt.status != "completed":
+                appt.status = "completed"
+    else:
+        unsync_dose_from_carnet(db, dose)
+        if dose.appointment_id:
+            appt = db.get(Appointment, dose.appointment_id)
+            if appt is not None and appt.status == "completed":
+                appt.status = "scheduled"
+
+    record_audit(
+        db,
+        clinic_id=ctx.clinic["id"],
+        actor_type="user",
+        actor_id=ctx.user.sub,
+        action="vaccination_dose_updated",
+        entity_type="vaccination_dose",
+        entity_id=dose.id,
+        metadata={"status": dose.status},
+    )
+    db.commit()
+    db.refresh(dose)
+
+    appointment_start = None
+    if dose.appointment_id:
+        appt = db.get(Appointment, dose.appointment_id)
+        appointment_start = appt.start_time if appt else None
+    return {
+        "id": str(dose.id),
+        "label": dose.label,
+        "due_date": dose.due_date.isoformat(),
+        "status": dose.status,
+        "appointment_id": str(dose.appointment_id) if dose.appointment_id else None,
+        "appointment_start": appointment_start,
+        "date_applied": dose.date_applied.isoformat() if dose.date_applied else None,
+        "lot": dose.lot,
+        "brand": dose.brand,
+    }
+
+
+@router.delete(
+    "/pets/{pet_id}/assignments/{assignment_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def unassign_plan(
+    pet_id: str,
+    assignment_id: str,
+    ctx: CurrentClinic = Depends(require_clinic_roles(*ASSIGN_MUTATORS)),
+    db: Session = Depends(get_db),
+) -> None:
+    assignment = _get_pet_vaccination_plan(db, ctx.clinic["id"], assignment_id)
+    if str(assignment.pet_id) != pet_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Asignación de plan no encontrada"
+        )
+    for dose in assignment.doses:
+        unsync_dose_from_carnet(db, dose)
+        if dose.appointment_id:
+            appt = db.get(Appointment, dose.appointment_id)
+            if appt is not None:
+                db.delete(appt)
+    record_audit(
+        db,
+        clinic_id=ctx.clinic["id"],
+        actor_type="user",
+        actor_id=ctx.user.sub,
+        action="vaccination_plan_unassigned",
+        entity_type="pet",
+        entity_id=pet_id,
+        metadata={"assignment_id": assignment_id},
+    )
+    db.delete(assignment)
+    db.commit()

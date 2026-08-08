@@ -1539,6 +1539,20 @@ verde clínico profundo, tipografía Plus Jakarta Sans (display) / Geist (UI) / 
 - Verificado E2E: asignar plan → dosis+citas; completar cita → aplicación en carnet con fecha,
   visible en expediente y cartilla; sellos/steps estructurados; limpieza de prueba.
 
+### Refactor vacunación — Fase 2: endpoints que cerraban el círculo
+- `PATCH /vaccination-plans/doses/{dose_id}`: cambiar estado (scheduled/completed/skipped),
+  fecha, lote y marca. El estado "Omitida" deja de ser código muerto. Al marcar completada
+  sincroniza carnet + cita; si sale de completada, revierte ambos.
+- `DELETE /vaccination-plans/pets/{pet_id}/assignments/{assignment_id}`: desasignar plan
+  (borra dosis + citas ligadas + aplicaciones de carnet de esas dosis).
+- `PATCH /pets/{pet_id}/carnet/{record_id}`: editar una aplicación (fecha/lote/marca/notas/
+  vet). Las aplicaciones de plan se editan vía el PATCH de dosis (el `source` las distingue).
+- `VaccinationPlanCreate` acepta `active` (antes se ignoraba al crear).
+- Borrar un plan con asignaciones devuelve 409 (antes podía dar 500).
+- Dashboards `vaccination`/`upcoming_doses`: respetan `period` y aceptan `branch_id`.
+- Verificado E2E: dosis skipped/completed con lote/marca, edición de carnet manual, 409 al
+  borrar plan asignado, dashboards por período/sucursal, y desasignación que limpia todo.
+
 ---
 
 **Siguiente subfase:** por decidir (Fase 3 en hold).

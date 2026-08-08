@@ -25,6 +25,7 @@ class VaccinationPlanCreate(BaseModel):
     brand: str | None = Field(default=None, max_length=100)
     prevents: str | None = Field(default=None, max_length=255)
     notes: str | None = Field(default=None, max_length=2000)
+    active: bool = True
     steps: list[PlanStepCreate] = Field(default_factory=list)
 
 
@@ -64,6 +65,14 @@ class VaccinationAssignRequest(BaseModel):
     start_date: date
     start_time: time = Field(default=time(10, 0))
     duration_minutes: int = Field(default=30, ge=5, le=240)
+
+
+class DoseUpdate(BaseModel):
+    status: str | None = Field(default=None, pattern="^(scheduled|completed|skipped)$")
+    due_date: date | None = None
+    date_applied: date | None = None
+    lot: str | None = Field(default=None, max_length=100)
+    brand: str | None = Field(default=None, max_length=100)
 
 
 class DoseRead(BaseModel):

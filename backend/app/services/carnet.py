@@ -49,6 +49,42 @@ def _application_from_record(record: PetCarnetRecord, vet_names: dict) -> dict:
     }
 
 
+def sync_dose_to_carnet(
+    db: Session,
+    dose: PetVaccinationDose,
+    date_applied: object,
+    applied_by: str | None,
+    clinic_id,
+    pet_id,
+) -> PetCarnetRecord:
+    """Crea (o actualiza) el registro de carnet vinculado a una dosis completada."""
+    assignment = db.get(PetVaccinationPlan, dose.pet_vaccination_plan_id)
+    plan = db.get(VaccinationPlan, assignment.plan_id) if assignment else None
+    vaccine = (plan.name if plan else dose.label) or dose.label
+    record = db.scalar(select(PetCarnetRecord).where(PetCarnetRecord.dose_id == dose.id))
+    if record is None:
+        record = PetCarnetRecord(
+            clinic_id=clinic_id,
+            pet_id=pet_id,
+            dose_id=dose.id,
+            vaccine=vaccine,
+            date_applied=date_applied,
+            vet_user_id=applied_by,
+        )
+        db.add(record)
+    else:
+        record.date_applied = date_applied
+        record.vet_user_id = applied_by
+    return record
+
+
+def unsync_dose_from_carnet(db: Session, dose: PetVaccinationDose) -> None:
+    """Elimina el registro de carnet si la dosis deja de estar completada."""
+    record = db.scalar(select(PetCarnetRecord).where(PetCarnetRecord.dose_id == dose.id))
+    if record is not None:
+        db.delete(record)
+
+
 def build_carnet(db: Session, pet: Pet) -> dict:
     ensure_standard_plans(db, pet.clinic_id)
 
