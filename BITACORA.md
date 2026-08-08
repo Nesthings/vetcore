@@ -1490,6 +1490,15 @@ verde clínico profundo, tipografía Plus Jakarta Sans (display) / Geist (UI) / 
 - Verificado con cámara simulada: el video se reproduce (1280x720) al abrir el escáner sin
   errores, y el escaneo por imagen sigue navegando al expediente.
 
+### Cartilla del dueño: header con la clínica + descarga como imagen
+- El header ya NO muestra "Cartilla de <mascota>" ni su subtexto; ahora muestra el **logo y el
+  nombre de la veterinaria** (el `GET /cartilla` devuelve `clinic: { name, logo_url }`; si no
+  hay logo, un ícono por defecto).
+- Botón **"Descargar"** en el header: genera la cartilla como imagen PNG (html-to-image, con
+  `pixelRatio: 2`) y descarga `cartilla-<mascota>.png`. Captura solo el contenido de la
+  cartilla (excluye el header).
+- Verificado headless: header con la clínica, sin "Cartilla de", y descarga de PNG (~550 KB).
+
 ---
 
 **Siguiente subfase:** por decidir (Fase 3 en hold).

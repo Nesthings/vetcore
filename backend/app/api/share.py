@@ -37,6 +37,7 @@ from app.data.vaccine_brands import brands_for_species
 from app.db.session import get_db
 from app.models import (
     Appointment,
+    Clinic,
     ClinicalAlert,
     Consultation,
     ConsultationAttachment,
@@ -355,8 +356,11 @@ def share_cartilla(
                 }
             )
 
+    clinic = db.get(Clinic, pet.clinic_id)
+
     return {
         "pet": _pet_dict(db, pet),
+        "clinic": {"name": clinic.name, "logo_url": clinic.logo_url},
         "qr_url": f"/cartilla?token={ensure_qr_token(db, pet)}",
         "alerts": [
             {

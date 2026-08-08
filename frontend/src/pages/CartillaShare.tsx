@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { toPng } from 'html-to-image'
 import { Icon as MDIIcon } from '@mdi/react'
 import { mdiPaw } from '@mdi/js'
 import {
   Camera,
   Cake,
   CalendarDays,
+  Download,
   FileSignature,
   FileText,
   History,
@@ -157,6 +159,7 @@ interface ShareFamily {
 
 interface ShareData {
   pet: SharePet
+  clinic?: { name: string; logo_url?: string | null } | null
   qr_url?: string | null
   alerts: ShareAlert[]
   carnet: { species: string; vaccines: ShareVaccine[] }
@@ -232,6 +235,28 @@ export function CartillaShare() {
   const [signature, setSignature] = useState<string | null>(null)
   const [signBusy, setSignBusy] = useState(false)
   const [confirm, setConfirm] = useState<{ title: string; onConfirm: () => void } | null>(null)
+
+  // descarga como imagen
+  const cartillaRef = useRef<HTMLDivElement>(null)
+  const [downloadBusy, setDownloadBusy] = useState(false)
+
+  const downloadImage = async () => {
+    const el = cartillaRef.current
+    if (!el || downloadBusy) return
+    setDownloadBusy(true)
+    setError(null)
+    try {
+      const dataUrl = await toPng(el, { pixelRatio: 2, cacheBust: true })
+      const link = document.createElement('a')
+      link.download = `cartilla-${pet.name.replace(/\s+/g, '-')}.png`
+      link.href = dataUrl
+      link.click()
+    } catch (err) {
+      setError(err instanceof Error ? 'No se pudo generar la imagen' : 'Error al descargar')
+    } finally {
+      setDownloadBusy(false)
+    }
+  }
 
   const load = useCallback(async () => {
     if (!token) {
@@ -400,13 +425,40 @@ export function CartillaShare() {
 
   return (
     <div className="mx-auto min-h-screen w-full max-w-3xl bg-background pb-16">
-      <header className="sticky top-0 z-10 border-b border-border/70 bg-background/80 px-4 py-3 backdrop-blur">
-        <h1 className="text-lg font-bold">Cartilla de {pet.name}</h1>
-        <p className="text-xs text-muted-foreground">Compartida por tu clínica</p>
+      <header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-border/70 bg-background/80 px-4 py-3 backdrop-blur">
+        <div className="flex min-w-0 items-center gap-2.5">
+          {data.clinic?.logo_url ? (
+            <img
+              src={data.clinic.logo_url}
+              alt={data.clinic.name}
+              className="size-9 shrink-0 rounded-full border border-border object-cover"
+            />
+          ) : (
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <Stethoscope className="size-5" aria-hidden="true" />
+            </div>
+          )}
+          <div className="min-w-0">
+            <p className="truncate text-sm font-bold">{data.clinic?.name ?? 'VetCore'}</p>
+            <p className="truncate text-xs text-muted-foreground">Cartilla veterinaria</p>
+          </div>
+        </div>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={downloadImage}
+          disabled={downloadBusy}
+          className="shrink-0"
+        >
+          {downloadBusy ? <Loader2 className="size-4 animate-spin" /> : <Download />} Descargar
+        </Button>
       </header>
 
       <main className="p-4">
-        <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
+        <div
+          ref={cartillaRef}
+          className="overflow-hidden rounded-2xl border border-border bg-card shadow-card"
+        >
           <div className="relative overflow-hidden">
             <div
               className={`pointer-events-none absolute inset-0 bg-gradient-to-b ${accent.gradient}`}
