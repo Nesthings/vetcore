@@ -618,8 +618,7 @@ export function Dashboard() {
                                   loading="lazy"
                                   decoding="async"
                                   className={cn(
-                                    'absolute inset-0 size-full object-cover transition-transform duration-300',
-                                    meta.imgClass ?? 'group-hover:scale-105',
+                                    'absolute inset-0 size-full object-cover transition-transform duration-300 group-hover:scale-105',
                                     meta.imgGif && 'group-hover:hidden',
                                   )}
                                 />

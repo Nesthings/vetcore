@@ -471,7 +471,7 @@ export function CartillaShare() {
                   petName={pet.name}
                   qrUrl={data.qr_url ?? ''}
                   placeholder={<PawPrint className="size-16 text-primary" aria-hidden="true" />}
-                  containerClassName="size-[202px]"
+                  containerClassName="size-48"
                   frontClassName={`rounded-[2rem] border-4 ${accent.ring} bg-secondary/60 shadow-elevated`}
                   frontOverlay={
                     <label
