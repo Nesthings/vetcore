@@ -9,13 +9,27 @@ from app.models import AuditLog, InternalNotification, User
 
 
 def notify_user(
-    db: Session, clinic_id: uuid.UUID, user_id: uuid.UUID, type_: str, message: str
+    db: Session,
+    clinic_id: uuid.UUID,
+    user_id: uuid.UUID,
+    type_: str,
+    message: str,
+    link: str | None = None,
 ) -> None:
-    db.add(InternalNotification(clinic_id=clinic_id, user_id=user_id, type=type_, message=message))
+    db.add(
+        InternalNotification(
+            clinic_id=clinic_id, user_id=user_id, type=type_, message=message, link=link
+        )
+    )
 
 
 def notify_roles(
-    db: Session, clinic_id: uuid.UUID, roles: list[str], type_: str, message: str
+    db: Session,
+    clinic_id: uuid.UUID,
+    roles: list[str],
+    type_: str,
+    message: str,
+    link: str | None = None,
 ) -> None:
     """Notifica a todos los usuarios activos de la clínica con los roles dados."""
     user_ids = db.scalars(
@@ -26,7 +40,7 @@ def notify_roles(
         )
     ).all()
     for uid in user_ids:
-        notify_user(db, clinic_id, uid, type_, message)
+        notify_user(db, clinic_id, uid, type_, message, link=link)
 
 
 def record_audit(

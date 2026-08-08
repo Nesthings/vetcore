@@ -48,6 +48,7 @@ class InternalNotification(UUIDPkMixin, Base):
     )
     type: Mapped[str] = mapped_column(String(50), nullable=False)
     message: Mapped[str] = mapped_column(Text, nullable=False)
+    link: Mapped[str | None] = mapped_column(Text)
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

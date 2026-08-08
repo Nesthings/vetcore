@@ -1418,6 +1418,18 @@ verde clínico profundo, tipografía Plus Jakarta Sans (display) / Geist (UI) / 
   confirma). Verificado E2E (staff doctor y dueño-médico generan PDF con 2 firmas) y UI
   headless (opciones del selector + adjunto visible tras enviar).
 
+### Notificación al staff cuando el dueño firma
+- Migración `0032`: `internal_notifications.link` (ruta del frontend).
+- Al firmar el dueño en la cartilla (`share_sign_consent`) se notifica a los roles
+  `admin/veterinario/recepcion` con tipo `consent_owner_signed`, mensaje
+  "El dueño firmó el consentimiento «X» de <mascota>. Confírmalo." y link
+  `/pets/<id>?tab=consents&confirm=<consent_id>`.
+- La campana de notificaciones navega al `link` al hacer clic (y marca como leída).
+- El expediente lee `tab=consents` (activa la pestaña) y `confirm=<id>` (abre el diálogo
+  "Confirmar consentimiento" del consentimiento en `owner_signed`).
+- Verificado E2E: al firmar llega la notificación (unread) y al hacer clic abre el
+  expediente con el diálogo de confirmación listo.
+
 ---
 
 **Siguiente subfase:** por decidir (Fase 3 en hold).

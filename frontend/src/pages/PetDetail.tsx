@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { Icon as MDIIcon } from '@mdi/react'
 import { mdiPaw } from '@mdi/js'
 import {
@@ -407,6 +407,11 @@ export function PetDetail() {
   const [transferOpen, setTransferOpen] = useState(false)
   const [consentOpen, setConsentOpen] = useState(false)
   const [confirmConsent, setConfirmConsent] = useState<Consent | null>(null)
+  const [searchParams] = useSearchParams()
+  const [activeTab, setActiveTab] = useState(
+    searchParams.get('tab') === 'consents' ? 'consents' : 'timeline',
+  )
+  const handledConfirm = useRef(false)
   const [alertType, setAlertType] = useState(ALERT_TYPES[0])
   const [alertDesc, setAlertDesc] = useState('')
   const [alertBusy, setAlertBusy] = useState(false)
@@ -471,6 +476,17 @@ export function PetDetail() {
   useEffect(() => {
     load()
   }, [load])
+
+  useEffect(() => {
+    const confirmId = searchParams.get('confirm')
+    if (handledConfirm.current || !confirmId || consents.length === 0) return
+    const target = consents.find((c) => c.id === confirmId && c.status === 'owner_signed')
+    if (target) {
+      handledConfirm.current = true
+      setConfirmConsent(target)
+      setActiveTab('consents')
+    }
+  }, [consents, searchParams])
 
   const addAlert = async () => {
     if (!alertDesc.trim()) return
@@ -1070,7 +1086,7 @@ export function PetDetail() {
           </div>
 
           <div className="border-t border-border p-5 sm:p-6">
-            <Tabs defaultValue="timeline" className="space-y-5">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-5">
               <TabsList className="w-full justify-start gap-1 overflow-x-auto rounded-xl border border-border bg-card p-1 sm:w-auto sm:overflow-visible">
                 <TabsTrigger value="timeline" className="gap-1.5">
                   <History className="size-4" aria-hidden="true" />

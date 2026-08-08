@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Bell, CheckCheck } from 'lucide-react'
 
 import { apiFetch } from '@/lib/api'
@@ -8,11 +9,13 @@ interface Notification {
   id: string
   type: string
   message: string
+  link?: string | null
   read_at?: string | null
   created_at: string
 }
 
 export function NotificationBell() {
+  const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const [count, setCount] = useState(0)
   const [items, setItems] = useState<Notification[]>([])
@@ -52,6 +55,12 @@ export function NotificationBell() {
     } catch {
       // ignorar
     }
+  }
+
+  const handleClick = async (n: Notification) => {
+    setOpen(false)
+    if (n.link) navigate(n.link)
+    await markRead(n.id)
   }
 
   const markAllRead = async () => {
@@ -101,7 +110,7 @@ export function NotificationBell() {
                 <button
                   key={n.id}
                   type="button"
-                  onClick={() => markRead(n.id)}
+                  onClick={() => handleClick(n)}
                   className={cn(
                     'block w-full border-b border-border/60 px-3 py-2.5 text-left transition-colors hover:bg-accent',
                     !n.read_at && 'bg-accent/40',

@@ -22,7 +22,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Upload
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
-from app.core.events import record_audit
+from app.core.events import notify_roles, record_audit
 from app.core.images import process_cartilla_photo
 from app.core.security import InvalidTokenError, decode_share_token
 from app.core.seed_vaccination_plans import ensure_standard_plans
@@ -660,6 +660,14 @@ def share_sign_consent(
     consent.status = "owner_signed"
     consent.signature_url = signature_url
     consent.signed_at = datetime.now(UTC)
+    notify_roles(
+        db,
+        pet.clinic_id,
+        ["admin", "veterinario", "recepcion"],
+        "consent_owner_signed",
+        f'El dueño firmó el consentimiento "{consent.title}" de {pet.name}. Confírmalo.',
+        link=f"/pets/{pet.id}?tab=consents&confirm={consent.id}",
+    )
     record_audit(
         db,
         clinic_id=pet.clinic_id,

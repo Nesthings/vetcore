@@ -11,6 +11,7 @@ class NotificationRead(BaseModel):
     clinic_id: uuid.UUID
     type: str
     message: str
+    link: str | None
     read_at: datetime | None
     created_at: datetime
 
