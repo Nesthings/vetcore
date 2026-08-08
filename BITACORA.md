@@ -1582,6 +1582,15 @@ verde clínico profundo, tipografía Plus Jakarta Sans (display) / Geist (UI) / 
 - También se muestra error si falta la fecha (antes guardaba silenciosamente) y se verificó
   que al guardar una aplicación sin marca el sello del carnet sí se llena.
 
+### Verificación exhaustiva de vacunación (todas las especies)
+- Prueba E2E por API sobre TODOS los planes activos de perro, gato, equino, hurones, conejo y
+  genéricos (22 planes): asignar → dosis+citas; completar cita → dosis completada + app en
+  carnet con fecha; marcar dosis 2 omitida; registro manual → app manual; desasignar → limpia
+  dosis, citas y apps de plan. **113/113 OK, 0 fallas.**
+- Plan NUEVO: se crea con steps, aparece en el carnet del perro, registrar app llena el sello
+  (1 de 2), editar steps a 3 lo refleja (sellos 1 de 3) y se elimina sin asignaciones.
+- Limpieza posterior: registros de prueba eliminados; datos de semilla intactos.
+
 ---
 
 **Siguiente subfase:** por decidir (Fase 3 en hold).
