@@ -666,7 +666,7 @@ def share_sign_consent(
         ["admin", "veterinario", "recepcion"],
         "consent_owner_signed",
         f'El dueño firmó el consentimiento "{consent.title}" de {pet.name}. Confírmalo.',
-        link=f"/pets/{pet.id}?tab=consents&confirm={consent.id}",
+        link=f"/pets/{pet.id}?tab=consents",
     )
     record_audit(
         db,

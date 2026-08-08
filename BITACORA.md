@@ -1425,10 +1425,11 @@ verde clínico profundo, tipografía Plus Jakarta Sans (display) / Geist (UI) / 
   "El dueño firmó el consentimiento «X» de <mascota>. Confírmalo." y link
   `/pets/<id>?tab=consents&confirm=<consent_id>`.
 - La campana de notificaciones navega al `link` al hacer clic (y marca como leída).
-- El expediente lee `tab=consents` (activa la pestaña) y `confirm=<id>` (abre el diálogo
-  "Confirmar consentimiento" del consentimiento en `owner_signed`).
-- Verificado E2E: al firmar llega la notificación (unread) y al hacer clic abre el
-  expediente con el diálogo de confirmación listo.
+- El expediente activa la pestaña Consentimientos (`tab=consents`) y hace scroll hasta ella.
+  La confirmación se hace MANUALMENTE con el botón "Confirmar" de la lista (sin popup
+  automático): el clic en la notificación solo lleva a la sección.
+- Verificado E2E: al firmar llega la notificación (unread) y al hacer clic navega a
+  `?tab=consents` (sin popup) dejando listo el botón "Confirmar".
 
 ### Fix: panel "Mi firma" fuera de la cartilla del dueño
 - El panel "Mi firma (si eres médico)" se movió a la pestaña Consentimientos de la
