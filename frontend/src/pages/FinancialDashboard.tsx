@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import { DollarSign, Receipt, TrendingUp } from 'lucide-react'
+import { DollarSign, Package, Receipt, Stethoscope, TrendingUp } from 'lucide-react'
 import {
   Bar,
   BarChart,
@@ -34,6 +34,7 @@ import { apiFetch } from '@/lib/api'
 interface Movement {
   id: string
   tipo: 'ingreso' | 'egreso'
+  categoria?: string
   monto: number
   fecha: string
   origen: string
@@ -47,12 +48,16 @@ interface FinancialReport {
   from: string
   to: string
   ingresos_total: number
+  ingresos_servicios_total: number
+  ingresos_productos_total: number
   ingresos_por_dia: { date: string; total: number }[]
   facturas_por_estado: Record<string, number>
   pendientes_por_cobrar: number
   ticket_promedio: number
   top_servicios: { name: string; total: number }[]
-  movements: Movement[]
+  ingresos_productos: Movement[]
+  ingresos_servicios: Movement[]
+  egresos: Movement[]
 }
 
 function toInputValue(d: Date): string {
@@ -62,6 +67,84 @@ function toInputValue(d: Date): string {
 
 function fmt(n: number) {
   return `$${n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
+
+function MovementTable({
+  title,
+  description,
+  rows,
+  badgeLabel,
+  badgeVariant,
+  moneyClass,
+  action,
+}: {
+  title: string
+  description?: string
+  rows: Movement[]
+  badgeLabel: (m: Movement) => string
+  badgeVariant: 'info' | 'success' | 'destructive'
+  moneyClass: string
+  action?: React.ReactNode
+}) {
+  return (
+    <Card className="shadow-card">
+      <CardHeader className="flex-row items-center justify-between space-y-0">
+        <div>
+          <CardTitle>{title}</CardTitle>
+          {description && <CardDescription>{description}</CardDescription>}
+        </div>
+        {action}
+      </CardHeader>
+      <CardContent>
+        {rows.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Sin movimientos en el rango seleccionado.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Fecha y hora</TableHead>
+                  <TableHead>Tipo</TableHead>
+                  <TableHead>Concepto / origen</TableHead>
+                  <TableHead>Sucursal</TableHead>
+                  <TableHead className="text-right">Monto</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.map((m) => (
+                  <TableRow key={`${m.tipo}-${m.id}`}>
+                    <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+                      {new Date(m.fecha).toLocaleString('es-MX', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={badgeVariant}>{badgeLabel(m)}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <p className="font-medium">{m.concepto}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {m.origen}
+                        {m.detalle !== '—' ? ` · ${m.detalle}` : ''}
+                      </p>
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{m.sucursal}</TableCell>
+                    <TableCell className={`text-right font-semibold ${moneyClass}`}>
+                      {m.tipo === 'ingreso' ? '+' : '-'}${m.monto.toFixed(2)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
 }
 
 export function FinancialDashboard() {
@@ -93,7 +176,9 @@ export function FinancialDashboard() {
     }
   }, [from, to])
 
-  const movements = data?.movements ?? []
+  const ingresosServicios = data?.ingresos_servicios ?? []
+  const ingresosProductos = data?.ingresos_productos ?? []
+  const egresos = data?.egresos ?? []
 
   return (
     <AppLayout>
@@ -130,7 +215,7 @@ export function FinancialDashboard() {
 
       {data && !loading && !error && (
         <div className="space-y-6">
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
             <Card className="shadow-card">
               <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
                 <CardDescription>Ingresos</CardDescription>
@@ -138,6 +223,28 @@ export function FinancialDashboard() {
               </CardHeader>
               <CardContent>
                 <p className="text-2xl font-semibold tracking-tight">{fmt(data.ingresos_total)}</p>
+              </CardContent>
+            </Card>
+            <Card className="shadow-card">
+              <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
+                <CardDescription>Servicios</CardDescription>
+                <Stethoscope className="size-4 text-primary" aria-hidden="true" />
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-semibold tracking-tight">
+                  {fmt(data.ingresos_servicios_total)}
+                </p>
+              </CardContent>
+            </Card>
+            <Card className="shadow-card">
+              <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
+                <CardDescription>Productos</CardDescription>
+                <Package className="size-4 text-primary" aria-hidden="true" />
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-semibold tracking-tight">
+                  {fmt(data.ingresos_productos_total)}
+                </p>
               </CardContent>
             </Card>
             <Card className="shadow-card">
@@ -262,77 +369,37 @@ export function FinancialDashboard() {
             </Card>
           </div>
 
-          <Card className="shadow-card">
-            <CardHeader className="flex-row items-center justify-between space-y-0">
-              <div>
-                <CardTitle>Movimientos</CardTitle>
-                <CardDescription>
-                  Ingresos (facturas) y egresos (gastos) con su detalle y origen
-                </CardDescription>
-              </div>
-              <Button size="sm" onClick={() => setExpenseOpen(true)}>
-                Registrar gasto
-              </Button>
-            </CardHeader>
-            <CardContent>
-              {movements.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  Sin movimientos en el rango seleccionado.
-                </p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Fecha y hora</TableHead>
-                        <TableHead>Tipo</TableHead>
-                        <TableHead>Concepto / origen</TableHead>
-                        <TableHead>Sucursal</TableHead>
-                        <TableHead className="text-right">Monto</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {movements.map((m) => (
-                        <TableRow key={`${m.tipo}-${m.id}`}>
-                          <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
-                            {new Date(m.fecha).toLocaleString('es-MX', {
-                              day: '2-digit',
-                              month: 'short',
-                              year: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={m.tipo === 'ingreso' ? 'success' : 'destructive'}>
-                              {m.tipo === 'ingreso' ? 'Ingreso' : 'Egreso'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <p className="font-medium">{m.concepto}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {m.origen}
-                              {m.detalle !== '—' ? ` · ${m.detalle}` : ''}
-                            </p>
-                          </TableCell>
-                          <TableCell className="text-xs text-muted-foreground">
-                            {m.sucursal}
-                          </TableCell>
-                          <TableCell
-                            className={`text-right font-semibold ${
-                              m.tipo === 'ingreso' ? 'text-success' : 'text-destructive'
-                            }`}
-                          >
-                            {m.tipo === 'ingreso' ? '+' : '-'}${m.monto.toFixed(2)}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <div className="space-y-6">
+            <MovementTable
+              title="Ingresos por servicios"
+              description="Facturas pagadas con líneas de servicio (consultas, procedimientos, etc.)"
+              rows={ingresosServicios}
+              badgeLabel={() => 'Servicio'}
+              badgeVariant="info"
+              moneyClass="text-success"
+            />
+            <MovementTable
+              title="Ingresos por ventas de productos"
+              description="Facturas pagadas con líneas de producto (insumos, medicamentos, etc.)"
+              rows={ingresosProductos}
+              badgeLabel={() => 'Producto'}
+              badgeVariant="success"
+              moneyClass="text-success"
+            />
+            <MovementTable
+              title="Egresos (gastos)"
+              description="Gastos registrados de la clínica"
+              rows={egresos}
+              badgeLabel={() => 'Egreso'}
+              badgeVariant="destructive"
+              moneyClass="text-destructive"
+              action={
+                <Button size="sm" onClick={() => setExpenseOpen(true)}>
+                  Registrar gasto
+                </Button>
+              }
+            />
+          </div>
         </div>
       )}
 

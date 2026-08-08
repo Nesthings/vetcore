@@ -6,6 +6,7 @@ El módulo de "Reportes operativos" se eliminó por decisión del usuario
 """
 
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
@@ -97,6 +98,33 @@ def financial_report(
 
     ticket_promedio = db.scalar(select(func.avg(Invoice.total)).where(*paid_base)) or 0
 
+    line_total = (
+        InvoiceItem.quantity
+        * InvoiceItem.unit_price
+        * (1 - InvoiceItem.discount_percent / 100)
+    )
+    service_cond = InvoiceItem.service_id.isnot(None)
+    product_cond = InvoiceItem.service_id.is_(None)
+
+    ingresos_servicios_total = (
+        db.scalar(
+            select(func.coalesce(func.sum(line_total), 0))
+            .select_from(InvoiceItem)
+            .join(Invoice, Invoice.id == InvoiceItem.invoice_id)
+            .where(*paid_base, service_cond)
+        )
+        or 0
+    )
+    ingresos_productos_total = (
+        db.scalar(
+            select(func.coalesce(func.sum(line_total), 0))
+            .select_from(InvoiceItem)
+            .join(Invoice, Invoice.id == InvoiceItem.invoice_id)
+            .where(*paid_base, product_cond)
+        )
+        or 0
+    )
+
     top_rows = db.execute(
         select(
             InvoiceItem.description,
@@ -120,26 +148,36 @@ def financial_report(
     ).all()
     top_servicios = [{"name": r.description, "total": float(r.total)} for r in top_rows]
 
-    movements = _build_movements(db, clinic_id, from_, to, branch_id)
+    ingresos_productos, ingresos_servicios, egresos = _build_movements(
+        db, clinic_id, from_, to, branch_id
+    )
 
     return {
         "from": from_.isoformat(),
         "to": to.isoformat(),
         "ingresos_total": float(ingresos_total),
+        "ingresos_servicios_total": float(ingresos_servicios_total),
+        "ingresos_productos_total": float(ingresos_productos_total),
         "ingresos_por_dia": ingresos_por_dia,
         "facturas_por_estado": facturas_por_estado,
         "pendientes_por_cobrar": float(pendientes_por_cobrar),
         "ticket_promedio": float(ticket_promedio),
         "top_servicios": top_servicios,
-        "movements": movements,
+        "ingresos_productos": ingresos_productos,
+        "ingresos_servicios": ingresos_servicios,
+        "egresos": egresos,
     }
 
 
 def _build_movements(
     db: Session, clinic_id: str, from_: datetime, to: datetime, branch_id: str | None
-) -> list[dict]:
-    """Lista de movimientos financieros: ingresos (facturas paid) y egresos
-    (gastos registrados), ordenados por fecha descendente."""
+) -> tuple[list[dict], list[dict], list[dict]]:
+    """Movimientos financieros separados por categoría:
+    - `ingresos_servicios`: facturas pagadas con líneas de servicio.
+    - `ingresos_productos`: facturas pagadas con líneas de producto.
+    - `egresos`: gastos registrados.
+    Una factura puede aparecer en ambas tablas de ingresos si mezcla servicios
+    y productos; cada fila lleva el subtotal de su categoría."""
     inv_stmt = (
         select(Invoice)
         .options(selectinload(Invoice.items))
@@ -183,26 +221,69 @@ def _build_movements(
         )
     )
 
-    movements: list[dict] = []
-    for inv in invoices_rows:
-        movements.append(
-            {
-                "id": str(inv.id),
+    def _split(inv: Invoice) -> tuple[dict | None, dict | None]:
+        servicios: list[str] = []
+        productos: list[str] = []
+        s_total = Decimal("0")
+        p_total = Decimal("0")
+        for item in inv.items:
+            amount = Decimal(str(item.quantity)) * Decimal(str(item.unit_price)) * (
+                Decimal("1") - Decimal(str(item.discount_percent)) / Decimal("100")
+            )
+            if item.service_id is not None:
+                servicios.append(item.description)
+                s_total += amount
+            else:
+                productos.append(item.description)
+                p_total += amount
+        base = {
+            "fecha": inv.created_at.isoformat(),
+            "origen": "Checkout de consulta" if inv.consultation_id else "Factura",
+            "concepto": pets.get(inv.pet_id) or "—",
+            "sucursal": branches.get(inv.branch_id) or "—",
+            "status": inv.status,
+        }
+        s_row = None
+        if servicios and s_total > 0:
+            s_row = {
+                "id": f"{inv.id}-s",
                 "tipo": "ingreso",
-                "monto": float(inv.total),
-                "fecha": inv.created_at.isoformat(),
-                "origen": "Checkout de consulta" if inv.consultation_id else "Factura",
-                "concepto": pets.get(inv.pet_id) or "—",
-                "detalle": ", ".join(i.description for i in inv.items[:3]) or "—",
-                "sucursal": branches.get(inv.branch_id) or "—",
-                "status": inv.status,
+                "categoria": "servicios",
+                "monto": float(s_total),
+                "detalle": ", ".join(servicios[:3]) or "—",
+                **base,
             }
-        )
+        p_row = None
+        if productos and p_total > 0:
+            p_row = {
+                "id": f"{inv.id}-p",
+                "tipo": "ingreso",
+                "categoria": "productos",
+                "monto": float(p_total),
+                "detalle": ", ".join(productos[:3]) or "—",
+                **base,
+            }
+        return s_row, p_row
+
+    ingresos_servicios: list[dict] = []
+    ingresos_productos: list[dict] = []
+    for inv in invoices_rows:
+        s_row, p_row = _split(inv)
+        if s_row:
+            ingresos_servicios.append(s_row)
+        if p_row:
+            ingresos_productos.append(p_row)
+
+    ingresos_servicios.sort(key=lambda m: m["fecha"], reverse=True)
+    ingresos_productos.sort(key=lambda m: m["fecha"], reverse=True)
+
+    egresos: list[dict] = []
     for exp in expenses:
-        movements.append(
+        egresos.append(
             {
                 "id": str(exp.id),
                 "tipo": "egreso",
+                "categoria": "egresos",
                 "monto": float(exp.amount),
                 "fecha": exp.recorded_at.isoformat(),
                 "origen": "Gasto registrado",
@@ -212,8 +293,9 @@ def _build_movements(
                 "status": None,
             }
         )
-    movements.sort(key=lambda m: m["fecha"], reverse=True)
-    return movements
+    egresos.sort(key=lambda m: m["fecha"], reverse=True)
+
+    return ingresos_productos, ingresos_servicios, egresos
 
 
 @router.get("/financial/expenses", response_model=list[ExpenseRead])

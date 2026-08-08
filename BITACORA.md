@@ -1457,6 +1457,19 @@ verde clínico profundo, tipografía Plus Jakarta Sans (display) / Geist (UI) / 
 - Nota: el `qr_token` es equivalente al token de cartilla (lectura + acciones puntuales de esa
   mascota); al ser permanente, `regenerate` permite revocarlo si se compromete.
 
+### Finanzas: ingresos separados por productos y servicios
+- El dashboard financiero ya NO mezcla todo en un solo "Movimientos": ahora hay tres tablas:
+  **Ingresos por servicios**, **Ingresos por ventas de productos** y **Egresos (gastos)**.
+- Clasificación: línea con `service_id` → servicio; el resto (producto o líneas sin referencia)
+  → producto. Una factura mixta aparece en ambas tablas con su subtotal por categoría.
+- Totales separados en las tarjetas (`ingresos_servicios_total`, `ingresos_productos_total`);
+  la suma de ambos cuadra con `ingresos_total`.
+- Fix de origen: los productos en el checkout de consulta (`consultations.py`) y en ventas
+  (`sales.py`) se creaban SIN `product_id`; ahora sí lo registran (mejora la precisión del
+  split a futuro).
+- Verificado por API (2 solo servicio, 4 solo producto, 6 mixtas; suma = total) y UI headless
+  (3 tablas + badges 8/10/1).
+
 ---
 
 **Siguiente subfase:** por decidir (Fase 3 en hold).

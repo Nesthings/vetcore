@@ -238,6 +238,7 @@ def checkout_consultation(
         total += line_total
         invoice_items.append(
             InvoiceItem(
+                product_id=product.id,
                 description=product.name,
                 quantity=float(qty),
                 unit_price=float(product.price),
