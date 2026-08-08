@@ -39,3 +39,4 @@ class DigitalConsent(UUIDPkMixin, Base):
     signed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

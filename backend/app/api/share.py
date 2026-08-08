@@ -29,7 +29,6 @@ from app.core.seed_vaccination_plans import ensure_standard_plans
 from app.core.storage import (
     ALLOWED_IMAGE_EXTENSIONS,
     public_url,
-    read_media_bytes,
     save_media,
     validate_extension,
 )
@@ -37,7 +36,6 @@ from app.data.vaccine_brands import brands_for_species
 from app.db.session import get_db
 from app.models import (
     Appointment,
-    Clinic,
     ClinicalAlert,
     Consultation,
     ConsultationAttachment,
@@ -48,7 +46,6 @@ from app.models import (
     User,
     VaccinationPlan,
 )
-from app.services.pdf import build_consent_pdf
 
 router = APIRouter(prefix="/share", tags=["share"])
 
@@ -546,7 +543,7 @@ def share_sign_consent(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Consentimiento no encontrado"
         )
-    if consent.status == "signed":
+    if consent.status in ("signed", "owner_signed"):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Ya está firmado")
 
     raw = signature_base64
@@ -564,42 +561,8 @@ def share_sign_consent(
     sig_rel = save_media(f"consents/{pet.id}", f"firma_remota_{consent.id}.png", signature_bytes)
     signature_url = public_url(sig_rel)
 
-    clinic = db.get(Clinic, pet.clinic_id)
-    owner_row = db.execute(
-        text(
-            "SELECT o.full_name FROM owner_pet_links l JOIN owners o ON o.id = l.owner_id "
-            "WHERE l.pet_id = :pid AND l.clinic_id = :cid AND l.is_active = true "
-            "ORDER BY l.linked_at DESC LIMIT 1"
-        ),
-        {"pid": pet.id, "cid": pet.clinic_id},
-    ).scalar()
-    owner_display = owner_row or "Dueño"
-
-    vet_signature_bytes = None
-    vet_name = None
-    if consent.vet_user_id:
-        vet_user = db.get(User, consent.vet_user_id)
-        if vet_user is not None:
-            vet_name = vet_user.full_name
-            vet_signature_bytes = read_media_bytes(vet_user.signature_url)
-
-    pdf_bytes = build_consent_pdf(
-        {
-            "clinic_name": clinic.name,
-            "pet_name": pet.name,
-            "owner_display": owner_display,
-            "title": consent.title,
-            "body": consent.body,
-            "date_str": datetime.now(UTC).astimezone().strftime("%d/%m/%Y %H:%M"),
-            "signature_bytes": signature_bytes,
-            "vet_signature_bytes": vet_signature_bytes,
-            "vet_name": vet_name,
-        }
-    )
-    pdf_rel = save_media(f"consents/{pet.id}", f"consentimiento_{consent.id}.pdf", pdf_bytes)
-    consent.status = "signed"
+    consent.status = "owner_signed"
     consent.signature_url = signature_url
-    consent.pdf_url = public_url(pdf_rel)
     consent.signed_at = datetime.now(UTC)
     record_audit(
         db,
@@ -612,4 +575,4 @@ def share_sign_consent(
         metadata={"pet_id": str(pet.id), "title": consent.title},
     )
     db.commit()
-    return {"id": str(consent.id), "status": "signed", "pdf_url": consent.pdf_url}
+    return {"id": str(consent.id), "status": "owner_signed", "pdf_url": consent.pdf_url}

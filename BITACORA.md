@@ -1386,6 +1386,20 @@ verde clínico profundo, tipografía Plus Jakarta Sans (display) / Geist (UI) / 
 - Frontend: `build` en verde; headless: tarjeta "Firma del médico" con firma guardada
   visible sin errores de consola.
 
+### Flujo de consentimientos re diseñado: enviar → firmar → confirmar
+- Migración `0030`: `digital_consents.confirmed_at`.
+- Desde el perfil de la mascota ya NO se pide firma: "Enviar consentimiento" crea un
+  `pending` que llega a la cartilla compartida del dueño.
+- El dueño firma en su cartilla (status `owner_signed`, se guarda su firma, SIN PDF) y
+  la envía de vuelta; la cartilla muestra "En espera".
+- El staff lo CONFIRMA (`POST /consents/{id}/confirm`): se incluye la firma guardada del
+  personal (de quien confirma, con respaldo a la del vet que emitió) y se genera el PDF
+  imprimible con ambas firmas → status `signed` + `confirmed_at`.
+- Se eliminó la firma en tablet en consulta (`POST /consents` con firma base64) y el
+  esquema `ConsentCreate`.
+- Verificado E2E (API + UI headless): pending → dueño firma → "En espera" en cartilla →
+  staff confirma → "Confirmado" + "Ver PDF" en ambas vistas, PDF con 2 imágenes RGBA.
+
 ---
 
 **Siguiente subfase:** por decidir (Fase 3 en hold).

@@ -4,6 +4,7 @@ import { Icon as MDIIcon } from '@mdi/react'
 import { mdiPaw } from '@mdi/js'
 import {
   ArrowLeft,
+  BadgeCheck,
   Cake,
   CalendarDays,
   Camera,
@@ -109,6 +110,7 @@ interface Consent {
   signature_url?: string | null
   pdf_url?: string | null
   signed_at: string
+  confirmed_at?: string | null
 }
 
 interface CarnetApp {
@@ -399,7 +401,7 @@ export function PetDetail() {
   const [inviteOpen, setInviteOpen] = useState(false)
   const [transferOpen, setTransferOpen] = useState(false)
   const [consentOpen, setConsentOpen] = useState(false)
-  const [remoteConsentOpen, setRemoteConsentOpen] = useState(false)
+  const [confirmConsent, setConfirmConsent] = useState<Consent | null>(null)
   const [alertType, setAlertType] = useState(ALERT_TYPES[0])
   const [alertDesc, setAlertDesc] = useState('')
   const [alertBusy, setAlertBusy] = useState(false)
@@ -447,6 +449,17 @@ export function PetDetail() {
       setLoading(false)
     }
   }, [id])
+
+  const confirmConsentFn = async () => {
+    if (!confirmConsent) return
+    try {
+      await apiFetch(`/consents/${confirmConsent.id}/confirm`, { method: 'POST' })
+      setConfirmConsent(null)
+      load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo confirmar el consentimiento')
+    }
+  }
 
   useEffect(() => {
     load()
@@ -1295,16 +1308,12 @@ export function PetDetail() {
               <TabsContent value="consents" className="space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-sm text-muted-foreground">
-                    Consentimientos informados firmados por el dueño.
+                    Se envía al dueño para que firme; al confirmarlo se incluyen las firmas del
+                    personal.
                   </p>
-                  <div className="flex gap-2">
-                    <Button size="sm" variant="outline" onClick={() => setRemoteConsentOpen(true)}>
-                      <Send /> Para firma del dueño
-                    </Button>
-                    <Button size="sm" onClick={() => setConsentOpen(true)}>
-                      <FileSignature /> Nuevo consentimiento
-                    </Button>
-                  </div>
+                  <Button size="sm" onClick={() => setConsentOpen(true)}>
+                    <Send /> Enviar consentimiento
+                  </Button>
                 </div>
                 {consents.length === 0 ? (
                   <EmptyState
@@ -1324,7 +1333,9 @@ export function PetDetail() {
                             className={`flex size-10 shrink-0 items-center justify-center rounded-lg ${
                               c.status === 'pending'
                                 ? 'bg-warning/10 text-warning'
-                                : 'bg-primary/10 text-primary'
+                                : c.status === 'owner_signed'
+                                  ? 'bg-info/10 text-info'
+                                  : 'bg-primary/10 text-primary'
                             }`}
                           >
                             <FileSignature className="size-4" aria-hidden="true" />
@@ -1333,11 +1344,22 @@ export function PetDetail() {
                             <p className="text-sm font-medium">{c.title}</p>
                             <p className="text-xs text-muted-foreground">
                               {c.status === 'pending' ? (
-                                'Pendiente de firma del dueño'
+                                'Enviado, pendiente de firma del dueño'
+                              ) : c.status === 'owner_signed' ? (
+                                <>
+                                  Firmado por el dueño el{' '}
+                                  {new Date(c.signed_at).toLocaleString('es-MX', {
+                                    day: 'numeric',
+                                    month: 'short',
+                                    year: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  })}
+                                </>
                               ) : (
                                 <>
-                                  Firmado{' '}
-                                  {new Date(c.signed_at).toLocaleString('es-MX', {
+                                  Confirmado el{' '}
+                                  {new Date(c.confirmed_at ?? c.signed_at).toLocaleString('es-MX', {
                                     day: 'numeric',
                                     month: 'short',
                                     year: 'numeric',
@@ -1350,7 +1372,11 @@ export function PetDetail() {
                           </div>
                         </div>
                         {c.status === 'pending' ? (
-                          <Badge variant="warning">Pendiente</Badge>
+                          <Badge variant="warning">Enviado</Badge>
+                        ) : c.status === 'owner_signed' ? (
+                          <Button size="sm" onClick={() => setConfirmConsent(c)}>
+                            <BadgeCheck /> Confirmar
+                          </Button>
                         ) : (
                           <a
                             href={c.pdf_url ?? '#'}
@@ -1554,19 +1580,20 @@ export function PetDetail() {
         />
       )}
 
-      {pet && (
-        <ConsentDialog
-          petId={pet.id}
-          petName={pet.name}
-          open={remoteConsentOpen}
-          onOpenChange={setRemoteConsentOpen}
-          remote
-          onSaved={() => {
-            setRemoteConsentOpen(false)
-            load()
-          }}
-        />
-      )}
+      <ConfirmDialog
+        open={Boolean(confirmConsent)}
+        onOpenChange={(open) => {
+          if (!open) setConfirmConsent(null)
+        }}
+        title="Confirmar consentimiento"
+        description={
+          confirmConsent
+            ? `El dueño ya firmó "${confirmConsent.title}". Al confirmar se incluirá la firma del personal y se generará el PDF imprimible.`
+            : undefined
+        }
+        confirmLabel="Confirmar y firmar"
+        onConfirm={confirmConsentFn}
+      />
 
       <ConfirmDialog
         open={Boolean(confirmState)}

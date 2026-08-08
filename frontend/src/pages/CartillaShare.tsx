@@ -1008,14 +1008,24 @@ export function CartillaShare() {
                       >
                         <div className="flex items-center gap-3">
                           <div
-                            className={`flex size-10 shrink-0 items-center justify-center rounded-lg ${c.status === 'pending' ? 'bg-warning/10 text-warning' : 'bg-primary/10 text-primary'}`}
+                            className={`flex size-10 shrink-0 items-center justify-center rounded-lg ${
+                              c.status === 'pending'
+                                ? 'bg-warning/10 text-warning'
+                                : c.status === 'owner_signed'
+                                  ? 'bg-info/10 text-info'
+                                  : 'bg-primary/10 text-primary'
+                            }`}
                           >
                             <FileSignature className="size-4" aria-hidden="true" />
                           </div>
                           <div className="min-w-0">
                             <p className="text-sm font-medium">{c.title}</p>
                             <p className="text-xs text-muted-foreground">
-                              {c.status === 'pending' ? 'Pendiente de tu firma' : 'Firmado'}
+                              {c.status === 'pending'
+                                ? 'Pendiente de tu firma'
+                                : c.status === 'owner_signed'
+                                  ? 'Firmado — en espera de confirmación de la clínica'
+                                  : 'Confirmado'}
                             </p>
                           </div>
                         </div>
@@ -1029,6 +1039,8 @@ export function CartillaShare() {
                           >
                             <FileSignature /> Firmar
                           </Button>
+                        ) : c.status === 'owner_signed' ? (
+                          <Badge variant="info">En espera</Badge>
                         ) : (
                           <a
                             href={c.pdf_url ?? '#'}
@@ -1124,7 +1136,8 @@ export function CartillaShare() {
           <DialogHeader>
             <DialogTitle>Firmar consentimiento</DialogTitle>
             <DialogDescription>
-              {signing?.title} · Dibuja tu firma y envíala. El documento se completará con tu firma.
+              {signing?.title} · Dibuja tu firma y envíala. La clínica la confirmará e incluirá las
+              firmas del personal; después podrás ver el PDF.
             </DialogDescription>
           </DialogHeader>
           {signing && (
