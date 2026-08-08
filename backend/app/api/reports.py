@@ -135,7 +135,7 @@ def financial_report(
             ).label("total"),
         )
         .join(Invoice, Invoice.id == InvoiceItem.invoice_id)
-        .where(*paid_base)
+        .where(*paid_base, service_cond)
         .group_by(InvoiceItem.description)
         .order_by(
             func.sum(
