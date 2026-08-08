@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.api.appointments import _with_names
 from app.api.deps import CurrentClinic, get_current_clinic, require_component
+from app.core.clinic_settings import clinic_stock_threshold
 from app.db.session import get_db
 from app.models import Appointment, InventoryMovement, InventoryProduct, Pet, ScheduleBlock
 
@@ -22,8 +23,6 @@ router = APIRouter(
     tags=["dashboard"],
     dependencies=[Depends(require_component("dashboard"))],
 )
-
-STOCK_ALERT_DEFAULT_THRESHOLD = 5
 
 WEEKDAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
 
@@ -41,13 +40,15 @@ def dashboard_day(
     branch_id: str | None = Query(default=None),
     day: date | None = Query(default=None, description="Fecha (YYYY-MM-DD). Default: hoy local"),
     period: str = Query(default="day", pattern="^(day|week|month)$"),
-    stock_threshold: float = Query(
-        default=STOCK_ALERT_DEFAULT_THRESHOLD, ge=0, description="Umbral para alerta de stock"
+    stock_threshold: float | None = Query(
+        default=None, ge=0, description="Umbral para alerta de stock (default: el de la clínica)"
     ),
 ) -> dict:
     clinic_id = ctx.clinic["id"]
     selected_branch = branch_id or ctx.user.branch_id
     today = day or date.today()
+    if stock_threshold is None:
+        stock_threshold = clinic_stock_threshold(db, clinic_id)
 
     window = PERIOD_WINDOWS[period]
     start_date = today - timedelta(days=window["days"])

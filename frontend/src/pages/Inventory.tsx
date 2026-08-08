@@ -48,9 +48,9 @@ export interface InventoryProduct {
   days_remaining?: number | null
 }
 
-function stockBadge(stock: number) {
+function stockBadge(stock: number, threshold: number) {
   if (stock <= 0) return <Badge variant="destructive">Agotado</Badge>
-  if (stock < 5) return <Badge variant="warning">Bajo</Badge>
+  if (stock < threshold) return <Badge variant="warning">Bajo</Badge>
   return <Badge variant="success">{stock} en stock</Badge>
 }
 
@@ -59,6 +59,7 @@ export function Inventory() {
   const [branches, setBranches] = useState<{ id: string; name: string }[]>([])
   const [branchId, setBranchId] = useState('')
   const [search, setSearch] = useState('')
+  const [threshold, setThreshold] = useState(5)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -73,12 +74,14 @@ export function Inventory() {
       const params = new URLSearchParams()
       if (search) params.set('search', search)
       if (branchId) params.set('branch_id', branchId)
-      const [res, branchList] = await Promise.all([
+      const [res, branchList, clinic] = await Promise.all([
         apiFetch<InventoryProduct[]>(`/inventory?${params}`),
         apiFetch<{ id: string; name: string }[]>('/branches'),
+        apiFetch<{ stock_alert_threshold?: number }>('/clinics/me'),
       ])
       setProducts(res)
       setBranches(branchList)
+      setThreshold(clinic.stock_alert_threshold ?? 5)
       if (!branchId && branchList.length > 0) setBranchId(branchList[0].id)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo cargar el inventario')
@@ -94,7 +97,7 @@ export function Inventory() {
 
   const summary = {
     agotados: products.filter((p) => p.stock <= 0).length,
-    bajos: products.filter((p) => p.stock > 0 && p.stock < 5).length,
+    bajos: products.filter((p) => p.stock > 0 && p.stock < threshold).length,
     vencidos: products.filter((p) => p.expired).length,
     porVencer: products.filter((p) => p.expiring_soon).length,
   }
@@ -211,7 +214,7 @@ export function Inventory() {
                   <TableCell className="font-medium">{p.name}</TableCell>
                   <TableCell className="hidden lg:table-cell">{p.category ?? '—'}</TableCell>
                   <TableCell className="hidden md:table-cell">{p.unit ?? '—'}</TableCell>
-                  <TableCell>{stockBadge(p.stock)}</TableCell>
+                  <TableCell>{stockBadge(p.stock, threshold)}</TableCell>
                   <TableCell>
                     {p.expired ? (
                       <Badge variant="destructive">Vencido</Badge>

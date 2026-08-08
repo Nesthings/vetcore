@@ -10,6 +10,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.api.deps import CurrentClinic, get_current_clinic
+from app.core.clinic_settings import clinic_stock_threshold
 from app.db.session import get_db
 
 router = APIRouter(prefix="/dashboards", tags=["dashboards"])
@@ -267,10 +268,12 @@ def _upcoming_doses(db: Session, cid: str, period: str, branch_id: str | None = 
 
 
 def _stock_levels(db: Session, cid: str, period: str) -> list[dict]:
+    threshold = clinic_stock_threshold(db, cid)
     rows = db.execute(
         text(
             "SELECT CASE WHEN stock_quantity <= 0 THEN 'Agotado' "
-            "WHEN stock_quantity <= 5 THEN 'Bajo' ELSE 'Sano' END AS name, count(*) AS value "
+            f"WHEN stock_quantity <= {threshold} THEN 'Bajo' ELSE 'Sano' END AS name, "
+            "count(*) AS value "
             "FROM sale_products WHERE clinic_id = :c GROUP BY 1"
         ),
         {"c": cid},

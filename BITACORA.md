@@ -1616,6 +1616,17 @@ verde clínico profundo, tipografía Plus Jakarta Sans (display) / Geist (UI) / 
   → visible en /waitlist del staff + notificación + badge en la cartilla; cancelar la quita;
   duplicado → 409.
 
+### Alertas de stock con umbral configurable (admin)
+- Migración `0035`: `clinics.stock_alert_threshold` (Numeric, default 5). Se guarda desde
+  **Configuración → pestaña Clínica → "Umbral de alerta de stock"** (`PATCH /clinics/me`).
+- Se usa de forma consistente en: **Insumos** (badge "Bajo" + StatChip "Stock bajo"),
+  **Productos** (badge "en existencia · Bajo" + StatChip), **dashboard** `/dashboard/day`
+  (stock_alerts, con parámetro opcional que sobreescribe) y el widget `stock_levels`, y las
+  **notificaciones** `low_stock` (`inventory.py`).
+- Helper compartido `app/core/clinic_settings.py` (`clinic_stock_threshold`).
+- Verificado E2E: cambiar el umbral a 8/40 se refleja en `/clinics/me`, dashboard y el badge
+  de Insumos (1 "Bajo" con stock 35 < 40).
+
 ---
 
 **Siguiente subfase:** por decidir (Fase 3 en hold).

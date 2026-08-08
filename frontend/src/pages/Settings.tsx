@@ -48,6 +48,7 @@ interface ClinicProfile {
   fiscal_name?: string | null
   timezone: string
   currency: string
+  stock_alert_threshold?: number | null
   logo_url?: string | null
 }
 
@@ -74,6 +75,7 @@ export function Settings() {
     fiscal_name: '',
     timezone: 'UTC',
     currency: 'MXN',
+    stock_alert_threshold: '5',
   })
   const [savingClinic, setSavingClinic] = useState(false)
   const [clinicSuccess, setClinicSuccess] = useState(false)
@@ -100,6 +102,7 @@ export function Settings() {
         fiscal_name: c.fiscal_name ?? '',
         timezone: c.timezone,
         currency: c.currency,
+        stock_alert_threshold: String(c.stock_alert_threshold ?? 5),
       })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo cargar la configuración')
@@ -155,6 +158,7 @@ export function Settings() {
         fiscal_name: clinicForm.fiscal_name || null,
         timezone: clinicForm.timezone,
         currency: clinicForm.currency,
+        stock_alert_threshold: Number(clinicForm.stock_alert_threshold) || 5,
       }
       await apiFetch('/clinics/me', { method: 'PATCH', body: JSON.stringify(body) })
       setClinicSuccess(true)
@@ -451,6 +455,21 @@ export function Settings() {
                         value={clinicForm.fiscal_name}
                         onChange={(e) => setClinicField('fiscal_name', e.target.value)}
                       />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Umbral de alerta de stock</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        step="0.5"
+                        value={clinicForm.stock_alert_threshold}
+                        onChange={(e) => setClinicField('stock_alert_threshold', e.target.value)}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Unidades para marcar "Stock bajo" en insumos, productos y el dashboard.
+                      </p>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">

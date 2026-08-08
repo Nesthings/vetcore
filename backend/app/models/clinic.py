@@ -33,6 +33,9 @@ class Clinic(UUIDPkMixin, Base):
     currency: Mapped[str] = mapped_column(
         String(10), nullable=False, default="MXN", server_default="MXN"
     )
+    stock_alert_threshold: Mapped[float] = mapped_column(
+        Numeric(10, 2), nullable=False, default=5, server_default="5"
+    )
     setup_completed: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default="true"
     )

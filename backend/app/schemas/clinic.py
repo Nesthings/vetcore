@@ -54,6 +54,7 @@ class ClinicUpdate(BaseModel):
     timezone: str | None = Field(default=None, max_length=50)
     currency: str | None = Field(default=None, max_length=10)
     setup_completed: bool | None = None
+    stock_alert_threshold: float | None = Field(default=None, ge=0, le=10000)
 
 
 class ClinicRead(ClinicBase):
@@ -63,6 +64,7 @@ class ClinicRead(ClinicBase):
     subscription_status: str
     logo_url: str | None = None
     setup_completed: bool
+    stock_alert_threshold: float
     created_at: datetime
     updated_at: datetime
 

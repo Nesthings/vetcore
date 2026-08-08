@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Package, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Package, PackageMinus, PackageX, Pencil, Plus, Trash2 } from 'lucide-react'
 
 import { AppLayout } from '@/components/layout/AppLayout'
 import { ProductFormDialog } from '@/components/products/ProductFormDialog'
@@ -9,11 +9,13 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState } from '@/components/ui/error-state'
 import { LoadingState } from '@/components/ui/loading-state'
+import { StatChip } from '@/components/ui/stat-chip'
 import { apiFetch } from '@/lib/api'
 import type { SaleProduct } from '@/lib/product'
 
 export function Products() {
   const [products, setProducts] = useState<SaleProduct[]>([])
+  const [threshold, setThreshold] = useState(5)
   const [confirm, setConfirm] = useState<{ title: string; onConfirm: () => void } | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -24,8 +26,12 @@ export function Products() {
     setLoading(true)
     setError(null)
     try {
-      const res = await apiFetch<SaleProduct[]>('/products')
+      const [res, clinic] = await Promise.all([
+        apiFetch<SaleProduct[]>('/products'),
+        apiFetch<{ stock_alert_threshold?: number }>('/clinics/me'),
+      ])
       setProducts(res)
+      setThreshold(clinic.stock_alert_threshold ?? 5)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudieron cargar los productos')
     } finally {
@@ -71,6 +77,25 @@ export function Products() {
           <Plus /> Nuevo producto
         </Button>
       </div>
+
+      {!loading && !error && products.length > 0 && (
+        <div className="mb-4 grid grid-cols-2 gap-3 sm:max-w-md">
+          <StatChip
+            label="Agotados"
+            value={products.filter((p) => p.stock_quantity <= 0).length}
+            icon={PackageX}
+            tint="bg-destructive/10 text-destructive"
+          />
+          <StatChip
+            label="Stock bajo"
+            value={
+              products.filter((p) => p.stock_quantity > 0 && p.stock_quantity < threshold).length
+            }
+            icon={PackageMinus}
+            tint="bg-warning/10 text-warning"
+          />
+        </div>
+      )}
 
       {error && <ErrorState description={error} onRetry={load} className="mb-6" />}
       {loading && <LoadingState label="Cargando productos…" />}
@@ -125,10 +150,14 @@ export function Products() {
                   {p.price != null ? `$${Number(p.price).toFixed(2)}` : 'Sin precio'}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {p.stock_quantity > 0 ? (
-                    <span>{p.stock_quantity} en existencia</span>
-                  ) : (
+                  {p.stock_quantity <= 0 ? (
                     <span className="font-medium text-destructive">Agotado</span>
+                  ) : p.stock_quantity < threshold ? (
+                    <span className="font-medium text-warning">
+                      {p.stock_quantity} en existencia · Bajo
+                    </span>
+                  ) : (
+                    <span>{p.stock_quantity} en existencia</span>
                   )}
                 </p>
                 <div className="flex justify-end gap-1 pt-1">

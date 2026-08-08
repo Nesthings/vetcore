@@ -14,6 +14,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps import CurrentClinic, get_current_clinic, require_clinic_roles, require_component
+from app.core.clinic_settings import clinic_stock_threshold
 from app.core.events import notify_roles
 from app.db.session import get_db
 from app.models import InventoryLot, InventoryMovement, InventoryProduct
@@ -36,17 +37,17 @@ INVENTORY_MUTATORS = ("admin", "veterinario")
 
 EXPIRATION_ALERT_DAYS = 30
 FORECAST_WINDOW_DAYS = 30
-LOW_STOCK_THRESHOLD = 5
 
 
 def _maybe_notify_low_stock(db: Session, ctx: CurrentClinic, product: InventoryProduct) -> None:
-    """Notifica a los admins si el stock del producto quedó bajo el umbral."""
+    """Notifica a los admins si el stock del producto quedó bajo el umbral configurado."""
+    threshold = clinic_stock_threshold(db, ctx.clinic["id"])
     stock = db.scalar(
         select(func.coalesce(func.sum(InventoryMovement.quantity_delta), 0)).where(
             InventoryMovement.product_id == product.id
         )
     )
-    if (stock or 0) < LOW_STOCK_THRESHOLD:
+    if (stock or 0) < threshold:
         notify_roles(
             db,
             clinic_id=ctx.clinic["id"],
