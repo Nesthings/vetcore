@@ -35,8 +35,10 @@ from app.core.storage import (
 from app.db.session import get_db
 from app.models import (
     Appointment,
+    AppointmentWaitlist,
     Clinic,
     ClinicalAlert,
+    ClinicBranch,
     Consultation,
     ConsultationAttachment,
     DigitalConsent,
@@ -318,6 +320,12 @@ def share_cartilla(
     return {
         "pet": _pet_dict(db, pet),
         "clinic": {"name": clinic.name, "logo_url": clinic.logo_url},
+        "branches": [
+            {"id": str(b.id), "name": b.name}
+            for b in db.scalars(
+                select(ClinicBranch).where(ClinicBranch.clinic_id == pet.clinic_id)
+            )
+        ],
         "qr_url": f"/cartilla?token={ensure_qr_token(db, pet)}",
         "alerts": [
             {
@@ -343,6 +351,156 @@ def share_cartilla(
         "photos": photos,
         "family": family,
     }
+
+
+def _waitlist_payload(db: Session, row: AppointmentWaitlist) -> dict:
+    pet_name = db.scalar(select(Pet.name).where(Pet.id == row.pet_id))
+    branch_name = db.scalar(select(ClinicBranch.name).where(ClinicBranch.id == row.branch_id))
+    return {
+        "id": str(row.id),
+        "pet_id": str(row.pet_id),
+        "pet_name": pet_name,
+        "branch_id": str(row.branch_id),
+        "branch_name": branch_name,
+        "desired_from": row.desired_from.isoformat(),
+        "desired_to": row.desired_to.isoformat(),
+        "status": row.status,
+        "created_at": row.created_at.isoformat(),
+    }
+
+
+@router.post(
+    "/cartilla/waitlist",
+    status_code=status.HTTP_201_CREATED,
+    summary="El dueño solicita una cita (entra a la lista de espera)",
+)
+def share_request_waitlist(
+    token: str = Form(...),
+    branch_id: str = Form(...),
+    desired_from: datetime = Form(...),
+    desired_to: datetime = Form(...),
+    db: Session = Depends(get_db),
+) -> dict:
+    pet = _pet_from_token(token, db)
+    if desired_to <= desired_from:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="desired_to debe ser posterior a desired_from",
+        )
+    branch = db.scalar(
+        select(ClinicBranch).where(
+            ClinicBranch.id == branch_id, ClinicBranch.clinic_id == pet.clinic_id
+        )
+    )
+    if branch is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Sucursal no encontrada"
+        )
+    active = db.scalar(
+        select(AppointmentWaitlist).where(
+            AppointmentWaitlist.pet_id == pet.id,
+            AppointmentWaitlist.clinic_id == pet.clinic_id,
+            AppointmentWaitlist.status.in_(("waiting", "offered")),
+        )
+    )
+    if active is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Ya tienes una solicitud de cita en espera para esta mascota",
+        )
+
+    row = AppointmentWaitlist(
+        clinic_id=pet.clinic_id,
+        branch_id=branch.id,
+        pet_id=pet.id,
+        desired_from=desired_from,
+        desired_to=desired_to,
+        status="waiting",
+    )
+    db.add(row)
+    db.flush()
+    notify_roles(
+        db,
+        pet.clinic_id,
+        ["admin", "veterinario", "recepcion"],
+        "waitlist_owner_request",
+        f"El dueño de {pet.name} solicitó una cita para "
+        f"{desired_from.strftime('%d/%m %H:%M')}–{desired_to.strftime('%H:%M')}. "
+        "Revisa la lista de espera.",
+        link="/waitlist",
+    )
+    record_audit(
+        db,
+        clinic_id=pet.clinic_id,
+        actor_type="owner",
+        actor_id=pet.id,
+        action="waitlist_owner_requested",
+        entity_type="waitlist",
+        entity_id=row.id,
+        metadata={"pet_id": str(pet.id)},
+    )
+    db.commit()
+    db.refresh(row)
+    return _waitlist_payload(db, row)
+
+
+@router.get(
+    "/cartilla/waitlist",
+    summary="Solicitudes de cita de la mascota (dueño)",
+)
+def share_waitlist(
+    token: str = Query(...),
+    db: Session = Depends(get_db),
+) -> list[dict]:
+    pet = _pet_from_token(token, db)
+    rows = list(
+        db.scalars(
+            select(AppointmentWaitlist)
+            .where(AppointmentWaitlist.pet_id == pet.id)
+            .order_by(AppointmentWaitlist.created_at.desc())
+        )
+    )
+    return [_waitlist_payload(db, r) for r in rows]
+
+
+@router.delete(
+    "/cartilla/waitlist/{waitlist_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="El dueño cancela su solicitud de cita",
+)
+def share_cancel_waitlist(
+    waitlist_id: str,
+    token: str = Form(...),
+    db: Session = Depends(get_db),
+) -> None:
+    pet = _pet_from_token(token, db)
+    row = db.scalar(
+        select(AppointmentWaitlist).where(
+            AppointmentWaitlist.id == waitlist_id,
+            AppointmentWaitlist.pet_id == pet.id,
+        )
+    )
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Solicitud no encontrada"
+        )
+    if row.status not in ("waiting", "offered"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La solicitud ya no se puede cancelar",
+        )
+    record_audit(
+        db,
+        clinic_id=pet.clinic_id,
+        actor_type="owner",
+        actor_id=pet.id,
+        action="waitlist_owner_cancelled",
+        entity_type="waitlist",
+        entity_id=row.id,
+        metadata={"pet_id": str(pet.id)},
+    )
+    db.delete(row)
+    db.commit()
 
 
 @router.post("/cartilla/photo", summary="Sube la foto de perfil de la mascota")

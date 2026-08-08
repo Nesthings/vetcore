@@ -1602,6 +1602,20 @@ verde clínico profundo, tipografía Plus Jakarta Sans (display) / Geist (UI) / 
 - Verificado E2E: escribir "almendra" muestra resultados sin clic; registrar la vacuna completó
   la dosis y apareció en el carnet con marca y lote.
 
+### Cartilla: solicitar cita → lista de espera (desde el dueño)
+- El dueño puede **solicitar una cita** desde la cartilla (sección "Solicitar cita"): elige
+  sucursal (la cartilla expone `branches`) y una ventana de tiempo (desde → hasta). La
+  solicitud entra a la **lista de espera** (`status="waiting"`) de la clínica.
+- Endpoints públicos por token en `share.py`: `POST/GET /share/cartilla/waitlist` y
+  `DELETE /share/cartilla/waitlist/{id}` (cancelar). **Una sola solicitud activa por mascota**
+  (409 si ya hay una en waiting/offered).
+- Al solicitar, **notifica al staff** (admin/vet/recepción) con link a la Lista de espera; el
+  dueño ve el estado de sus solicitudes ("En espera" / "Hueco ofrecido" / "Cumplida" /
+  "Expirada") y puede cancelarlas.
+- Funciona con el enlace de 30 días y con el QR permanente (qr_token). Verificado E2E: solicitar
+  → visible en /waitlist del staff + notificación + badge en la cartilla; cancelar la quita;
+  duplicado → 409.
+
 ---
 
 **Siguiente subfase:** por decidir (Fase 3 en hold).

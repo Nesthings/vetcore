@@ -44,6 +44,8 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { EmptyState } from '@/components/ui/empty-state'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   Table,
   TableBody,
@@ -138,6 +140,18 @@ interface ShareVaccinationPlan {
   doses: ShareDose[]
 }
 
+interface ShareWaitlistEntry {
+  id: string
+  pet_id: string
+  pet_name?: string | null
+  branch_id: string
+  branch_name?: string | null
+  desired_from: string
+  desired_to: string
+  status: string
+  created_at: string
+}
+
 interface ShareConsent {
   id: string
   title: string
@@ -186,6 +200,7 @@ interface ShareFamily {
 interface ShareData {
   pet: SharePet
   clinic?: { name: string; logo_url?: string | null } | null
+  branches: { id: string; name: string }[]
   qr_url?: string | null
   alerts: ShareAlert[]
   carnet: { species: string; vaccines: ShareVaccine[] }
@@ -275,6 +290,14 @@ export function CartillaShare() {
   const cartillaRef = useRef<HTMLDivElement>(null)
   const [downloadBusy, setDownloadBusy] = useState(false)
 
+  // solicitud de cita (lista de espera)
+  const [waitlist, setWaitlist] = useState<ShareWaitlistEntry[]>([])
+  const [reqBranch, setReqBranch] = useState('')
+  const [reqFrom, setReqFrom] = useState('')
+  const [reqTo, setReqTo] = useState('')
+  const [reqBusy, setReqBusy] = useState(false)
+  const [reqMsg, setReqMsg] = useState<string | null>(null)
+
   const downloadImage = async () => {
     const el = cartillaRef.current
     if (!el || downloadBusy) return
@@ -304,12 +327,66 @@ export function CartillaShare() {
     try {
       const res = await apiFetch<ShareData>(`/share/cartilla?token=${encodeURIComponent(token)}`)
       setData(res)
+      try {
+        const wl = await apiFetch<ShareWaitlistEntry[]>(
+          `/share/cartilla/waitlist?token=${encodeURIComponent(token)}`,
+        )
+        setWaitlist(wl)
+      } catch {
+        setWaitlist([])
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo cargar la cartilla')
     } finally {
       setLoading(false)
     }
   }, [token])
+
+  const submitWaitlist = async () => {
+    const branchId = reqBranch || data?.branches[0]?.id || ''
+    if (!branchId || !reqFrom || !reqTo) {
+      setReqMsg('Completa la sucursal y la ventana de tiempo.')
+      return
+    }
+    if (new Date(reqTo) <= new Date(reqFrom)) {
+      setReqMsg('La hora de fin debe ser posterior a la de inicio.')
+      return
+    }
+    setReqBusy(true)
+    setReqMsg(null)
+    setError(null)
+    try {
+      const fd = new FormData()
+      fd.append('token', token)
+      fd.append('branch_id', branchId)
+      fd.append('desired_from', new Date(reqFrom).toISOString())
+      fd.append('desired_to', new Date(reqTo).toISOString())
+      await apiFetch('/share/cartilla/waitlist', { method: 'POST', body: fd })
+      setReqFrom('')
+      setReqTo('')
+      setReqMsg('Solicitud enviada. La clínica te contactará con un hueco disponible.')
+      await load()
+    } catch (err) {
+      setReqMsg(err instanceof Error ? err.message : 'No se pudo enviar la solicitud')
+    } finally {
+      setReqBusy(false)
+    }
+  }
+
+  const cancelWaitlist = async (id: string) => {
+    setReqBusy(true)
+    setError(null)
+    try {
+      const fd = new FormData()
+      fd.append('token', token)
+      await apiFetch(`/share/cartilla/waitlist/${id}`, { method: 'DELETE', body: fd })
+      await load()
+    } catch (err) {
+      setReqMsg(err instanceof Error ? err.message : 'No se pudo cancelar la solicitud')
+    } finally {
+      setReqBusy(false)
+    }
+  }
 
   useEffect(() => {
     load()
@@ -899,6 +976,124 @@ export function CartillaShare() {
                     ))}
                   </div>
                 </>
+              )}
+            </div>
+          </div>
+
+          <div className="border-t border-border p-5 sm:p-6">
+            <SectionHeading
+              icon={CalendarDays}
+              title="Solicitar cita"
+              subtitle="Elige una ventana de tiempo; entra a la lista de espera de la clínica"
+            />
+            <div className="mt-3 space-y-3">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Sucursal</Label>
+                  <select
+                    value={reqBranch || data.branches[0]?.id || ''}
+                    onChange={(e) => setReqBranch(e.target.value)}
+                    className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  >
+                    {data.branches.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Desde</Label>
+                  <Input
+                    type="datetime-local"
+                    value={reqFrom}
+                    onChange={(e) => setReqFrom(e.target.value)}
+                    className="w-full"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Hasta</Label>
+                  <Input
+                    type="datetime-local"
+                    value={reqTo}
+                    onChange={(e) => setReqTo(e.target.value)}
+                    className="w-full"
+                  />
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button type="button" size="sm" onClick={submitWaitlist} disabled={reqBusy}>
+                  {reqBusy ? <Loader2 className="animate-spin" /> : <CalendarDays />} Solicitar cita
+                </Button>
+                {reqMsg && <p className="text-sm text-muted-foreground">{reqMsg}</p>}
+              </div>
+
+              {waitlist.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Tus solicitudes
+                  </p>
+                  {waitlist.map((w) => (
+                    <div
+                      key={w.id}
+                      className="flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2"
+                    >
+                      <div>
+                        <p className="text-sm font-medium">
+                          {new Date(w.desired_from).toLocaleDateString('es-MX', {
+                            day: 'numeric',
+                            month: 'short',
+                          })}{' '}
+                          {new Date(w.desired_from).toLocaleTimeString('es-MX', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                          {' – '}
+                          {new Date(w.desired_to).toLocaleTimeString('es-MX', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {w.branch_name ?? 'Sucursal'}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge
+                          variant={
+                            w.status === 'waiting'
+                              ? 'warning'
+                              : w.status === 'offered'
+                                ? 'info'
+                                : w.status === 'fulfilled'
+                                  ? 'success'
+                                  : 'secondary'
+                          }
+                        >
+                          {w.status === 'waiting'
+                            ? 'En espera'
+                            : w.status === 'offered'
+                              ? 'Hueco ofrecido'
+                              : w.status === 'fulfilled'
+                                ? 'Cumplida'
+                                : 'Expirada'}
+                        </Badge>
+                        {(w.status === 'waiting' || w.status === 'offered') && (
+                          <button
+                            type="button"
+                            onClick={() => cancelWaitlist(w.id)}
+                            aria-label="Cancelar solicitud"
+                            className="flex size-7 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-accent"
+                          >
+                            <X className="size-3.5" aria-hidden="true" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           </div>
