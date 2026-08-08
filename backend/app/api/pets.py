@@ -31,7 +31,6 @@ from app.core.security import (
     create_share_token,
     decode_share_token,
 )
-from app.core.seed_vaccination_plans import ensure_standard_plans
 from app.core.storage import (
     ALLOWED_IMAGE_EXTENSIONS,
     public_url,
@@ -45,7 +44,6 @@ from app.data.breeds import (
     markings_for,
     species_options,
 )
-from app.data.vaccine_brands import brands_for_species
 from app.db.session import get_db
 from app.models import (
     Appointment,
@@ -58,7 +56,6 @@ from app.models import (
     PetPhoto,
     PetWeightRecord,
     User,
-    VaccinationPlan,
 )
 from app.schemas.crm import PhotoEvolutionItem
 from app.schemas.pet import (
@@ -75,6 +72,7 @@ from app.schemas.pet import (
     PetWeightCreate,
     PetWeightRead,
 )
+from app.services.carnet import build_carnet
 
 router = APIRouter(
     prefix="/pets",
@@ -779,7 +777,7 @@ def pet_family(
 
 @router.get(
     "/{pet_id}/carnet",
-    summary="Carnet de vacunación (esquema estándar + aplicaciones)",
+    summary="Carnet de vacunación (esquema + dosis + aplicaciones)",
 )
 def pet_carnet(
     pet_id: str,
@@ -787,59 +785,7 @@ def pet_carnet(
     db: Session = Depends(get_db),
 ) -> dict:
     pet = _get_pet_or_404(db, ctx.clinic["id"], pet_id)
-    ensure_standard_plans(db, ctx.clinic["id"])
-
-    rows = db.execute(
-        text(
-            "SELECT r.id, r.vaccine, r.brand, r.date_applied, r.lot, r.notes, "
-            "r.vet_user_id, u.full_name AS vet_name "
-            "FROM pet_carnet_records r LEFT JOIN users u ON u.id = r.vet_user_id "
-            "WHERE r.pet_id = :pid ORDER BY r.date_applied DESC"
-        ),
-        {"pid": pet.id},
-    ).mappings().all()
-
-    by_vaccine: dict[str, list[dict]] = {}
-    for row in rows:
-        by_vaccine.setdefault(row["vaccine"], []).append(
-            {
-                "id": str(row["id"]),
-                "brand": row["brand"],
-                "date_applied": row["date_applied"].isoformat(),
-                "lot": row["lot"],
-                "notes": row["notes"],
-                "vet_name": row["vet_name"],
-            }
-        )
-
-    vaccines = [
-        {
-            "name": plan.name,
-            "prevents": plan.prevents,
-            "schedule": plan.notes,
-            "applications": by_vaccine.get(plan.name, []),
-        }
-        for plan in db.scalars(
-            select(VaccinationPlan).where(
-                VaccinationPlan.clinic_id == ctx.clinic["id"],
-                VaccinationPlan.species == pet.species,
-                VaccinationPlan.active.is_(True),
-            )
-        )
-    ]
-    # Aplicaciones de vacunas no incluidas en los planes activos de la especie
-    for vaccine, apps in by_vaccine.items():
-        if vaccine not in {v["name"] for v in vaccines}:
-            vaccines.append(
-                {
-                    "name": vaccine,
-                    "prevents": None,
-                    "schedule": None,
-                    "applications": apps,
-                }
-            )
-
-    return {"species": pet.species, "vaccines": vaccines, "brands": brands_for_species(pet.species)}
+    return build_carnet(db, pet)
 
 
 @router.post(

@@ -75,6 +75,9 @@ class DoseRead(BaseModel):
     status: str
     appointment_id: uuid.UUID | None
     appointment_start: datetime | None = None
+    date_applied: date | None = None
+    lot: str | None = None
+    brand: str | None = None
 
 
 class PetVaccinationPlanRead(BaseModel):
@@ -85,6 +88,7 @@ class PetVaccinationPlanRead(BaseModel):
     plan_id: uuid.UUID
     plan_name: str | None = None
     compound: str | None = None
+    prevents: str | None = None
     branch_id: uuid.UUID
     branch_name: str | None = None
     vet_user_id: uuid.UUID | None
@@ -92,4 +96,5 @@ class PetVaccinationPlanRead(BaseModel):
     start_date: date
     start_time: time
     duration_minutes: int
+    steps: list[PlanStepRead] = Field(default_factory=list)
     doses: list[DoseRead] = Field(default_factory=list)

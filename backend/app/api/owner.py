@@ -39,6 +39,7 @@ from app.schemas.crm import (
     SurveyCreate,
     SurveyRead,
 )
+from app.services.carnet import build_carnet, build_vaccination
 
 router = APIRouter(prefix="/owner", tags=["owner"])
 
@@ -146,6 +147,8 @@ def owner_pet_detail(
 ) -> dict:
     pet, clinic = _linked_pet(db, owner.sub, pet_id)
     base = _pet_cartilla(db, pet, clinic)
+    base["carnet"] = build_carnet(db, pet)
+    base["vaccination"] = build_vaccination(db, pet)
 
     consultations = list(
         db.scalars(

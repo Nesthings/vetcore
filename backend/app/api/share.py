@@ -26,14 +26,12 @@ from app.api.pets import ensure_qr_token
 from app.core.events import notify_roles, record_audit
 from app.core.images import process_cartilla_photo
 from app.core.security import InvalidTokenError, decode_share_token
-from app.core.seed_vaccination_plans import ensure_standard_plans
 from app.core.storage import (
     ALLOWED_IMAGE_EXTENSIONS,
     public_url,
     save_media,
     validate_extension,
 )
-from app.data.vaccine_brands import brands_for_species
 from app.db.session import get_db
 from app.models import (
     Appointment,
@@ -46,8 +44,8 @@ from app.models import (
     PetPhoto,
     PetWeightRecord,
     User,
-    VaccinationPlan,
 )
+from app.services.carnet import build_carnet, build_vaccination
 
 router = APIRouter(prefix="/share", tags=["share"])
 
@@ -126,48 +124,7 @@ def share_cartilla(
         .order_by(ClinicalAlert.created_at.desc())
     ).all()
 
-    ensure_standard_plans(db, clinic_id)
-    records = db.execute(
-        text(
-            "SELECT r.id, r.vaccine, r.brand, r.date_applied, r.lot, r.notes, "
-            "r.vet_user_id, u.full_name AS vet_name "
-            "FROM pet_carnet_records r LEFT JOIN users u ON u.id = r.vet_user_id "
-            "WHERE r.pet_id = :pid ORDER BY r.date_applied DESC"
-        ),
-        {"pid": pet.id},
-    ).mappings().all()
-    by_vaccine: dict[str, list[dict]] = {}
-    for row in records:
-        by_vaccine.setdefault(row["vaccine"], []).append(
-            {
-                "id": str(row["id"]),
-                "brand": row["brand"],
-                "date_applied": row["date_applied"].isoformat(),
-                "lot": row["lot"],
-                "notes": row["notes"],
-                "vet_name": row["vet_name"],
-            }
-        )
-    vaccines = [
-        {
-            "name": plan.name,
-            "prevents": plan.prevents,
-            "schedule": plan.notes,
-            "applications": by_vaccine.get(plan.name, []),
-        }
-        for plan in db.scalars(
-            select(VaccinationPlan).where(
-                VaccinationPlan.clinic_id == clinic_id,
-                VaccinationPlan.species == pet.species,
-                VaccinationPlan.active.is_(True),
-            )
-        )
-    ]
-    for vaccine, apps in by_vaccine.items():
-        if vaccine not in {v["name"] for v in vaccines}:
-            vaccines.append(
-                {"name": vaccine, "prevents": None, "schedule": None, "applications": apps}
-            )
+    carnet = build_carnet(db, pet)
 
     consents = list(
         db.scalars(
@@ -371,11 +328,8 @@ def share_cartilla(
             }
             for a in alerts
         ],
-        "carnet": {
-            "species": pet.species,
-            "vaccines": vaccines,
-            "brands": brands_for_species(pet.species),
-        },
+        "carnet": carnet,
+        "vaccination": build_vaccination(db, pet),
         "consents": consents_payload,
         "weights": [
             {

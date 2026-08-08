@@ -9,7 +9,16 @@ from sqlalchemy.orm import Session
 from app.api.deps import CurrentClinic, get_current_clinic, require_clinic_roles, require_component
 from app.core.events import notify_user, record_audit
 from app.db.session import get_db
-from app.models import Appointment, ClinicBranch, Pet, PetVaccinationDose, User
+from app.models import (
+    Appointment,
+    ClinicBranch,
+    Pet,
+    PetCarnetRecord,
+    PetVaccinationDose,
+    PetVaccinationPlan,
+    User,
+    VaccinationPlan,
+)
 from app.schemas.appointment import AppointmentCreate, AppointmentRead, AppointmentUpdate
 
 router = APIRouter(
@@ -17,6 +26,36 @@ router = APIRouter(
     tags=["appointments"],
     dependencies=[Depends(require_component("agenda"))],
 )
+
+
+def _sync_dose_to_carnet(
+    db: Session, dose: PetVaccinationDose, appointment: Appointment, applied_by: str
+) -> None:
+    """Crea (o actualiza) el registro de carnet vinculado a una dosis completada."""
+    assignment = db.get(PetVaccinationPlan, dose.pet_vaccination_plan_id)
+    plan = db.get(VaccinationPlan, assignment.plan_id) if assignment else None
+    vaccine = (plan.name if plan else dose.label) or dose.label
+    record = db.scalar(select(PetCarnetRecord).where(PetCarnetRecord.dose_id == dose.id))
+    if record is None:
+        record = PetCarnetRecord(
+            clinic_id=appointment.clinic_id,
+            pet_id=appointment.pet_id,
+            dose_id=dose.id,
+            vaccine=vaccine,
+            date_applied=appointment.start_time.date(),
+            vet_user_id=applied_by,
+        )
+        db.add(record)
+    else:
+        record.date_applied = appointment.start_time.date()
+        record.vet_user_id = applied_by
+
+
+def _unsync_dose_from_carnet(db: Session, dose: PetVaccinationDose) -> None:
+    """Elimina el registro de carnet si la dosis deja de estar completada."""
+    record = db.scalar(select(PetCarnetRecord).where(PetCarnetRecord.dose_id == dose.id))
+    if record is not None:
+        db.delete(record)
 
 
 def _with_names(db: Session, appointments: list[Appointment]) -> list[dict]:
@@ -153,13 +192,23 @@ def update_appointment(
     for field, value in data.items():
         setattr(appointment, field, value)
 
-    # Si la cita es una dosis de vacunación y se completa, la dosis se marca completada.
-    if "status" in data and data["status"] == "completed" and old_status != "completed":
+    # Sync de citas de vacunación con dosis y carnet: al completar la cita,
+    # la dosis se marca completada y se crea/actualiza la aplicación del carnet.
+    if "status" in data and data["status"] != old_status:
         dose = db.scalar(
             select(PetVaccinationDose).where(PetVaccinationDose.appointment_id == appointment.id)
         )
         if dose is not None:
-            dose.status = "completed"
+            if data["status"] == "completed":
+                dose.status = "completed"
+                dose.date_applied = appointment.start_time.date()
+                dose.applied_by = ctx.user.sub
+                _sync_dose_to_carnet(db, dose, appointment, ctx.user.sub)
+            elif old_status == "completed":
+                dose.status = "scheduled"
+                dose.date_applied = None
+                dose.applied_by = None
+                _unsync_dose_from_carnet(db, dose)
 
     # Auditoría + notificación al cambiar estado (cancelación/no-show)
     if "status" in data and data["status"] != old_status:

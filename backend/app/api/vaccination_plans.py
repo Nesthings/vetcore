@@ -88,9 +88,25 @@ def _enrich_assignment(db: Session, assignment: PetVaccinationPlan) -> dict:
     data.update(
         plan_name=plan.name if plan else None,
         compound=plan.compound if plan else None,
+        prevents=plan.prevents if plan else None,
         branch_name=branch.name if branch else None,
         vet_name=vet.full_name if vet else None,
     )
+    if plan is not None:
+        steps_rows = db.scalars(
+            select(VaccinationPlanStep)
+            .where(VaccinationPlanStep.plan_id == plan.id)
+            .order_by(VaccinationPlanStep.position)
+        ).all()
+        data["steps"] = [
+            {
+                "id": str(s.id),
+                "label": s.label,
+                "offset_days": s.offset_days,
+                "position": s.position,
+            }
+            for s in steps_rows
+        ]
     dose_ids = [d.id for d in assignment.doses]
     starts = (
         dict(

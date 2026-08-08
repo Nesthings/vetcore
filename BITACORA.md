@@ -1520,6 +1520,25 @@ verde clínico profundo, tipografía Plus Jakarta Sans (display) / Geist (UI) / 
 - Verificado headless: header, colores distintos por tipo de alerta, y sellos que se llenan
   con las aplicaciones (0→2 al crear una).
 
+### Refactor vacunación — Fase 1: fuente única de verdad (backend)
+- Migración `0034`: `pet_carnet_records.dose_id` (única, FK dosis, SET NULL) vincula cada
+  aplicación con su dosis; `pet_vaccination_doses` ahora captura `date_applied`, `lot`,
+  `brand`, `applied_by`; `appointment_id` → ondelete SET NULL (borrar/reprogramar cita ya no
+  rompe la dosis).
+- **Sync cita→carnet** (`appointments.py`): al completar una cita de vacunación, la dosis se
+  marca completada (fecha + vet) y se crea/actualiza el registro de carnet vinculado; si la
+  cita deja de estar completada, se revierte la dosis y se elimina el registro.
+- **Builder único `app/services/carnet.py`**: `build_carnet` (expediente, cartilla y portal)
+  devuelve por vacuna `steps` estructurados + `doses` reales de la mascota + `applications`
+  unificadas (dosis completadas + manuales, sin duplicar vía `dose_id`). `build_vaccination`
+  devuelve los planes asignados con sus dosis (estado + fecha de cita).
+- `/share/cartilla` y `/owner/pets/{id}` exponen `carnet` y `vaccination` (la pestaña
+  "Vacunación" del dueño y el portal ya tienen datos).
+- Schemas: `DoseRead` con campos de aplicación; `PetVaccinationPlanRead` expone `prevents` y
+  `steps`.
+- Verificado E2E: asignar plan → dosis+citas; completar cita → aplicación en carnet con fecha,
+  visible en expediente y cartilla; sellos/steps estructurados; limpieza de prueba.
+
 ---
 
 **Siguiente subfase:** por decidir (Fase 3 en hold).

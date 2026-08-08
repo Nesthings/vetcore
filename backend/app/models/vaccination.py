@@ -107,7 +107,13 @@ class PetVaccinationDose(UUIDPkMixin, Base):
         String(20), nullable=False, default="scheduled", server_default="scheduled"
     )
     appointment_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("appointments.id")
+        UUID(as_uuid=True), ForeignKey("appointments.id", ondelete="SET NULL")
+    )
+    date_applied: Mapped[date | None] = mapped_column(Date)
+    lot: Mapped[str | None] = mapped_column(String(100))
+    brand: Mapped[str | None] = mapped_column(String(100))
+    applied_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -117,7 +123,11 @@ class PetVaccinationDose(UUIDPkMixin, Base):
 
 
 class PetCarnetRecord(UUIDPkMixin, Base):
-    """Aplicación de vacuna registrada en el carnet del paciente."""
+    """Aplicación de vacuna registrada en el carnet del paciente.
+
+    Si la aplicación proviene de una dosis del plan (se completó la cita de
+    vacunación), `dose_id` la vincula para no duplicarla en las vistas.
+    """
 
     __tablename__ = "pet_carnet_records"
 
@@ -126,6 +136,9 @@ class PetCarnetRecord(UUIDPkMixin, Base):
     )
     pet_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("pets.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    dose_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("pet_vaccination_doses.id", ondelete="SET NULL"), unique=True
     )
     vaccine: Mapped[str] = mapped_column(String(150), nullable=False)
     brand: Mapped[str | None] = mapped_column(String(100))
