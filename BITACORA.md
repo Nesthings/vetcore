@@ -1470,6 +1470,17 @@ verde clínico profundo, tipografía Plus Jakarta Sans (display) / Geist (UI) / 
 - Verificado por API (2 solo servicio, 4 solo producto, 6 mixtas; suma = total) y UI headless
   (3 tablas + badges 8/10/1).
 
+### Finanzas: gráfica top por producto + toggle Día/Semana/Mes/Año
+- Nueva gráfica **"Top productos por ingreso"** (líneas con `service_id` nulo), junto a la de
+  servicios; la de servicios ya no mezcla productos.
+- Toggle **Día / Semana / Mes / Año** arriba del dashboard: calcula el rango (hoy, últimos 7,
+  30 y 365 días) y **re-grafíca automáticamente** al cambiar. El dashboard también carga solo
+  al entrar (Mes por defecto). Las fechas manuales pasan el toggle a "personalizado" y se
+  usan con el botón Generar.
+- El escáner de QR ahora **pide el permiso de la cámara explícitamente** al hacer clic en
+  "Escanear QR" (`getUserMedia` con `facingMode: environment`), antes de iniciar el lector;
+  si se niega o no hay cámara, muestra el aviso y el fallback de subir imagen.
+
 ---
 
 **Siguiente subfase:** por decidir (Fase 3 en hold).

@@ -148,6 +148,29 @@ def financial_report(
     ).all()
     top_servicios = [{"name": r.description, "total": float(r.total)} for r in top_rows]
 
+    top_prod_rows = db.execute(
+        select(
+            InvoiceItem.description,
+            func.sum(
+                InvoiceItem.quantity
+                * InvoiceItem.unit_price
+                * (1 - InvoiceItem.discount_percent / 100)
+            ).label("total"),
+        )
+        .join(Invoice, Invoice.id == InvoiceItem.invoice_id)
+        .where(*paid_base, product_cond)
+        .group_by(InvoiceItem.description)
+        .order_by(
+            func.sum(
+                InvoiceItem.quantity
+                * InvoiceItem.unit_price
+                * (1 - InvoiceItem.discount_percent / 100)
+            ).desc()
+        )
+        .limit(5)
+    ).all()
+    top_productos = [{"name": r.description, "total": float(r.total)} for r in top_prod_rows]
+
     ingresos_productos, ingresos_servicios, egresos = _build_movements(
         db, clinic_id, from_, to, branch_id
     )
@@ -163,6 +186,7 @@ def financial_report(
         "pendientes_por_cobrar": float(pendientes_por_cobrar),
         "ticket_promedio": float(ticket_promedio),
         "top_servicios": top_servicios,
+        "top_productos": top_productos,
         "ingresos_productos": ingresos_productos,
         "ingresos_servicios": ingresos_servicios,
         "egresos": egresos,

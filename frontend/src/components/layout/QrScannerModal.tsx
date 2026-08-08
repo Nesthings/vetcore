@@ -78,21 +78,34 @@ export function QrScannerModal({
   const startCamera = useCallback(async () => {
     if (!open || !videoRef.current) return
     setCameraError(null)
-    const hasCam = await QrScanner.hasCamera().catch(() => false)
-    setHasCamera(hasCam)
-    if (!hasCam) {
-      setCameraError('No se detectó cámara. Puedes subir una imagen del QR.')
+    // 1) Pedir el permiso de la cámara explícitamente: esto dispara el prompt
+    //    del navegador al hacer clic en "Escanear QR".
+    try {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setCameraError('Tu navegador no permite usar la cámara. Sube una imagen del QR.')
+        return
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' },
+        audio: false,
+      })
+      stream.getTracks().forEach((track) => track.stop())
+      setHasCamera(true)
+    } catch {
+      setHasCamera(false)
+      setCameraError(
+        'No se pudo acceder a la cámara. Revisa los permisos o sube una imagen del QR.',
+      )
       return
     }
+    // 2) Iniciar el lector con la cámara (env = trasera por defecto).
     try {
       scannerRef.current = new QrScanner(videoRef.current, (result: string) => {
         handleDecoded(result)
       })
       await scannerRef.current.start()
     } catch {
-      setCameraError(
-        'No se pudo acceder a la cámara. Revisa los permisos o sube una imagen del QR.',
-      )
+      setCameraError('No se pudo iniciar la cámara. Revisa los permisos o sube una imagen del QR.')
     }
   }, [open, handleDecoded])
 
