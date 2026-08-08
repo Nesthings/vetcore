@@ -21,7 +21,7 @@ import { usePermissions } from '@/lib/permissions'
 import { useNavConfig } from '@/lib/nav-config'
 import { MODULE_META, NAV_ROUTES } from '@/lib/nav'
 import { NotificationBell } from '@/components/layout/NotificationBell'
-import { QrScannerModal } from '@/components/layout/QrScannerModal'
+import { QrScannerModal, requestCameraPermission } from '@/components/layout/QrScannerModal'
 import { ThemeToggle } from '@/components/layout/ThemeToggle'
 
 const SIDEBAR_KEY = 'vetcore_sidebar_collapsed'
@@ -264,7 +264,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             <ThemeToggle />
             <button
               type="button"
-              onClick={() => setQrOpen(true)}
+              onClick={async () => {
+                await requestCameraPermission()
+                setQrOpen(true)
+              }}
               className="flex size-9 items-center justify-center rounded-md border border-border bg-card text-muted-foreground transition-colors hover:bg-accent"
               title="Escanear QR de la cartilla"
               aria-label="Escanear QR"

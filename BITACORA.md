@@ -1481,6 +1481,15 @@ verde clínico profundo, tipografía Plus Jakarta Sans (display) / Geist (UI) / 
   "Escanear QR" (`getUserMedia` con `facingMode: environment`), antes de iniciar el lector;
   si se niega o no hay cámara, muestra el aviso y el fallback de subir imagen.
 
+### Fix: prompt de cámara del escáner de QR
+- El permiso ahora se solicita **dentro del gesto del clic** (`requestCameraPermission()` en
+  el `onClick` del botón del header), porque Chrome/Safari no muestran el prompt si
+  `getUserMedia` se llama desde un efecto posterior.
+- El modal inicia el lector solo cuando el elemento `<video>` ya está montado (ref callback +
+  estado `videoReady`), evitando arranques fallidos.
+- Verificado con cámara simulada: el video se reproduce (1280x720) al abrir el escáner sin
+  errores, y el escaneo por imagen sigue navegando al expediente.
+
 ---
 
 **Siguiente subfase:** por decidir (Fase 3 en hold).

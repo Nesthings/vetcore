@@ -26,6 +26,23 @@ function extractToken(decoded: string): string | null {
   return value
 }
 
+/** Pide el permiso de cámara DENTRO del gesto del usuario (clic).
+ * Debe llamarse desde el onClick del botón: así el navegador muestra el
+ * prompt de permisos (Chrome/Safari lo exigen dentro de un gesto de usuario). */
+export async function requestCameraPermission(): Promise<boolean> {
+  try {
+    if (!navigator.mediaDevices?.getUserMedia) return false
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment' },
+      audio: false,
+    })
+    stream.getTracks().forEach((track) => track.stop())
+    return true
+  } catch {
+    return false
+  }
+}
+
 export function QrScannerModal({
   open,
   onOpenChange,
@@ -36,6 +53,7 @@ export function QrScannerModal({
   const navigate = useNavigate()
   const videoRef = useRef<HTMLVideoElement>(null)
   const scannerRef = useRef<QrScanner | null>(null)
+  const [videoReady, setVideoReady] = useState(false)
   const [cameraError, setCameraError] = useState<string | null>(null)
   const [decoding, setDecoding] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
@@ -50,7 +68,7 @@ export function QrScannerModal({
   const handleDecoded = useCallback(
     async (decoded: string) => {
       const token = extractToken(decoded)
-      if (!token || decoding) return
+      if (!token) return
       setDecoding(true)
       setMessage('Resolviendo paciente…')
       try {
@@ -72,55 +90,50 @@ export function QrScannerModal({
         )
       }
     },
-    [decoding, navigate, onOpenChange, stopScanner],
+    [navigate, onOpenChange, stopScanner],
   )
 
   const startCamera = useCallback(async () => {
-    if (!open || !videoRef.current) return
+    const video = videoRef.current
+    if (!video || scannerRef.current) return
     setCameraError(null)
-    // 1) Pedir el permiso de la cámara explícitamente: esto dispara el prompt
-    //    del navegador al hacer clic en "Escanear QR".
-    try {
-      if (!navigator.mediaDevices?.getUserMedia) {
-        setCameraError('Tu navegador no permite usar la cámara. Sube una imagen del QR.')
-        return
-      }
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' },
-        audio: false,
-      })
-      stream.getTracks().forEach((track) => track.stop())
-      setHasCamera(true)
-    } catch {
+    const granted = await requestCameraPermission()
+    if (!granted) {
       setHasCamera(false)
       setCameraError(
         'No se pudo acceder a la cámara. Revisa los permisos o sube una imagen del QR.',
       )
       return
     }
-    // 2) Iniciar el lector con la cámara (env = trasera por defecto).
+    setHasCamera(true)
     try {
-      scannerRef.current = new QrScanner(videoRef.current, (result: string) => {
+      const scanner = new QrScanner(video, (result: string) => {
         handleDecoded(result)
       })
-      await scannerRef.current.start()
+      scannerRef.current = scanner
+      await scanner.start()
     } catch {
+      stopScanner()
       setCameraError('No se pudo iniciar la cámara. Revisa los permisos o sube una imagen del QR.')
     }
-  }, [open, handleDecoded])
+  }, [handleDecoded, stopScanner])
+
+  const setVideoRef = useCallback((el: HTMLVideoElement | null) => {
+    videoRef.current = el
+    setVideoReady(Boolean(el))
+  }, [])
 
   useEffect(() => {
     if (open) {
-      startCamera()
+      if (videoReady) startCamera()
     } else {
       stopScanner()
       setDecoding(false)
       setMessage(null)
     }
-    return () => {
-      stopScanner()
-    }
-  }, [open, startCamera, stopScanner])
+  }, [open, videoReady, startCamera, stopScanner])
+
+  useEffect(() => () => stopScanner(), [stopScanner])
 
   const handleFile = async (file: File | undefined) => {
     if (!file || decoding) return
@@ -149,7 +162,7 @@ export function QrScannerModal({
 
         <div className="space-y-3">
           <div className="relative aspect-square w-full overflow-hidden rounded-xl border border-border bg-muted">
-            <video ref={videoRef} className="size-full object-cover" muted playsInline />
+            <video ref={setVideoRef} className="size-full object-cover" muted playsInline />
             {cameraError && (
               <div className="absolute inset-0 flex items-center justify-center p-4 text-center text-sm text-muted-foreground">
                 {cameraError}
