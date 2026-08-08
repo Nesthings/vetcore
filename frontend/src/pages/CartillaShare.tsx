@@ -413,7 +413,7 @@ export function CartillaShare() {
             <div className="relative flex flex-col items-center p-8 text-center">
               <div className="relative">
                 <div
-                  className={`flex size-36 items-center justify-center overflow-hidden rounded-[2rem] border-4 ${accent.ring} bg-secondary/60 shadow-elevated`}
+                  className={`flex size-48 items-center justify-center overflow-hidden rounded-[2rem] border-4 ${accent.ring} bg-secondary/60 shadow-elevated`}
                 >
                   {pet.clinical_photo_url ? (
                     <img
@@ -422,11 +422,11 @@ export function CartillaShare() {
                       className="size-full object-cover"
                     />
                   ) : (
-                    <PawPrint className="size-12 text-primary" aria-hidden="true" />
+                    <PawPrint className="size-16 text-primary" aria-hidden="true" />
                   )}
                 </div>
                 <label
-                  className={`absolute -bottom-2 -right-2 flex size-9 cursor-pointer items-center justify-center rounded-full border-4 border-card bg-primary text-primary-foreground shadow-card transition-colors hover:bg-primary-hover ${
+                  className={`absolute -bottom-2 -right-2 flex size-10 cursor-pointer items-center justify-center rounded-full border-4 border-card bg-primary text-primary-foreground shadow-card transition-colors hover:bg-primary-hover ${
                     photoBusy ? 'pointer-events-none opacity-70' : ''
                   }`}
                   title="Subir foto de perfil de la mascota"

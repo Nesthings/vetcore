@@ -680,7 +680,7 @@ export function PetDetail() {
                   <div className="relative flex flex-col items-center p-6 pt-8 text-center sm:p-8">
                     <div className="relative">
                       <div
-                        className={`flex size-44 items-center justify-center overflow-hidden rounded-[2rem] border-4 ${accent.ring} bg-secondary/60 shadow-elevated ${accent.glow}`}
+                        className={`flex size-56 items-center justify-center overflow-hidden rounded-[2rem] border-4 ${accent.ring} bg-secondary/60 shadow-elevated ${accent.glow}`}
                       >
                         {pet.clinical_photo_url ? (
                           <img
@@ -689,11 +689,11 @@ export function PetDetail() {
                             className="size-full object-cover"
                           />
                         ) : (
-                          <PawPrint className="size-16 text-primary" aria-hidden="true" />
+                          <PawPrint className="size-20 text-primary" aria-hidden="true" />
                         )}
                       </div>
                       <span
-                        className={`absolute -bottom-2 -right-2 flex size-10 items-center justify-center rounded-full border-4 border-card ${accent.speciesBg} text-white shadow-glow`}
+                        className={`absolute -bottom-2 -right-2 flex size-11 items-center justify-center rounded-full border-4 border-card ${accent.speciesBg} text-white shadow-glow`}
                         title={speciesLabel(pet.species)}
                       >
                         <MDIIcon
