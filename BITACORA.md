@@ -1666,6 +1666,14 @@ verde clínico profundo, tipografía Plus Jakarta Sans (display) / Geist (UI) / 
   (`value`/`onValueChange`) y la lista usa `flex-wrap` + `relative z-10` (sin recortes ni
   solapamientos). Verificado headless en varios anchos y ciclos de cambio de pestaña.
 
+### Textos: "super usuario" → "administrador"
+- Registro de clínica (`/create-clinic`): "Primer super-usuario (tú)" → "Primer administrador
+  (tú)" con descripción de qué hace el rol.
+- Wizard de configuración: el paso/toggle "Super usuario" → "Administrador" (con descripción del
+  rol), y el resumen final usa "Administrador".
+- Menú de perfil (AppLayout): etiquetas de rol legibles (Administrador, Administrador de
+  plataforma, Veterinario, Recepción).
+
 ---
 
 **Siguiente subfase:** por decidir (Fase 3 en hold).

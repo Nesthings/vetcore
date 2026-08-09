@@ -106,10 +106,14 @@ export function CreateClinic() {
           </div>
 
           <div className="rounded-md border border-border p-4">
-            <div className="mb-3 flex items-center gap-2">
+            <div className="mb-1 flex items-center gap-2">
               <PawPrint className="size-4 text-primary" aria-hidden="true" />
-              <p className="text-sm font-medium">Primer super-usuario (tú)</p>
+              <p className="text-sm font-medium">Primer administrador (tú)</p>
             </div>
+            <p className="mb-3 text-xs text-muted-foreground">
+              El administrador tiene acceso a todo: configura la clínica, agrega sucursales y
+              equipo, y gestiona citas, expedientes, inventario y finanzas.
+            </p>
             <div className="space-y-3">
               <div className="space-y-2">
                 <Label htmlFor="cc-fullname">Nombre completo *</Label>

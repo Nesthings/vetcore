@@ -293,7 +293,17 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 <div className="absolute right-0 top-12 z-50 w-60 overflow-hidden rounded-xl border border-border bg-card shadow-dialog">
                   <div className="border-b border-border bg-muted/40 px-3 py-3">
                     <p className="truncate text-sm font-semibold text-foreground">{displayName}</p>
-                    <p className="text-xs capitalize text-muted-foreground">{user?.role}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {user?.role === 'admin'
+                        ? 'Administrador'
+                        : user?.role === 'super-admin'
+                          ? 'Administrador de plataforma'
+                          : user?.role === 'veterinario'
+                            ? 'Veterinario'
+                            : user?.role === 'recepcion'
+                              ? 'Recepción'
+                              : user?.role}
+                    </p>
                   </div>
                   <div className="p-1.5">
                     <NavLink

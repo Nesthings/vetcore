@@ -24,7 +24,7 @@ import { useSetup } from '@/lib/setup'
 
 const STEPS = [
   { id: 'clinic', label: 'Clínica', icon: Building2 },
-  { id: 'super-user', label: 'Super usuario', icon: CircleUserRound },
+  { id: 'super-user', label: 'Administrador', icon: CircleUserRound },
   { id: 'branches', label: 'Sucursales', icon: MapPin },
   { id: 'team', label: 'Equipo', icon: UserPlus },
   { id: 'org', label: 'Organigrama', icon: Network },
@@ -428,9 +428,13 @@ export function SetupWizard() {
           {step === 1 && (
             <div className="space-y-4">
               <div>
-                <h2 className="text-lg font-semibold">Super usuario</h2>
+                <h2 className="text-lg font-semibold">Administrador</h2>
                 <p className="text-sm text-muted-foreground">
                   Tu perfil profesional: título, cédula y datos de contacto.
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Como administrador tendrás acceso a todo: configuración, sucursales, equipo,
+                  citas, expedientes, inventario y finanzas de la clínica.
                 </p>
               </div>
               <div className="flex items-center gap-4">
@@ -891,7 +895,7 @@ export function SetupWizard() {
               <div className="rounded-md border border-border/60 bg-secondary/50 px-4 py-3 text-sm">
                 <p className="font-medium">{clinicForm.name}</p>
                 <p className="text-muted-foreground">
-                  {superForm.full_name || 'Super usuario'} · {branchOptions.length} sucursales ·{' '}
+                  {superForm.full_name || 'Administrador'} · {branchOptions.length} sucursales ·{' '}
                   {users.length} miembros del equipo
                 </p>
               </div>
