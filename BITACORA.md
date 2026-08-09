@@ -1733,6 +1733,18 @@ verde clínico profundo, tipografía Plus Jakarta Sans (display) / Geist (UI) / 
 - Verificado: `marigon@gmail.com`, `MARIGON@GMAIL.COM`, `ADMIN@VETCORE.APP` y `DrWallace@Gmail.com`
   entran correctamente.
 
+### Rediseño del wizard de configuración (SetupWizard)
+- Layout de **stepper lateral** (escritorio) con iconos por paso, estados completado/actual/
+  pendiente y línea conectora; en móvil se muestra el paso actual + barra de progreso.
+- Header con marca en gradiente (`bg-gradient-brand`), título y contador "Paso X de 7".
+- Panel de contenido con encabezado por paso (icono + título + descripción + chip de paso),
+  carga/logo en bloques tipo drop, aviso del rol admin, tarjetas por sucursal/equipo, toggles de
+  privilegios con estado, y paso final con resumen + check.
+- Transición suave entre pasos (fade/slide, respeta `prefers-reduced-motion`), barra de progreso
+  animada y pie con Atrás/Continuar.
+- Mantiene la misma lógica y handlers; coherente con el tema (papel cálido, verde #1E6F5E,
+  `rounded-2xl`, `shadow-card`).
+
 ---
 
 **Siguiente subfase:** por decidir (Fase 3 en hold).

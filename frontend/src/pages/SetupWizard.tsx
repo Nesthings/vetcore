@@ -21,6 +21,7 @@ import { Label } from '@/components/ui/label'
 import { apiFetch } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
 import { useSetup } from '@/lib/setup'
+import { cn } from '@/lib/utils'
 
 const STEPS = [
   { id: 'clinic', label: 'Clínica', icon: Building2 },
@@ -31,6 +32,16 @@ const STEPS = [
   { id: 'access', label: 'Accesos', icon: ShieldCheck },
   { id: 'done', label: 'Listo', icon: Sparkles },
 ]
+
+const STEP_META: Record<number, { title: string; desc: string }> = {
+  0: { title: 'Tu clínica', desc: 'Nombre, logo y datos de contacto para tu expediente.' },
+  1: { title: 'Administrador', desc: 'Tu perfil profesional: título, cédula y contacto.' },
+  2: { title: 'Sucursales', desc: 'Define las sucursales de tu clínica y dónde operará.' },
+  3: { title: 'Equipo', desc: 'Agrega a tu equipo y asígnalo a sucursal, puesto y rol.' },
+  4: { title: 'Organigrama', desc: 'Define quién es encargado de quién dentro de cada sucursal.' },
+  5: { title: 'Privilegios', desc: 'Controla el acceso a cada pantalla del panel por usuario.' },
+  6: { title: '¡Listo!', desc: 'Tu clínica quedó configurada y lista para operar.' },
+}
 
 interface ClinicProfile {
   id: string
@@ -96,6 +107,72 @@ const ROLE_LABELS: Record<string, string> = {
   admin: 'Admin',
   veterinario: 'Veterinario',
   recepcion: 'Recepción',
+}
+
+function StepHeader({ icon: Icon, title, desc, step }: {
+  icon: React.ElementType
+  title: string
+  desc: string
+  step: number
+}) {
+  return (
+    <div className="flex items-start gap-3">
+      <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+        <Icon className="size-5" aria-hidden="true" />
+      </div>
+      <div className="min-w-0">
+        <div className="flex items-center gap-2">
+          <h2 className="font-display text-lg font-semibold tracking-tight text-foreground">
+            {title}
+          </h2>
+          <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+            Paso {step + 1} de {STEPS.length}
+          </span>
+        </div>
+        <p className="mt-0.5 text-sm text-muted-foreground">{desc}</p>
+      </div>
+    </div>
+  )
+}
+
+function StepperItem({ index, step }: { index: number; step: number }) {
+  const s = STEPS[index]
+  const done = index < step
+  const current = index === step
+  return (
+    <li className="relative flex items-center gap-3 py-2.5">
+      <div
+        className={cn(
+          'flex size-9 shrink-0 items-center justify-center rounded-full border-2 transition-colors',
+          done && 'border-success bg-success/10 text-success',
+          current && 'border-primary bg-primary text-primary-foreground shadow-glow',
+          !done && !current && 'border-border bg-secondary text-muted-foreground',
+        )}
+      >
+        {done ? <Check className="size-4" aria-hidden="true" /> : <s.icon className="size-4" aria-hidden="true" />}
+      </div>
+      <div className="min-w-0">
+        <p
+          className={cn(
+            'truncate text-sm font-medium transition-colors',
+            current ? 'text-foreground' : 'text-muted-foreground',
+          )}
+        >
+          {s.label}
+        </p>
+        {current && <p className="text-[11px] text-primary">Paso actual</p>}
+      </div>
+      {index < STEPS.length - 1 && (
+        <span
+          className={cn(
+            'absolute left-[1.125rem] top-11 h-7 w-px rounded-full',
+            done ? 'bg-success/50' : 'bg-border',
+          )}
+          aria-hidden="true"
+        />
+      )}
+    </li>
+  )
 }
 
 export function SetupWizard() {
@@ -303,623 +380,760 @@ export function SetupWizard() {
     setTeam((prev) => prev.map((t, i) => (i === idx ? { ...t, [field]: value } : t)))
   }
 
+  const progress = (step / (STEPS.length - 1)) * 100
+
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-background px-4 py-10">
-      <div className="flex flex-col items-center gap-2 text-center">
-        <div className="flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-elevated">
-          <PawPrint className="size-6" aria-hidden="true" />
-        </div>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-          Configura tu clínica
-        </h1>
-        <p className="max-w-md text-sm text-muted-foreground">
-          Antes de empezar, dejemos lista tu clínica en VetCore. Esta pantalla solo aparece la
-          primera vez.
-        </p>
-      </div>
-
-      <div className="w-full max-w-2xl">
-        <ol className="mb-6 flex flex-wrap items-center gap-1">
-          {STEPS.map((s, i) => (
-            <li key={s.id} className="flex items-center gap-1">
-              <span
-                className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${
-                  i < step
-                    ? 'bg-success/10 text-success'
-                    : i === step
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-secondary text-muted-foreground'
-                }`}
-              >
-                <s.icon className="size-3.5" aria-hidden="true" />
-                {i < step ? <Check className="size-3.5" /> : s.label}
-              </span>
-              {i < STEPS.length - 1 && <span className="text-muted-foreground">·</span>}
-            </li>
-          ))}
-        </ol>
-
-        <div className="rounded-xl border border-border bg-card p-8 shadow-card">
-          {error && (
-            <p className="mb-4 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-              {error}
+    <div className="min-h-[100dvh] bg-background px-4 py-6 sm:px-6 sm:py-10">
+      <div className="mx-auto w-full max-w-5xl">
+        {/* Header */}
+        <header className="mb-6 flex flex-wrap items-center justify-between gap-4 sm:mb-8">
+          <div className="flex items-center gap-4">
+            <div className="flex size-12 items-center justify-center rounded-2xl bg-gradient-brand text-white shadow-elevated">
+              <PawPrint className="size-6" aria-hidden="true" />
+            </div>
+            <div>
+              <h1 className="font-display text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
+                Configura tu clínica
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                Unos minutos y VetCore quedará lista para tu clínica.
+              </p>
+            </div>
+          </div>
+          <div className="hidden text-right sm:block">
+            <p className="font-display text-sm font-semibold text-foreground">
+              Paso {Math.min(step + 1, STEPS.length)} de {STEPS.length}
             </p>
-          )}
+            <p className="text-xs text-muted-foreground">{STEP_META[step].title}</p>
+          </div>
+        </header>
 
-          {step === 0 && (
-            <div className="space-y-4">
-              <div>
-                <h2 className="text-lg font-semibold">Tu clínica</h2>
-                <p className="text-sm text-muted-foreground">Nombre, logo y datos de contacto.</p>
-              </div>
-              <div className="flex items-center gap-4">
-                <div className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-secondary">
-                  {logoFile ? (
-                    <img
-                      src={URL.createObjectURL(logoFile)}
-                      alt="Logo nuevo"
-                      className="size-full object-cover"
-                    />
-                  ) : logoUrl ? (
-                    <img src={logoUrl} alt="Logo" className="size-full object-cover" />
-                  ) : (
-                    <Building2 className="size-6 text-muted-foreground" />
-                  )}
-                </div>
-                <div className="space-y-1.5">
-                  <input
-                    id="setup-logo"
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => setLogoFile(e.target.files?.[0] ?? null)}
-                  />
-                  <Button type="button" variant="outline" size="sm">
-                    <label htmlFor="setup-logo" className="cursor-pointer">
-                      {logoFile || logoUrl ? 'Cambiar logo' : 'Elegir logo'}
-                    </label>
-                  </Button>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Nombre de la clínica *</Label>
-                <Input
-                  value={clinicForm.name}
-                  onChange={(e) => setClinicForm({ ...clinicForm, name: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Nombre de contacto</Label>
-                  <Input
-                    value={clinicForm.contact_name}
-                    onChange={(e) => setClinicForm({ ...clinicForm, contact_name: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Teléfono</Label>
-                  <Input
-                    value={clinicForm.contact_phone}
-                    onChange={(e) =>
-                      setClinicForm({ ...clinicForm, contact_phone: e.target.value })
-                    }
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Correo de contacto</Label>
-                <Input
-                  type="email"
-                  value={clinicForm.contact_email}
-                  onChange={(e) => setClinicForm({ ...clinicForm, contact_email: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Dirección</Label>
-                <Input
-                  value={clinicForm.address}
-                  onChange={(e) => setClinicForm({ ...clinicForm, address: e.target.value })}
-                />
-              </div>
+        <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
+          {/* Stepper (escritorio) */}
+          <aside className="hidden h-fit rounded-2xl border border-border bg-card p-3 shadow-card lg:block">
+            <p className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              Progreso de configuración
+            </p>
+            <ol className="relative">
+              {STEPS.map((_, i) => (
+                <StepperItem key={STEPS[i].id} index={i} step={step} />
+              ))}
+            </ol>
+          </aside>
+
+          {/* Contenido */}
+          <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
+            <div className="border-b border-border bg-muted/30 px-6 py-5">
+              <StepHeader
+                icon={STEPS[step].icon}
+                title={STEP_META[step].title}
+                desc={STEP_META[step].desc}
+                step={step}
+              />
             </div>
-          )}
 
-          {step === 1 && (
-            <div className="space-y-4">
-              <div>
-                <h2 className="text-lg font-semibold">Administrador</h2>
-                <p className="text-sm text-muted-foreground">
-                  Tu perfil profesional: título, cédula y datos de contacto.
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Como administrador tendrás acceso a todo: configuración, sucursales, equipo,
-                  citas, expedientes, inventario y finanzas de la clínica.
-                </p>
-              </div>
-              <div className="flex items-center gap-4">
-                <div className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-secondary">
-                  {superPhoto ? (
-                    <img
-                      src={URL.createObjectURL(superPhoto)}
-                      alt="Foto nueva"
-                      className="size-full object-cover"
-                    />
-                  ) : (
-                    <CircleUserRound className="size-8 text-muted-foreground" />
-                  )}
+            <div className="px-6 py-6">
+              {error && (
+                <div className="mb-5 flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm text-destructive">
+                  <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full bg-destructive/15 text-[10px] font-bold">
+                    !
+                  </span>
+                  <span>{error}</span>
                 </div>
-                <div className="space-y-1.5">
-                  <input
-                    id="setup-photo"
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => setSuperPhoto(e.target.files?.[0] ?? null)}
-                  />
-                  <Button type="button" variant="outline" size="sm">
-                    <label htmlFor="setup-photo" className="cursor-pointer">
-                      Elegir foto
-                    </label>
-                  </Button>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Nombre completo *</Label>
-                <Input
-                  value={superForm.full_name}
-                  onChange={(e) => setSuperForm({ ...superForm, full_name: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Título profesional</Label>
-                  <Input
-                    value={superForm.professional_title}
-                    onChange={(e) =>
-                      setSuperForm({ ...superForm, professional_title: e.target.value })
-                    }
-                    placeholder="ej. MVZ"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Cédula profesional</Label>
-                  <Input
-                    value={superForm.cedula}
-                    onChange={(e) => setSuperForm({ ...superForm, cedula: e.target.value })}
-                    placeholder="ej. 1234567"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Cargo / puesto</Label>
-                  <select
-                    value={superForm.job_title}
-                    onChange={(e) => setSuperForm({ ...superForm, job_title: e.target.value })}
-                    className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                  >
-                    <option value="">— Elegir puesto —</option>
-                    {PUESTOS.map((p) => (
-                      <option key={p} value={p}>
-                        {p}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Especialidad</Label>
-                  <Input
-                    value={superForm.specialty}
-                    onChange={(e) => setSuperForm({ ...superForm, specialty: e.target.value })}
-                    placeholder="ej. Cirugía"
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Teléfono</Label>
-                <Input
-                  value={superForm.phone}
-                  onChange={(e) => setSuperForm({ ...superForm, phone: e.target.value })}
-                />
-              </div>
-            </div>
-          )}
+              )}
 
-          {step === 2 && (
-            <div className="space-y-4">
-              <div>
-                <h2 className="text-lg font-semibold">Sucursales</h2>
-                <p className="text-sm text-muted-foreground">
-                  Define cuántas sucursales tendrá tu clínica y sus nombres.
-                </p>
-              </div>
-              {newBranches.length === 0 && branchOptions.length === 0 && (
-                <p className="rounded-md border border-border/60 bg-secondary/50 px-3 py-2 text-sm text-muted-foreground">
-                  Agrega tu primera sucursal (ej. «Sucursal Centro»).
-                </p>
-              )}
-              {branchOptions.length > 0 && (
-                <p className="rounded-md border border-border/60 bg-secondary/50 px-3 py-2 text-sm text-muted-foreground">
-                  Ya existentes: {branchOptions.map((b) => b.name).join(', ')}. Agrega nuevas si
-                  quieres más.
-                </p>
-              )}
-              <div className="space-y-3">
-                {newBranches.map((b, i) => (
-                  <div key={i} className="grid grid-cols-[1fr_1fr_auto] gap-3">
-                    <div className="space-y-1.5">
-                      <Label>Nombre</Label>
-                      <Input
-                        value={b.name}
-                        onChange={(e) =>
-                          setNewBranches((prev) =>
-                            prev.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)),
-                          )
-                        }
-                        placeholder="Nombre de la sucursal"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label>Dirección</Label>
-                      <Input
-                        value={b.address}
-                        onChange={(e) =>
-                          setNewBranches((prev) =>
-                            prev.map((x, j) => (j === i ? { ...x, address: e.target.value } : x)),
-                          )
-                        }
-                        placeholder="Calle, número, colonia"
-                      />
-                    </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="self-end text-destructive"
-                      onClick={() => setNewBranches((prev) => prev.filter((_, j) => j !== i))}
-                    >
-                      Quitar
-                    </Button>
-                  </div>
-                ))}
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setNewBranches((prev) => [...prev, { name: '', address: '' }])}
+              <div
+                key={step}
+                className="motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-right-2 motion-safe:duration-300"
               >
-                + Agregar sucursal
-              </Button>
-            </div>
-          )}
-
-          {step === 3 && (
-            <div className="space-y-4">
-              <div>
-                <h2 className="text-lg font-semibold">Dependientes por sucursal</h2>
-                <p className="text-sm text-muted-foreground">
-                  Agrega al equipo y asígnalo a su sucursal y puesto. Cada uno verá su propio panel
-                  según su rol.
-                </p>
-              </div>
-
-              {branchOptions.length === 0 && (
-                <p className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-                  Primero define al menos una sucursal en el paso anterior.
-                </p>
-              )}
-
-              {branchOptions.map((b) => {
-                const members = team.filter((t) => t.branch_id === b.id)
-                return (
-                  <div key={b.id} className="rounded-md border border-border/60 p-4">
-                    <div className="mb-3 flex items-center justify-between">
-                      <p className="text-sm font-semibold">{b.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {members.length} dependiente{members.length === 1 ? '' : 's'}
-                      </p>
-                    </div>
-                    {members.length === 0 && (
-                      <p className="mb-3 text-sm text-muted-foreground">
-                        Sin dependientes asignados todavía.
-                      </p>
-                    )}
-                    {members.map((t, i) => {
-                      const globalIdx = team.indexOf(t)
-                      return (
-                        <div
-                          key={i}
-                          className="mb-3 space-y-3 rounded-md border border-border/50 p-3"
-                        >
-                          <div className="flex items-center justify-between">
-                            <p className="text-sm font-medium">
-                              {t.full_name || 'Nuevo dependiente'} ·{' '}
-                              <span className="font-normal text-muted-foreground">
-                                {t.job_title || 'sin puesto'}
-                              </span>
-                            </p>
+                {step === 0 && (
+                  <div className="space-y-5">
+                    <div className="flex flex-col gap-4 rounded-xl border border-dashed border-border/70 bg-background/50 p-4 sm:flex-row sm:items-center">
+                      <div className="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-secondary">
+                        {logoFile ? (
+                          <img
+                            src={URL.createObjectURL(logoFile)}
+                            alt="Logo nuevo"
+                            className="size-full object-cover"
+                          />
+                        ) : logoUrl ? (
+                          <img src={logoUrl} alt="Logo" className="size-full object-cover" />
+                        ) : (
+                          <Building2 className="size-8 text-muted-foreground" />
+                        )}
+                      </div>
+                      <div className="min-w-0 space-y-1.5">
+                        <p className="text-sm font-medium">Logo de la clínica</p>
+                        <p className="text-xs text-muted-foreground">
+                          Aparecerá en la cartilla del dueño y en los documentos.
+                        </p>
+                        <input
+                          id="setup-logo"
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => setLogoFile(e.target.files?.[0] ?? null)}
+                        />
+                        <div className="flex gap-2">
+                          <Button type="button" variant="outline" size="sm">
+                            <label htmlFor="setup-logo" className="cursor-pointer">
+                              {logoFile || logoUrl ? 'Cambiar logo' : 'Elegir logo'}
+                            </label>
+                          </Button>
+                          {(logoFile || logoUrl) && (
                             <Button
                               type="button"
                               variant="ghost"
                               size="sm"
-                              className="text-destructive"
-                              onClick={() =>
-                                setTeam((prev) => prev.filter((_, j) => j !== globalIdx))
-                              }
+                              onClick={() => {
+                                setLogoFile(null)
+                                setLogoUrl(null)
+                              }}
                             >
                               Quitar
                             </Button>
-                          </div>
-                          <div className="grid grid-cols-2 gap-3">
-                            <div className="space-y-1.5">
-                              <Label>Nombre completo *</Label>
-                              <Input
-                                value={t.full_name}
-                                onChange={(e) =>
-                                  setTeamField(globalIdx, 'full_name', e.target.value)
-                                }
-                                required
-                              />
-                            </div>
-                            <div className="space-y-1.5">
-                              <Label>Correo *</Label>
-                              <Input
-                                type="email"
-                                value={t.email}
-                                onChange={(e) => setTeamField(globalIdx, 'email', e.target.value)}
-                                required
-                              />
-                            </div>
-                          </div>
-                          <div className="grid grid-cols-2 gap-3">
-                            <div className="space-y-1.5">
-                              <Label>Contraseña *</Label>
-                              <Input
-                                type="password"
-                                value={t.password}
-                                onChange={(e) =>
-                                  setTeamField(globalIdx, 'password', e.target.value)
-                                }
-                                minLength={8}
-                                required
-                              />
-                            </div>
-                            <div className="space-y-1.5">
-                              <Label>Puesto *</Label>
-                              <select
-                                value={t.job_title}
-                                onChange={(e) =>
-                                  setTeamField(globalIdx, 'job_title', e.target.value)
-                                }
-                                required
-                                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                              >
-                                <option value="">— Elegir puesto —</option>
-                                {PUESTOS.map((p) => (
-                                  <option key={p} value={p}>
-                                    {p}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                          </div>
-                          <div className="grid grid-cols-2 gap-3">
-                            <div className="space-y-1.5">
-                              <Label>Rol de acceso *</Label>
-                              <select
-                                value={t.role}
-                                onChange={(e) => setTeamField(globalIdx, 'role', e.target.value)}
-                                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                              >
-                                <option value="veterinario">Veterinario</option>
-                                <option value="recepcion">Recepción</option>
-                                <option value="admin">Admin</option>
-                              </select>
-                            </div>
-                            <div className="space-y-1.5">
-                              <Label>Cédula profesional</Label>
-                              <Input
-                                value={t.cedula}
-                                onChange={(e) => setTeamField(globalIdx, 'cedula', e.target.value)}
-                              />
-                            </div>
-                          </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="cc-name">Nombre de la clínica *</Label>
+                      <Input
+                        id="cc-name"
+                        value={clinicForm.name}
+                        onChange={(e) => setClinicForm({ ...clinicForm, name: e.target.value })}
+                        placeholder="Ej. Clínica Veterinaria del Valle"
+                        required
+                      />
+                    </div>
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label>Nombre de contacto</Label>
+                        <Input
+                          value={clinicForm.contact_name}
+                          onChange={(e) =>
+                            setClinicForm({ ...clinicForm, contact_name: e.target.value })
+                          }
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Teléfono</Label>
+                        <Input
+                          value={clinicForm.contact_phone}
+                          onChange={(e) =>
+                            setClinicForm({ ...clinicForm, contact_phone: e.target.value })
+                          }
+                          placeholder="ej. 555 1234 5678"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Correo de contacto</Label>
+                      <Input
+                        type="email"
+                        value={clinicForm.contact_email}
+                        onChange={(e) =>
+                          setClinicForm({ ...clinicForm, contact_email: e.target.value })
+                        }
+                        placeholder="contacto@tuclinica.com"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Dirección</Label>
+                      <Input
+                        value={clinicForm.address}
+                        onChange={(e) =>
+                          setClinicForm({ ...clinicForm, address: e.target.value })
+                        }
+                        placeholder="Calle, número, colonia, ciudad"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {step === 1 && (
+                  <div className="space-y-5">
+                    <div className="flex flex-col gap-4 rounded-xl border border-dashed border-border/70 bg-background/50 p-4 sm:flex-row sm:items-center">
+                      <div className="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-primary/20 bg-secondary">
+                        {superPhoto ? (
+                          <img
+                            src={URL.createObjectURL(superPhoto)}
+                            alt="Foto nueva"
+                            className="size-full object-cover"
+                          />
+                        ) : (
+                          <CircleUserRound className="size-9 text-muted-foreground" />
+                        )}
+                      </div>
+                      <div className="min-w-0 space-y-1.5">
+                        <p className="text-sm font-medium">Tu foto de perfil</p>
+                        <p className="text-xs text-muted-foreground">
+                          Se muestra en el panel y en los documentos que firmes.
+                        </p>
+                        <input
+                          id="setup-photo"
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => setSuperPhoto(e.target.files?.[0] ?? null)}
+                        />
+                        <Button type="button" variant="outline" size="sm">
+                          <label htmlFor="setup-photo" className="cursor-pointer">
+                            {superPhoto ? 'Cambiar foto' : 'Elegir foto'}
+                          </label>
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-primary/20 bg-primary/[0.04] px-4 py-3">
+                      <p className="text-sm font-medium text-foreground">
+                        Como administrador tendrás acceso a todo
+                      </p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        Configuración, sucursales, equipo, citas, expedientes, inventario y
+                        finanzas de la clínica.
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Nombre completo *</Label>
+                      <Input
+                        value={superForm.full_name}
+                        onChange={(e) =>
+                          setSuperForm({ ...superForm, full_name: e.target.value })
+                        }
+                        required
+                      />
+                    </div>
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label>Título profesional</Label>
+                        <Input
+                          value={superForm.professional_title}
+                          onChange={(e) =>
+                            setSuperForm({ ...superForm, professional_title: e.target.value })
+                          }
+                          placeholder="ej. MVZ"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Cédula profesional</Label>
+                        <Input
+                          value={superForm.cedula}
+                          onChange={(e) =>
+                            setSuperForm({ ...superForm, cedula: e.target.value })
+                          }
+                          placeholder="ej. 1234567"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label>Cargo / puesto</Label>
+                        <select
+                          value={superForm.job_title}
+                          onChange={(e) =>
+                            setSuperForm({ ...superForm, job_title: e.target.value })
+                          }
+                          className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                        >
+                          <option value="">— Elegir puesto —</option>
+                          {PUESTOS.map((p) => (
+                            <option key={p} value={p}>
+                              {p}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Especialidad</Label>
+                        <Input
+                          value={superForm.specialty}
+                          onChange={(e) =>
+                            setSuperForm({ ...superForm, specialty: e.target.value })
+                          }
+                          placeholder="ej. Cirugía"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Teléfono</Label>
+                      <Input
+                        value={superForm.phone}
+                        onChange={(e) => setSuperForm({ ...superForm, phone: e.target.value })}
+                        placeholder="ej. 555 1234 5678"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {step === 2 && (
+                  <div className="space-y-5">
+                    {newBranches.length === 0 && branchOptions.length === 0 && (
+                      <div className="flex items-start gap-2 rounded-lg border border-border/60 bg-secondary/40 px-3 py-2.5 text-sm text-muted-foreground">
+                        <MapPin className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                        <span>Agrega tu primera sucursal, por ejemplo «Sucursal Centro».</span>
+                      </div>
+                    )}
+                    {branchOptions.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border/60 bg-secondary/40 px-3 py-2.5 text-sm text-muted-foreground">
+                        <Check className="size-4 shrink-0 text-success" aria-hidden="true" />
+                        <span>
+                          Ya existentes:{' '}
+                          {branchOptions.map((b) => (
+                            <span key={b.id} className="font-medium text-foreground">
+                              {b.name}{' '}
+                            </span>
+                          ))}
+                          · agrega nuevas si quieres más.
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="space-y-3">
+                      {newBranches.map((b, i) => (
+                        <div
+                          key={i}
+                          className="grid gap-3 rounded-xl border border-border/70 bg-background/50 p-4 sm:grid-cols-[1fr_1fr_auto]"
+                        >
                           <div className="space-y-1.5">
-                            <Label>Título profesional</Label>
+                            <Label>Nombre</Label>
                             <Input
-                              value={t.professional_title}
+                              value={b.name}
                               onChange={(e) =>
-                                setTeamField(globalIdx, 'professional_title', e.target.value)
+                                setNewBranches((prev) =>
+                                  prev.map((x, j) =>
+                                    j === i ? { ...x, name: e.target.value } : x,
+                                  ),
+                                )
                               }
-                              placeholder="ej. MVZ"
+                              placeholder="Nombre de la sucursal"
                             />
                           </div>
+                          <div className="space-y-1.5">
+                            <Label>Dirección</Label>
+                            <Input
+                              value={b.address}
+                              onChange={(e) =>
+                                setNewBranches((prev) =>
+                                  prev.map((x, j) =>
+                                    j === i ? { ...x, address: e.target.value } : x,
+                                  ),
+                                )
+                              }
+                              placeholder="Calle, número, colonia"
+                            />
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="self-end text-destructive"
+                            onClick={() => setNewBranches((prev) => prev.filter((_, j) => j !== i))}
+                          >
+                            Quitar
+                          </Button>
                         </div>
-                      )
-                    })}
+                      ))}
+                    </div>
+
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() =>
-                        setTeam((prev) => [
-                          ...prev,
-                          {
-                            full_name: '',
-                            email: '',
-                            password: '',
-                            role: 'veterinario',
-                            branch_id: b.id,
-                            job_title: '',
-                            professional_title: '',
-                            cedula: '',
-                          },
-                        ])
-                      }
+                      onClick={() => setNewBranches((prev) => [...prev, { name: '', address: '' }])}
                     >
-                      + Agregar dependiente a {b.name}
+                      + Agregar sucursal
                     </Button>
                   </div>
-                )
-              })}
-            </div>
-          )}
+                )}
 
-          {step === 4 && (
-            <div className="space-y-4">
-              <div>
-                <h2 className="text-lg font-semibold">Organigrama y encargados</h2>
-                <p className="text-sm text-muted-foreground">
-                  Define quién es encargado de quién (jefe–subordinado) dentro de cada sucursal.
-                </p>
-              </div>
-              <div className="space-y-2">
-                {users.map((u) => (
-                  <div
-                    key={u.id}
-                    className="flex items-center justify-between gap-3 rounded-md border border-border/60 px-3 py-2"
-                  >
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium">{u.full_name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {u.job_title ?? ROLE_LABELS[u.role] ?? u.role}
-                      </p>
-                    </div>
-                    <select
-                      value={reportsTo[u.id] ?? ''}
-                      onChange={(e) =>
-                        setReportsTo((prev) => ({ ...prev, [u.id]: e.target.value }))
-                      }
-                      aria-label={`Reporta a ${u.full_name}`}
-                      className="h-8 w-48 shrink-0 rounded-md border border-input bg-background px-2 text-sm"
-                    >
-                      <option value="">— Sin encargado —</option>
-                      {users
-                        .filter((x) => x.id !== u.id)
-                        .map((x) => (
-                          <option key={x.id} value={x.id}>
-                            {x.full_name}
-                          </option>
-                        ))}
-                    </select>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {step === 5 && (
-            <div className="space-y-4">
-              <div>
-                <h2 className="text-lg font-semibold">Privilegios</h2>
-                <p className="text-sm text-muted-foreground">
-                  Activa o desactiva el acceso a cada pantalla del panel por usuario.
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Puedes modificarlos después desde Configuración, cuando quieras.
-                </p>
-              </div>
-              <div className="space-y-4">
-                {users.map((u) => (
-                  <div key={u.id} className="rounded-md border border-border/60 p-4">
-                    <div className="mb-2 flex items-center justify-between">
-                      <p className="text-sm font-medium">
-                        {u.full_name}
-                        <span className="ml-1.5 text-xs font-normal text-muted-foreground">
-                          {ROLE_LABELS[u.role] ?? u.role}
-                        </span>
-                      </p>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => loadComponentsForUser(u.id)}
-                      >
-                        Cargar módulos
-                      </Button>
-                    </div>
-                    {userComponents[u.id] ? (
-                      <div className="space-y-1.5">
-                        {userComponents[u.id].catalog.map((c) => {
-                          const checked = accessOverride[u.id]?.[c.slug] ?? false
-                          return (
-                            <div
-                              key={c.slug}
-                              className="flex items-center justify-between rounded-md border border-border/50 px-3 py-1.5 text-sm"
-                            >
-                              <span>{c.label}</span>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setAccessOverride((prev) => ({
-                                    ...prev,
-                                    [u.id]: { ...prev[u.id], [c.slug]: !checked },
-                                  }))
-                                }
-                                aria-pressed={checked}
-                                className={`flex h-7 w-14 items-center rounded-full px-1 transition-colors ${
-                                  checked ? 'justify-end bg-success' : 'justify-start bg-secondary'
-                                }`}
-                              >
-                                <span className="flex size-5 items-center justify-center rounded-full bg-background text-[10px] font-semibold text-foreground shadow-sm">
-                                  {checked ? 'SÍ' : 'NO'}
-                                </span>
-                              </button>
-                            </div>
-                          )
-                        })}
-                        <p className="text-[11px] text-muted-foreground">
-                          {Object.values(accessOverride[u.id] ?? {}).filter(Boolean).length} de{' '}
-                          {userComponents[u.id].catalog.length} pantallas activas
-                        </p>
+                {step === 3 && (
+                  <div className="space-y-5">
+                    {branchOptions.length === 0 && (
+                      <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm text-destructive">
+                        <span>Primero define al menos una sucursal en el paso anterior.</span>
                       </div>
-                    ) : (
+                    )}
+
+                    {branchOptions.map((b) => {
+                      const members = team.filter((t) => t.branch_id === b.id)
+                      return (
+                        <div
+                          key={b.id}
+                          className="overflow-hidden rounded-xl border border-border/70"
+                        >
+                          <div className="flex items-center justify-between border-b border-border/70 bg-muted/40 px-4 py-3">
+                            <p className="flex items-center gap-2 text-sm font-semibold">
+                              <MapPin className="size-4 text-primary" aria-hidden="true" />
+                              {b.name}
+                            </p>
+                            <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                              {members.length} dependiente{members.length === 1 ? '' : 's'}
+                            </span>
+                          </div>
+                          <div className="space-y-3 p-4">
+                            {members.length === 0 && (
+                              <p className="text-sm text-muted-foreground">
+                                Sin dependientes asignados todavía.
+                              </p>
+                            )}
+                            {members.map((t) => {
+                              const globalIdx = team.indexOf(t)
+                              return (
+                                <div
+                                  key={globalIdx}
+                                  className="space-y-3 rounded-lg border border-border/60 bg-background/50 p-4"
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex min-w-0 items-center gap-2.5">
+                                      <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                                        <UserPlus className="size-4" aria-hidden="true" />
+                                      </div>
+                                      <p className="truncate text-sm font-medium">
+                                        {t.full_name || 'Nuevo dependiente'}
+                                        <span className="ml-1 font-normal text-muted-foreground">
+                                          · {t.job_title || 'sin puesto'}
+                                        </span>
+                                      </p>
+                                    </div>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      className="text-destructive"
+                                      onClick={() =>
+                                        setTeam((prev) => prev.filter((_, j) => j !== globalIdx))
+                                      }
+                                    >
+                                      Quitar
+                                    </Button>
+                                  </div>
+                                  <div className="grid gap-3 sm:grid-cols-2">
+                                    <div className="space-y-1.5">
+                                      <Label>Nombre completo *</Label>
+                                      <Input
+                                        value={t.full_name}
+                                        onChange={(e) =>
+                                          setTeamField(globalIdx, 'full_name', e.target.value)
+                                        }
+                                        required
+                                      />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                      <Label>Correo *</Label>
+                                      <Input
+                                        type="email"
+                                        value={t.email}
+                                        onChange={(e) =>
+                                          setTeamField(globalIdx, 'email', e.target.value)
+                                        }
+                                        required
+                                      />
+                                    </div>
+                                  </div>
+                                  <div className="grid gap-3 sm:grid-cols-2">
+                                    <div className="space-y-1.5">
+                                      <Label>Contraseña *</Label>
+                                      <Input
+                                        type="password"
+                                        value={t.password}
+                                        onChange={(e) =>
+                                          setTeamField(globalIdx, 'password', e.target.value)
+                                        }
+                                        minLength={8}
+                                        required
+                                      />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                      <Label>Puesto *</Label>
+                                      <select
+                                        value={t.job_title}
+                                        onChange={(e) =>
+                                          setTeamField(globalIdx, 'job_title', e.target.value)
+                                        }
+                                        required
+                                        className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                                      >
+                                        <option value="">— Elegir puesto —</option>
+                                        {PUESTOS.map((p) => (
+                                          <option key={p} value={p}>
+                                            {p}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                  </div>
+                                  <div className="grid gap-3 sm:grid-cols-2">
+                                    <div className="space-y-1.5">
+                                      <Label>Rol de acceso *</Label>
+                                      <select
+                                        value={t.role}
+                                        onChange={(e) =>
+                                          setTeamField(globalIdx, 'role', e.target.value)
+                                        }
+                                        className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                                      >
+                                        <option value="veterinario">Veterinario</option>
+                                        <option value="recepcion">Recepción</option>
+                                        <option value="admin">Admin</option>
+                                      </select>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                      <Label>Cédula profesional</Label>
+                                      <Input
+                                        value={t.cedula}
+                                        onChange={(e) =>
+                                          setTeamField(globalIdx, 'cedula', e.target.value)
+                                        }
+                                      />
+                                    </div>
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <Label>Título profesional</Label>
+                                    <Input
+                                      value={t.professional_title}
+                                      onChange={(e) =>
+                                        setTeamField(globalIdx, 'professional_title', e.target.value)
+                                      }
+                                      placeholder="ej. MVZ"
+                                    />
+                                  </div>
+                                </div>
+                              )
+                            })}
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                setTeam((prev) => [
+                                  ...prev,
+                                  {
+                                    full_name: '',
+                                    email: '',
+                                    password: '',
+                                    role: 'veterinario',
+                                    branch_id: b.id,
+                                    job_title: '',
+                                    professional_title: '',
+                                    cedula: '',
+                                  },
+                                ])
+                              }
+                            >
+                              + Agregar dependiente a {b.name}
+                            </Button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+
+                {step === 4 && (
+                  <div className="space-y-4">
+                    {users.length === 0 ? (
                       <p className="text-sm text-muted-foreground">
-                        Presiona «Cargar módulos» para editar.
+                        Aún no hay usuarios para organizar. Agrega equipo en el paso anterior.
                       </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {users.map((u) => (
+                          <div
+                            key={u.id}
+                            className="flex flex-col gap-3 rounded-xl border border-border/70 bg-background/50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                          >
+                            <div className="flex min-w-0 items-center gap-3">
+                              <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-semibold text-secondary-foreground">
+                                {u.full_name
+                                  .split(/\s+/)
+                                  .slice(0, 2)
+                                  .map((w) => w[0]?.toUpperCase())
+                                  .join('') || '?'}
+                              </div>
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-medium">{u.full_name}</p>
+                                <p className="truncate text-xs text-muted-foreground">
+                                  {u.job_title ?? ROLE_LABELS[u.role] ?? u.role}
+                                </p>
+                              </div>
+                            </div>
+                            <select
+                              value={reportsTo[u.id] ?? ''}
+                              onChange={(e) =>
+                                setReportsTo((prev) => ({ ...prev, [u.id]: e.target.value }))
+                              }
+                              aria-label={`Reporta a ${u.full_name}`}
+                              className="h-9 w-full shrink-0 rounded-md border border-input bg-background px-3 text-sm sm:w-56"
+                            >
+                              <option value="">— Sin encargado —</option>
+                              {users
+                                .filter((x) => x.id !== u.id)
+                                .map((x) => (
+                                  <option key={x.id} value={x.id}>
+                                    {x.full_name}
+                                  </option>
+                                ))}
+                            </select>
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </div>
-                ))}
+                )}
+
+                {step === 5 && (
+                  <div className="space-y-4">
+                    <p className="text-xs text-muted-foreground">
+                      Puedes modificarlos después desde Configuración, cuando quieras.
+                    </p>
+                    {users.map((u) => (
+                      <div key={u.id} className="rounded-xl border border-border/70">
+                        <div className="flex items-center justify-between border-b border-border/70 bg-muted/40 px-4 py-3">
+                          <p className="text-sm font-medium">
+                            {u.full_name}
+                            <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                              {ROLE_LABELS[u.role] ?? u.role}
+                            </span>
+                          </p>
+                          {!userComponents[u.id] && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => loadComponentsForUser(u.id)}
+                            >
+                              Cargar módulos
+                            </Button>
+                          )}
+                        </div>
+                        <div className="p-4">
+                          {userComponents[u.id] ? (
+                            <div className="space-y-1.5">
+                              {userComponents[u.id].catalog.map((c) => {
+                                const checked = accessOverride[u.id]?.[c.slug] ?? false
+                                return (
+                                  <div
+                                    key={c.slug}
+                                    className="flex items-center justify-between rounded-lg border border-border/50 px-3 py-2 text-sm"
+                                  >
+                                    <span>{c.label}</span>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setAccessOverride((prev) => ({
+                                          ...prev,
+                                          [u.id]: { ...prev[u.id], [c.slug]: !checked },
+                                        }))
+                                      }
+                                      aria-pressed={checked}
+                                      className={cn(
+                                        'flex h-7 w-14 items-center rounded-full border px-1 transition-colors',
+                                        checked
+                                          ? 'justify-end border-success/30 bg-success/15'
+                                          : 'justify-start border-border bg-secondary',
+                                      )}
+                                    >
+                                      <span
+                                        className={cn(
+                                          'flex size-5 items-center justify-center rounded-full text-[10px] font-semibold shadow-sm transition-colors',
+                                          checked
+                                            ? 'bg-success text-success-foreground'
+                                            : 'bg-background text-muted-foreground',
+                                        )}
+                                      >
+                                        {checked ? 'SÍ' : 'NO'}
+                                      </span>
+                                    </button>
+                                  </div>
+                                )
+                              })}
+                              <p className="text-[11px] text-muted-foreground">
+                                {Object.values(accessOverride[u.id] ?? {}).filter(Boolean).length}{' '}
+                                de {userComponents[u.id].catalog.length} pantallas activas
+                              </p>
+                            </div>
+                          ) : (
+                            <p className="text-sm text-muted-foreground">
+                              Presiona «Cargar módulos» para editar sus accesos.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {step === 6 && (
+                  <div className="flex flex-col items-center gap-5 py-4 text-center">
+                    <div className="flex size-16 items-center justify-center rounded-full bg-success/10 text-success">
+                      <Check className="size-8" aria-hidden="true" />
+                    </div>
+                    <div>
+                      <h2 className="font-display text-xl font-semibold tracking-tight text-foreground">
+                        ¡Todo listo!
+                      </h2>
+                      <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
+                        Tu clínica quedó configurada. Al continuar entrarás al panel y podrás
+                        empezar a agendar.
+                      </p>
+                    </div>
+                    <div className="w-full max-w-sm rounded-xl border border-border/70 bg-background/50 p-4 text-left">
+                      <div className="flex items-center gap-3">
+                        <div className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-secondary">
+                          {logoUrl ? (
+                            <img src={logoUrl} alt="Logo" className="size-full object-cover" />
+                          ) : (
+                            <Building2 className="size-5 text-muted-foreground" />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold">{clinicForm.name}</p>
+                          <p className="truncate text-xs text-muted-foreground">
+                            {superForm.full_name || 'Administrador'} · {branchOptions.length}{' '}
+                            sucursales · {users.length} miembros del equipo
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
-          )}
 
-          {step === 6 && (
-            <div className="space-y-4">
-              <div>
-                <h2 className="text-lg font-semibold">¡Todo listo!</h2>
-                <p className="text-sm text-muted-foreground">
-                  Tu clínica quedó configurada. Al continuar entrarás al panel.
-                </p>
+            {/* Pie: progreso + acciones */}
+            <div className="flex flex-col gap-4 border-t border-border bg-muted/20 px-6 py-4 sm:flex-row sm:items-center">
+              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-secondary">
+                <div
+                  className="h-full rounded-full bg-gradient-brand transition-all duration-500 ease-out"
+                  style={{ width: `${progress}%` }}
+                />
               </div>
-              <div className="rounded-md border border-border/60 bg-secondary/50 px-4 py-3 text-sm">
-                <p className="font-medium">{clinicForm.name}</p>
-                <p className="text-muted-foreground">
-                  {superForm.full_name || 'Administrador'} · {branchOptions.length} sucursales ·{' '}
-                  {users.length} miembros del equipo
-                </p>
+              <div className="flex items-center justify-end gap-2">
+                <Button type="button" variant="ghost" onClick={goBack} disabled={step === 0 || saving}>
+                  <ChevronLeft /> Atrás
+                </Button>
+                <Button type="button" onClick={saveStep} disabled={saving}>
+                  {saving ? (
+                    <Loader2 className="animate-spin" />
+                  ) : step === STEPS.length - 1 ? (
+                    <Check />
+                  ) : (
+                    <ChevronRight />
+                  )}
+                  {step === STEPS.length - 1 ? 'Entrar al panel' : 'Continuar'}
+                </Button>
               </div>
             </div>
-          )}
-
-          <div className="mt-6 flex items-center justify-between border-t border-border pt-4">
-            <Button type="button" variant="ghost" onClick={goBack} disabled={step === 0 || saving}>
-              <ChevronLeft /> Atrás
-            </Button>
-            <Button type="button" onClick={saveStep} disabled={saving}>
-              {saving ? (
-                <Loader2 className="animate-spin" />
-              ) : step === STEPS.length - 1 ? (
-                <Check />
-              ) : (
-                <ChevronRight />
-              )}
-              {step === STEPS.length - 1 ? 'Entrar al panel' : 'Continuar'}
-            </Button>
-          </div>
+          </section>
         </div>
       </div>
     </div>
