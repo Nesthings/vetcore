@@ -1658,6 +1658,14 @@ verde clínico profundo, tipografía Plus Jakarta Sans (display) / Geist (UI) / 
 - `GET /platform/users` acepta `clinic_id` para listar el staff de un tenant.
 - Verificado E2E: listado, detalle con conteos y staff, suspender/reactivar registrado.
 
+### Fix: toggle de pestañas del panel /platform
+- El mensaje de error (de las cargas asíncronas) aparecía arriba de las pestañas y al
+  insertarse/quitase **desplazaba la barra bajo el cursor**, por lo que a veces el clic no
+  activaba la pestaña ("toggle bloqueado").
+- Se reservó el espacio del error (`min-h`), las pestañas ahora son controladas
+  (`value`/`onValueChange`) y la lista usa `flex-wrap` + `relative z-10` (sin recortes ni
+  solapamientos). Verificado headless en varios anchos y ciclos de cambio de pestaña.
+
 ---
 
 **Siguiente subfase:** por decidir (Fase 3 en hold).

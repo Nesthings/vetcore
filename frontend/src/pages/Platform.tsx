@@ -100,6 +100,7 @@ export function Platform() {
   const [clinicStaff, setClinicStaff] = useState<StaffUser[]>([])
   const [events, setEvents] = useState<ClinicEvent[]>([])
   const [loadingClinics, setLoadingClinics] = useState(true)
+  const [tab, setTab] = useState('links')
 
   const loadInvites = useCallback(async () => {
     try {
@@ -252,10 +253,12 @@ export function Platform() {
         </div>
       </div>
 
-      {error && <p className="mb-4 text-sm text-destructive">{error}</p>}
+      <div className="mb-4 min-h-[20px]">
+        {error && <p className="text-sm text-destructive">{error}</p>}
+      </div>
 
-      <Tabs defaultValue="links">
-        <TabsList className="w-full justify-start gap-1 overflow-x-auto rounded-xl border border-border bg-card p-1">
+      <Tabs value={tab} onValueChange={setTab}>
+        <TabsList className="relative z-10 w-full flex-wrap justify-start gap-1 rounded-xl border border-border bg-card p-1">
           <TabsTrigger value="links">Links de invitación</TabsTrigger>
           <TabsTrigger value="clinics">Clínicas</TabsTrigger>
           <TabsTrigger value="recover">Recuperar acceso</TabsTrigger>
