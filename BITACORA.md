@@ -1647,6 +1647,17 @@ verde clínico profundo, tipografía Plus Jakarta Sans (display) / Geist (UI) / 
   público ya no (401 sin token).
 - Contraseña del super-admin (dev): `<redactado>`.
 
+### Panel de plataforma: administración de tenants
+- Nueva pestaña **"Clínicas"** en `/platform` (super-admin): lista los tenants con su estado
+  de suscripción y, al expandir, muestra la información de la clínica (contacto, zona horaria,
+  moneda, umbral de stock, setup), el resumen de conteos (sucursales, staff, mascotas, citas,
+  facturas vía `/clinics/{id}/summary`), el staff (`/platform/users?clinic_id=`) y el historial
+  de suscripción (`/clinics/{id}/events`).
+- Acciones: **Activar / Suspender / Cancelar** (via `POST /clinics/{id}/subscription`), que
+  registra el evento.
+- `GET /platform/users` acepta `clinic_id` para listar el staff de un tenant.
+- Verificado E2E: listado, detalle con conteos y staff, suspender/reactivar registrado.
+
 ---
 
 **Siguiente subfase:** por decidir (Fase 3 en hold).

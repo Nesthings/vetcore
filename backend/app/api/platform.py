@@ -27,6 +27,7 @@ def _super_admin(user: CurrentUser = Depends(require_roles("super-admin"))) -> C
 @router.get("/users", summary="Busca staff de cualquier clínica (super-admin)")
 def list_staff(
     search: str | None = Query(default=None, max_length=100),
+    clinic_id: str | None = Query(default=None),
     db: Session = Depends(get_db),
     _: CurrentUser = Depends(_super_admin),
 ) -> list[dict]:
@@ -35,11 +36,14 @@ def list_staff(
     if search:
         where = "(u.email ILIKE :s OR u.full_name ILIKE :s)"
         params["s"] = f"%{search}%"
+    if clinic_id:
+        where += " AND u.clinic_id = :cid"
+        params["cid"] = clinic_id
     rows = db.execute(
         text(
             "SELECT u.id, u.full_name, u.email, u.role, c.name AS clinic_name "
             "FROM users u JOIN clinics c ON c.id = u.clinic_id "
-            f"WHERE {where} ORDER BY c.name, u.full_name LIMIT 50"
+            f"WHERE {where} ORDER BY c.name, u.full_name LIMIT 100"
         ),
         params,
     ).mappings().all()

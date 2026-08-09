@@ -1,5 +1,16 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Clipboard, Copy, KeyRound, Link2, Plus, RefreshCw, ShieldCheck } from 'lucide-react'
+import {
+  Building2,
+  ChevronDown,
+  ChevronRight,
+  Clipboard,
+  Copy,
+  KeyRound,
+  Link2,
+  Plus,
+  RefreshCw,
+  ShieldCheck,
+} from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -26,6 +37,48 @@ interface StaffUser {
   clinic_name?: string | null
 }
 
+interface ClinicRow {
+  id: string
+  name: string
+  contact_name?: string | null
+  contact_phone?: string | null
+  contact_email?: string | null
+  subscription_status: string
+  setup_completed: boolean
+  timezone: string
+  currency: string
+  stock_alert_threshold?: number | null
+  created_at: string
+}
+
+interface ClinicSummary {
+  id: string
+  name: string
+  subscription_status: string
+  branches: number
+  staff: number
+  pets: number
+  appointments: number
+  invoices: number
+}
+
+interface ClinicEvent {
+  id: string
+  event_type: string
+  notes?: string | null
+  created_at: string
+}
+
+const SUBSCRIPTION_LABEL: Record<
+  string,
+  { label: string; variant: 'success' | 'warning' | 'destructive' | 'secondary' | 'info' }
+> = {
+  active: { label: 'Activa', variant: 'success' },
+  trial: { label: 'Prueba', variant: 'info' },
+  suspended: { label: 'Suspendida', variant: 'warning' },
+  cancelled: { label: 'Cancelada', variant: 'destructive' },
+}
+
 export function Platform() {
   const [invites, setInvites] = useState<Invite[]>([])
   const [invName, setInvName] = useState('')
@@ -40,6 +93,14 @@ export function Platform() {
   const [resetFor, setResetFor] = useState<StaffUser | null>(null)
   const [newPassword, setNewPassword] = useState('')
 
+  const [clinics, setClinics] = useState<ClinicRow[]>([])
+  const [clinicSearch, setClinicSearch] = useState('')
+  const [detailId, setDetailId] = useState<string | null>(null)
+  const [summary, setSummary] = useState<ClinicSummary | null>(null)
+  const [clinicStaff, setClinicStaff] = useState<StaffUser[]>([])
+  const [events, setEvents] = useState<ClinicEvent[]>([])
+  const [loadingClinics, setLoadingClinics] = useState(true)
+
   const loadInvites = useCallback(async () => {
     try {
       setInvites(await apiFetch<Invite[]>('/platform/clinic-invites'))
@@ -48,9 +109,59 @@ export function Platform() {
     }
   }, [])
 
+  const loadClinics = useCallback(async () => {
+    setLoadingClinics(true)
+    setError(null)
+    try {
+      setClinics(await apiFetch<ClinicRow[]>('/clinics'))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudieron cargar las clínicas')
+    } finally {
+      setLoadingClinics(false)
+    }
+  }, [])
+
   useEffect(() => {
     loadInvites()
-  }, [loadInvites])
+    loadClinics()
+  }, [loadInvites, loadClinics])
+
+  const toggleDetail = async (id: string) => {
+    if (detailId === id) {
+      setDetailId(null)
+      return
+    }
+    setDetailId(id)
+    setSummary(null)
+    setClinicStaff([])
+    setEvents([])
+    setError(null)
+    try {
+      const [sum, staff, evts] = await Promise.all([
+        apiFetch<ClinicSummary>(`/clinics/${id}/summary`),
+        apiFetch<StaffUser[]>(`/platform/users?clinic_id=${id}`),
+        apiFetch<ClinicEvent[]>(`/clinics/${id}/events`),
+      ])
+      setSummary(sum)
+      setClinicStaff(staff)
+      setEvents(evts)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo cargar el detalle')
+    }
+  }
+
+  const setSubscription = async (id: string, status: string) => {
+    setError(null)
+    try {
+      await apiFetch(`/clinics/${id}/subscription`, {
+        method: 'POST',
+        body: JSON.stringify({ status, notes: null }),
+      })
+      await loadClinics()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo cambiar el estado')
+    }
+  }
 
   const generate = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -146,6 +257,7 @@ export function Platform() {
       <Tabs defaultValue="links">
         <TabsList className="w-full justify-start gap-1 overflow-x-auto rounded-xl border border-border bg-card p-1">
           <TabsTrigger value="links">Links de invitación</TabsTrigger>
+          <TabsTrigger value="clinics">Clínicas</TabsTrigger>
           <TabsTrigger value="recover">Recuperar acceso</TabsTrigger>
         </TabsList>
 
@@ -263,6 +375,196 @@ export function Platform() {
                     </div>
                   </div>
                 ))
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="clinics" className="space-y-4">
+          <Card className="shadow-card">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Building2 className="size-5 text-primary" /> Clínicas (tenants)
+              </CardTitle>
+              <CardDescription>
+                Activa, suspende o cancela clínicas y consulta su información.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Input
+                value={clinicSearch}
+                onChange={(e) => setClinicSearch(e.target.value)}
+                placeholder="Buscar clínica…"
+                className="max-w-sm"
+              />
+
+              {loadingClinics ? (
+                <p className="text-sm text-muted-foreground">Cargando clínicas…</p>
+              ) : (
+                <div className="space-y-2">
+                  {clinics
+                    .filter((c) => c.name.toLowerCase().includes(clinicSearch.trim().toLowerCase()))
+                    .map((c) => {
+                      const st = SUBSCRIPTION_LABEL[c.subscription_status] ?? {
+                        label: c.subscription_status,
+                        variant: 'secondary' as const,
+                      }
+                      const open = detailId === c.id
+                      return (
+                        <div key={c.id} className="rounded-lg border border-border/60 bg-muted/20">
+                          <div className="flex items-center justify-between gap-2 px-3 py-2">
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-medium">{c.name}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {c.id.slice(0, 8)}… · Creada{' '}
+                                {new Date(c.created_at).toLocaleDateString('es-MX')}
+                              </p>
+                            </div>
+                            <div className="flex shrink-0 items-center gap-2">
+                              <Badge variant={st.variant}>{st.label}</Badge>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => toggleDetail(c.id)}
+                              >
+                                {open ? <ChevronDown /> : <ChevronRight />} Info
+                              </Button>
+                            </div>
+                          </div>
+
+                          {open && (
+                            <div className="space-y-4 border-t border-border px-3 py-3">
+                              <div className="grid gap-3 sm:grid-cols-2">
+                                <div>
+                                  <p className="text-xs font-medium text-muted-foreground">
+                                    Contacto
+                                  </p>
+                                  <p className="text-sm">
+                                    {c.contact_name ?? '—'}
+                                    {c.contact_email ? ` · ${c.contact_email}` : ''}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    Teléfono: {c.contact_phone ?? '—'}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-xs font-medium text-muted-foreground">
+                                    Configuración
+                                  </p>
+                                  <p className="text-sm">
+                                    Zona horaria {c.timezone} · Moneda {c.currency}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    Umbral de stock: {c.stock_alert_threshold ?? 5} · Setup:{' '}
+                                    {c.setup_completed ? 'Completado' : 'Pendiente'}
+                                  </p>
+                                </div>
+                              </div>
+
+                              {summary && (
+                                <div className="flex flex-wrap gap-2">
+                                  {[
+                                    ['Sucursales', summary.branches],
+                                    ['Staff', summary.staff],
+                                    ['Mascotas', summary.pets],
+                                    ['Citas', summary.appointments],
+                                    ['Facturas', summary.invoices],
+                                  ].map(([label, value]) => (
+                                    <span
+                                      key={String(label)}
+                                      className="rounded-md border border-border bg-card px-2.5 py-1.5 text-xs"
+                                    >
+                                      <span className="font-semibold">{value}</span>{' '}
+                                      <span className="text-muted-foreground">{label}</span>
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+
+                              <div className="flex flex-wrap items-center gap-2">
+                                <p className="w-full text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                  Estado de suscripción
+                                </p>
+                                {c.subscription_status !== 'active' && (
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setSubscription(c.id, 'active')}
+                                  >
+                                    Activar
+                                  </Button>
+                                )}
+                                {c.subscription_status !== 'suspended' && (
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setSubscription(c.id, 'suspended')}
+                                  >
+                                    Suspender
+                                  </Button>
+                                )}
+                                {c.subscription_status !== 'cancelled' && (
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    className="text-destructive"
+                                    onClick={() => setSubscription(c.id, 'cancelled')}
+                                  >
+                                    Cancelar
+                                  </Button>
+                                )}
+                              </div>
+
+                              {clinicStaff.length > 0 && (
+                                <div>
+                                  <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                    Staff
+                                  </p>
+                                  <div className="space-y-1">
+                                    {clinicStaff.map((u) => (
+                                      <p key={u.id} className="text-sm">
+                                        <span className="font-medium">{u.full_name}</span>
+                                        <span className="text-muted-foreground">
+                                          {' '}
+                                          · {u.email} · {u.role}
+                                        </span>
+                                      </p>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {events.length > 0 && (
+                                <div>
+                                  <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                    Historial de suscripción
+                                  </p>
+                                  <div className="space-y-1">
+                                    {events.map((ev) => (
+                                      <p key={ev.id} className="text-sm">
+                                        <span className="font-medium capitalize">
+                                          {ev.event_type}
+                                        </span>
+                                        <span className="text-muted-foreground">
+                                          {' '}
+                                          · {new Date(ev.created_at).toLocaleString('es-MX')}
+                                          {ev.notes ? ` · ${ev.notes}` : ''}
+                                        </span>
+                                      </p>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                </div>
               )}
             </CardContent>
           </Card>
