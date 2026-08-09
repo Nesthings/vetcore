@@ -818,6 +818,9 @@ export function SetupWizard() {
                 <p className="text-sm text-muted-foreground">
                   Activa o desactiva el acceso a cada pantalla del panel por usuario.
                 </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Puedes modificarlos después desde Configuración, cuando quieras.
+                </p>
               </div>
               <div className="space-y-4">
                 {users.map((u) => (
