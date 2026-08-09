@@ -1685,6 +1685,16 @@ verde clínico profundo, tipografía Plus Jakarta Sans (display) / Geist (UI) / 
   navega según el rol. Verificado: staff identifica clínica/rol, super-admin por el mismo
   endpoint, credenciales inválidas 401, endpoints de rejilla 404 y sin nombres filtrados.
 
+### Sin login como owner (solo cartilla por link)
+- Se eliminó el login de owner: `_owner_login` fuera del `/auth/login` (solo staff y
+  super-admin) y se borró `POST /auth/login/owner` (404). Un owner ya no inicia sesión.
+- El modelo de **cartilla por link se mantiene intacto**: los owners siguen entrando solo a
+  `/cartilla?token=…` (compartida), y siguen existiendo como entidad (firmar
+  consentimientos, solicitar citas, etc.). El portal `/portal` y la activación se conservan.
+- Frontend: se quitó la mención a "dueños" en la nota del login.
+- Verificado: owner login 401, `/login/owner` 404, staff y super-admin entran, cartilla por
+  link sigue abriendo.
+
 ---
 
 **Siguiente subfase:** por decidir (Fase 3 en hold).

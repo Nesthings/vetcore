@@ -109,7 +109,7 @@ export function Login() {
 
         <p className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
           <UserRound className="size-3.5" aria-hidden="true" />
-          Acceso para personal de la clínica, dueños y administradores de plataforma.
+          Acceso para el personal de la clínica y administradores de plataforma.
         </p>
       </form>
     </AuthLayout>

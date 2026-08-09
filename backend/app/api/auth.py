@@ -70,32 +70,6 @@ def _staff_login(db: Session, identifier: str, password: str) -> LoginResponse:
     )
 
 
-def _owner_login(db: Session, identifier: str, password: str) -> LoginResponse:
-    row = (
-        db.execute(
-            text(
-                "SELECT id, password_hash FROM owners "
-                "WHERE email = :identifier OR phone = :identifier"
-            ),
-            {"identifier": identifier},
-        )
-        .mappings()
-        .first()
-    )
-    if row is None or not row["password_hash"]:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Credenciales inválidas",
-        )
-    if not verify_password(password, row["password_hash"]):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Credenciales inválidas",
-        )
-    token = create_access_token(subject=str(row["id"]), role="owner")
-    return LoginResponse(access_token=token, role="owner", sub=str(row["id"]))
-
-
 def _super_admin_login(db: Session, identifier: str, password: str) -> LoginResponse:
     row = (
         db.execute(
@@ -132,7 +106,7 @@ def login(body: LoginRequest, db: Session = Depends(get_db)) -> LoginResponse:
     """Autentica con correo + contraseña y detecta la identidad:
     staff de clínica (identifica `clinic_id`, `branch_id` y rol), dueño u
     super-admin. No expone la lista de usuarios de las clínicas."""
-    for fn in (_staff_login, _owner_login, _super_admin_login):
+    for fn in (_staff_login, _super_admin_login):
         try:
             return fn(db, body.identifier, body.password)
         except HTTPException:
@@ -140,11 +114,6 @@ def login(body: LoginRequest, db: Session = Depends(get_db)) -> LoginResponse:
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED, detail="Credenciales inválidas"
     )
-
-
-@router.post("/login/owner", response_model=LoginResponse, summary="Login de dueño (owner)")
-def login_owner(body: LoginRequest, db: Session = Depends(get_db)) -> LoginResponse:
-    return _owner_login(db, body.identifier, body.password)
 
 
 @router.post(
