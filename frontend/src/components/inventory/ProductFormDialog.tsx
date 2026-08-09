@@ -38,18 +38,23 @@ export function ProductFormDialog({
   const [name, setName] = useState('')
   const [category, setCategory] = useState(CATEGORIES[0])
   const [unit, setUnit] = useState('')
+  const [threshold, setThreshold] = useState('5')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!open) return
-    apiFetch<{ id: string; name: string }[]>('/branches')
-      .then((b) => {
+    Promise.all([
+      apiFetch<{ id: string; name: string }[]>('/branches'),
+      apiFetch<{ stock_alert_threshold?: number }>('/clinics/me'),
+    ])
+      .then(([b, clinic]) => {
         setBranches(b)
         if (b.length > 0 && !branchId) setBranchId(b[0].id)
+        setThreshold(String(clinic.stock_alert_threshold ?? 5))
       })
       .catch((err) =>
-        setError(err instanceof Error ? err.message : 'No se pudieron cargar las sucursales'),
+        setError(err instanceof Error ? err.message : 'No se pudieron cargar los datos'),
       )
     setError(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -68,6 +73,10 @@ export function ProductFormDialog({
           category,
           unit: unit || null,
         }),
+      })
+      await apiFetch('/clinics/me', {
+        method: 'PATCH',
+        body: JSON.stringify({ stock_alert_threshold: Number(threshold) || 5 }),
       })
       onSaved()
     } catch (err) {
@@ -126,6 +135,19 @@ export function ProductFormDialog({
               onChange={(e) => setUnit(e.target.value)}
               placeholder="Ej. caja, frasco, dosis"
             />
+          </div>
+          <div className="space-y-2">
+            <Label>Umbral de alerta de stock</Label>
+            <Input
+              type="number"
+              min={0}
+              step="0.5"
+              value={threshold}
+              onChange={(e) => setThreshold(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Unidades para marcar "Stock bajo" en insumos, productos y el dashboard.
+            </p>
           </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
           <DialogFooter>

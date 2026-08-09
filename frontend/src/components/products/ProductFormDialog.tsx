@@ -32,6 +32,7 @@ export function ProductFormDialog({
   const [price, setPrice] = useState('')
   const [stock, setStock] = useState('')
   const [active, setActive] = useState(true)
+  const [threshold, setThreshold] = useState('5')
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -45,6 +46,9 @@ export function ProductFormDialog({
     setActive(product?.active ?? true)
     setPhotoFile(null)
     setError(null)
+    apiFetch<{ stock_alert_threshold?: number }>('/clinics/me')
+      .then((c) => setThreshold(String(c.stock_alert_threshold ?? 5)))
+      .catch(() => undefined)
   }, [open, product])
 
   const submit = async (e: React.FormEvent) => {
@@ -72,6 +76,10 @@ export function ProductFormDialog({
         form.append('file', photoFile)
         await apiFetch(`/products/${id}/photo`, { method: 'POST', body: form })
       }
+      await apiFetch('/clinics/me', {
+        method: 'PATCH',
+        body: JSON.stringify({ stock_alert_threshold: Number(threshold) || 5 }),
+      })
       onSaved()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo guardar el producto')
@@ -146,6 +154,22 @@ export function ProductFormDialog({
                 placeholder="0"
               />
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="p-threshold">Umbral de alerta de stock</Label>
+            <Input
+              id="p-threshold"
+              type="number"
+              min="0"
+              step="0.5"
+              value={threshold}
+              onChange={(e) => setThreshold(e.target.value)}
+              placeholder="5"
+            />
+            <p className="text-xs text-muted-foreground">
+              Unidades para marcar "Stock bajo" en productos e insumos.
+            </p>
           </div>
 
           <label className="flex items-center gap-2 text-sm">
