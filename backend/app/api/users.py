@@ -209,8 +209,9 @@ def create_user(
     ctx: CurrentClinic = Depends(require_component("settings")),
     db: Session = Depends(get_db),
 ) -> User:
+    email = body.email.strip().lower()
     exists = db.scalar(
-        select(User).where(User.clinic_id == ctx.clinic["id"], User.email == body.email)
+        select(User).where(User.clinic_id == ctx.clinic["id"], User.email == email)
     )
     if exists:
         raise HTTPException(
@@ -218,6 +219,7 @@ def create_user(
             detail="Ya existe un usuario con ese email en la clínica",
         )
     data = body.model_dump(exclude={"password"})
+    data["email"] = email
     data["password_hash"] = hash_password(body.password)
     if data.get("reports_to"):
         _validate_reports_to(db, ctx.clinic["id"], str(data["reports_to"]))
@@ -241,6 +243,8 @@ def update_user(
 ) -> dict:
     user = _get_user_or_404(db, ctx.clinic["id"], user_id)
     data = body.model_dump(exclude_unset=True, exclude={"password"})
+    if data.get("email"):
+        data["email"] = data["email"].strip().lower()
     if data.get("reports_to"):
         _validate_reports_to(db, ctx.clinic["id"], str(data["reports_to"]))
     for field, value in data.items():

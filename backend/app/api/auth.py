@@ -34,7 +34,7 @@ def _staff_login(db: Session, identifier: str, password: str) -> LoginResponse:
         db.execute(
             text(
                 "SELECT id, clinic_id, branch_id, role, password_hash, is_active "
-                "FROM users WHERE email = :email"
+                "FROM users WHERE LOWER(email) = LOWER(:email)"
             ),
             {"email": identifier},
         )
@@ -73,7 +73,10 @@ def _staff_login(db: Session, identifier: str, password: str) -> LoginResponse:
 def _super_admin_login(db: Session, identifier: str, password: str) -> LoginResponse:
     row = (
         db.execute(
-            text("SELECT id, password_hash, is_active FROM super_admins WHERE email = :email"),
+            text(
+                "SELECT id, password_hash, is_active FROM super_admins "
+                "WHERE LOWER(email) = LOWER(:email)"
+            ),
             {"email": identifier},
         )
         .mappings()
@@ -283,7 +286,9 @@ def forgot_password(
     """
     user = (
         db.execute(
-            text("SELECT id FROM users WHERE email = :email AND is_active = true"),
+            text(
+                "SELECT id FROM users WHERE LOWER(email) = LOWER(:email) AND is_active = true"
+            ),
             {"email": body.email},
         )
         .mappings()

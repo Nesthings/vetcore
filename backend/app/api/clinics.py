@@ -139,6 +139,7 @@ def _create_clinic_with_admin(
     db: Session, data: dict, admin_data: dict
 ) -> LoginResponse:
     """Crea el tenant + su primer admin y devuelve un token de sesión."""
+    admin_data = {**admin_data, "email": admin_data["email"].strip().lower()}
     clinic = Clinic(**data, setup_completed=False)
     db.add(clinic)
     db.flush()
@@ -226,6 +227,7 @@ def create_clinic(
 
     if body.first_admin is not None:
         admin_data = body.first_admin.model_dump()
+        admin_data["email"] = admin_data["email"].strip().lower()
         exists = db.scalar(
             select(User).where(User.clinic_id == clinic.id, User.email == admin_data["email"])
         )

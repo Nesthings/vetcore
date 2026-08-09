@@ -1724,6 +1724,15 @@ verde clínico profundo, tipografía Plus Jakarta Sans (display) / Geist (UI) / 
   - `alexramz@gmail.com` / `<redactado>` (vet, media del cabo)
   - `thiling@gmail.com` / `<redactado>` (vet, media del cabo)
 
+### Login de correo case-insensitive
+- Las consultas de login (staff y super-admin) y el forgot-password ahora comparan el correo sin
+  distinguir mayúsculas (`LOWER(email) = LOWER(:email)`).
+- Se normalizaron los emails existentes a **minúsculas** en `users`, `super_admins` y `owners`
+  (sin colisiones), y al **crear/editar** usuarios (users.py) o clínicas (clinics.py) el correo
+  se guarda en minúsculas.
+- Verificado: `marigon@gmail.com`, `MARIGON@GMAIL.COM`, `ADMIN@VETCORE.APP` y `DrWallace@Gmail.com`
+  entran correctamente.
+
 ---
 
 **Siguiente subfase:** por decidir (Fase 3 en hold).
