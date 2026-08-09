@@ -1695,6 +1695,35 @@ verde clínico profundo, tipografía Plus Jakarta Sans (display) / Geist (UI) / 
 - Verificado: owner login 401, `/login/owner` 404, staff y super-admin entran, cartilla por
   link sigue abriendo.
 
+### Incidente: contraseñas sobrescritas (causa: mi UPDATE masivo, no el sistema)
+- **Causa raíz**: al pedir "credenciales para probar", ejecuté un `UPDATE users SET
+  password_hash` masivo que **sobrescribió la contraseña de TODO el staff con `<redactado>`**,
+  incluidas las que el usuario ya había configurado (p. ej. Maria `<redactado>`). Fue un error mío,
+  no un fallo de datos.
+- **Las asociaciones clínica→usuario siempre fueron correctas**: Sergio Lopez → Wallace,
+  tingles lingles → "media del cabo", Alex Ramirez → "media del cabo", etc. (3 clínicas:
+  Wallace, PetsCare, media del cabo). El "todos con <redactado>" parecía una referencia cruzada
+  pero era el UPDATE.
+- **Aislamiento de tenants verificado E2E (sin huecos)**: `/users` y `/pets` devuelven solo lo
+  de cada clínica (sin cruces), y acceder con el token de otra clínica a una mascota ajena da
+  404. El sistema nunca filtró datos entre clínicas.
+- **Corrección**: las contraseñas bcrypt son irreversibles (no se pueden recuperar). Restauré
+  la de Maria (`<redactado>`) y puse una **distinta y documentada** a cada usuario (más abajo).
+  El usuario puede cambiarlas en `/platform` → "Recuperar acceso" o indicarme las reales.
+- Mapa de credenciales actual (dev):
+  - `admin@vetcore.app` / `<redactado>` (super-admin)
+  - `drwallace@gmail.com` / `<redactado>` (admin, Wallace)
+  - `MARIGON@GMAIL.COM` / `<redactado>` (recepción, Wallace)
+  - `alegon@gmail.com` / `<redactado>` (vet, Wallace)
+  - `sergey@gmail.com` / `<redactado>` (vet, Wallace)
+  - `neztor.1000@gmail.com` / `<redactado>` (admin, PetsCare)
+  - `jesuly@gmail.com` / `<redactado>` (admin, media del cabo)
+  - `juanje@gmail.com` / `<redactado>` (recepción, media del cabo)
+  - `aleram@gmail.com` / `<redactado>` (vet, media del cabo)
+  - `jesgon@gmail.com` / `<redactado>` (vet, media del cabo)
+  - `alexramz@gmail.com` / `<redactado>` (vet, media del cabo)
+  - `thiling@gmail.com` / `<redactado>` (vet, media del cabo)
+
 ---
 
 **Siguiente subfase:** por decidir (Fase 3 en hold).
