@@ -24,7 +24,6 @@ from app.schemas.auth import (
     LoginResponse,
     MeResponse,
     ResetPasswordRequest,
-    UserIdLoginRequest,
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -124,9 +123,23 @@ def _super_admin_login(db: Session, identifier: str, password: str) -> LoginResp
     return LoginResponse(access_token=token, role="super-admin", sub=str(row["id"]))
 
 
-@router.post("/login", response_model=LoginResponse, summary="Login de staff de clínica")
-def login_staff(body: LoginRequest, db: Session = Depends(get_db)) -> LoginResponse:
-    return _staff_login(db, body.identifier, body.password)
+@router.post(
+    "/login",
+    response_model=LoginResponse,
+    summary="Login por correo y contraseña (identifica clínica y rol automáticamente)",
+)
+def login(body: LoginRequest, db: Session = Depends(get_db)) -> LoginResponse:
+    """Autentica con correo + contraseña y detecta la identidad:
+    staff de clínica (identifica `clinic_id`, `branch_id` y rol), dueño u
+    super-admin. No expone la lista de usuarios de las clínicas."""
+    for fn in (_staff_login, _owner_login, _super_admin_login):
+        try:
+            return fn(db, body.identifier, body.password)
+        except HTTPException:
+            continue
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED, detail="Credenciales inválidas"
+    )
 
 
 @router.post("/login/owner", response_model=LoginResponse, summary="Login de dueño (owner)")
@@ -367,93 +380,3 @@ def reset_password(
     )
     db.commit()
 
-
-@router.get(
-    "/login-candidates",
-    summary="Perfiles visibles para el login con foto (idea 1)",
-)
-def login_candidates(db: Session = Depends(get_db)) -> dict:
-    """Lista los staff con `is_visible_on_login=true` agrupados por clínica,
-    para la rejilla de selección de usuario con foto.
-
-    Modelo de un solo admin: no hay super-admin de plataforma visible.
-    Solo devuelve perfiles activos de clínicas con suscripción activa/trial.
-    No incluye el email en la rejilla (se pide en el paso de contraseña).
-    """
-    clinics = db.execute(
-        text(
-            "SELECT c.id AS clinic_id, c.name AS clinic_name, "
-            "u.id, u.full_name, u.role, u.job_title, u.photo_url "
-            "FROM users u JOIN clinics c ON c.id = u.clinic_id "
-            "WHERE u.is_active = true AND u.is_visible_on_login = true "
-            "AND c.subscription_status IN ('active', 'trial') "
-            "ORDER BY c.name, u.full_name"
-        )
-    ).mappings()
-    by_clinic: dict[str, dict] = {}
-    for row in clinics:
-        group = by_clinic.setdefault(
-            row["clinic_id"],
-            {"id": row["clinic_id"], "name": row["clinic_name"], "users": []},
-        )
-        group["users"].append(
-            {
-                "id": row["id"],
-                "full_name": row["full_name"],
-                "role": row["role"],
-                "job_title": row["job_title"],
-                "photo_url": row["photo_url"],
-            }
-        )
-    return {"clinics": list(by_clinic.values())}
-
-
-@router.post(
-    "/login/user",
-    response_model=LoginResponse,
-    summary="Login de staff por id de usuario",
-)
-def login_user_by_id(body: UserIdLoginRequest, db: Session = Depends(get_db)) -> LoginResponse:
-    """Login con la tarjeta del usuario (idea 1).
-
-    A diferencia del login por email, identifica al usuario por `id`, lo que
-    evita la ambigüedad de emails repetidos entre clínicas.
-    """
-    row = (
-        db.execute(
-            text(
-                "SELECT id, clinic_id, branch_id, role, password_hash, is_active "
-                "FROM users WHERE id = :uid"
-            ),
-            {"uid": body.user_id},
-        )
-        .mappings()
-        .first()
-    )
-    if row is None or not row["is_active"]:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Credenciales inválidas",
-        )
-    if not verify_password(body.password, row["password_hash"]):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Credenciales inválidas",
-        )
-    db.execute(
-        text("UPDATE users SET last_login_at = now() WHERE id = :uid"), {"uid": row["id"]}
-    )
-    db.commit()
-    token = create_access_token(
-        subject=str(row["id"]),
-        role=row["role"],
-        clinic_id=str(row["clinic_id"]),
-        branch_id=str(row["branch_id"]) if row["branch_id"] else None,
-    )
-    return LoginResponse(
-        access_token=token,
-        role=row["role"],
-        sub=str(row["id"]),
-        clinic_id=str(row["clinic_id"]),
-        branch_id=str(row["branch_id"]) if row["branch_id"] else None,
-    )

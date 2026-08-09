@@ -1674,6 +1674,17 @@ verde clínico profundo, tipografía Plus Jakarta Sans (display) / Geist (UI) / 
 - Menú de perfil (AppLayout): etiquetas de rol legibles (Administrador, Administrador de
   plataforma, Veterinario, Recepción).
 
+### Login por correo + contraseña (sin exponer las clínicas)
+- El login ya NO muestra la rejilla de perfiles de TODAS las clínicas (eso filtraba a los
+  staff de todos los tenants en la pantalla pública). Se eliminaron los endpoints
+  `/auth/login-candidates` y `/auth/login/user` (404) y su esquema.
+- `/auth/login` (correo + contraseña) ahora **detecta la identidad automáticamente**: staff de
+  clínica (devuelve `clinic_id`, `branch_id` y rol), dueño u super-admin, probando cada tipo.
+  Un solo formulario cubre todos los roles.
+- Frontend: la página de login es un formulario correo + contraseña (sin grid); al entrar
+  navega según el rol. Verificado: staff identifica clínica/rol, super-admin por el mismo
+  endpoint, credenciales inválidas 401, endpoints de rejilla 404 y sin nombres filtrados.
+
 ---
 
 **Siguiente subfase:** por decidir (Fase 3 en hold).
