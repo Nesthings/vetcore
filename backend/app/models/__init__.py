@@ -1,8 +1,8 @@
-from app.models._references import owners  # noqa: F401
+from app.models._references import owners, super_admins  # noqa: F401
 from app.models.appointment import Appointment, AppointmentWaitlist, ScheduleBlock
 from app.models.audit import AuditLog
 from app.models.billing import Invoice, InvoiceItem, ServiceCatalog
-from app.models.clinic import Clinic, ClinicBranch, ClinicSubscriptionEvent
+from app.models.clinic import Clinic, ClinicBranch, ClinicInvite, ClinicSubscriptionEvent
 from app.models.consent import DigitalConsent
 from app.models.consultation import (
     Consultation,
@@ -36,6 +36,7 @@ __all__ = [
     "AuditLog",
     "Clinic",
     "ClinicBranch",
+    "ClinicInvite",
     "ClinicSubscriptionEvent",
     "ClinicalAlert",
     "Consultation",

@@ -8,6 +8,7 @@ import { firstAllowedRoute } from '@/lib/nav'
 
 const ROLE_HOME: Record<string, string> = {
   owner: '/portal',
+  'super-admin': '/platform',
   admin: '/',
   veterinario: '/',
   recepcion: '/',

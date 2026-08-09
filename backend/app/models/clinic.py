@@ -49,6 +49,27 @@ class Clinic(UUIDPkMixin, Base):
     branches: Mapped[list["ClinicBranch"]] = relationship(back_populates="clinic")
 
 
+class ClinicInvite(UUIDPkMixin, Base):
+    """Link único del super-admin para que un admin cree su clínica."""
+
+    __tablename__ = "clinic_invites"
+
+    token: Mapped[str] = mapped_column(String(128), nullable=False, unique=True, index=True)
+    clinic_name: Mapped[str | None] = mapped_column(String(200))
+    contact_email: Mapped[str | None] = mapped_column(String(200))
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("super_admins.id", ondelete="SET NULL")
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="pending", server_default="pending"
+    )
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class ClinicBranch(UUIDPkMixin, Base):
     __tablename__ = "clinic_branches"
 

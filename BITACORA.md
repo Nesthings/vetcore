@@ -1626,8 +1626,26 @@ verde clínico profundo, tipografía Plus Jakarta Sans (display) / Geist (UI) / 
   (stock_alerts, con parámetro opcional que sobreescribe) y el widget `stock_levels`, y las
   **notificaciones** `low_stock` (`inventory.py`).
 - Helper compartido `app/core/clinic_settings.py` (`clinic_stock_threshold`).
-- Verificado E2E: cambiar el umbral desde el modal de Productos se guarda (7) y se refleja en
-  `/clinics/me`, dashboard y el badge de Insumos.
+
+### Links únicos para crear clínica + panel del super-admin
+- Migración `0036`: `clinic_invites` (token único de un solo uso, con expiración). El **super-admin**
+  (`admin@vetcore.app`, dueño del producto) genera el link.
+- Endpoints de plataforma (solo super-admin): `POST/GET /platform/clinic-invites`,
+  `POST /platform/clinic-invites/{id}/revoke`, `GET /platform/users` y
+  `POST /platform/staff/{user_id}/reset-password` (recuperación de admin).
+- Alta pública controlada: `GET /create-clinic/info?token=` (valida) y `POST /create-clinic`
+  (token + primer admin) que crea el tenant, devuelve sesión y **marca el invite usado**
+  (segundo uso → 400). Se desactivó el alta autogestionada (`/clinics/register` solo
+  super-admin).
+- Frontend: página pública `/create-clinic?token=…` (prellena clínica/correo del invite);
+  Login ya NO tiene "Crear mi clínica" y agrega "Acceso del dueño" (super-admin);
+  panel `/platform` con "Links de invitación" (generar/copiar/revocar) y "Recuperar acceso"
+  (buscar staff + reset de contraseña). El super-admin entra a `/platform` desde su home.
+- `super_admins` se registró como tabla en `_references.py` para resolver la FK.
+- Verificado E2E: login super-admin → generar link → info válido → crear clínica por link →
+  segundo uso 400 → el nuevo admin entra → reset de contraseña funciona → `/clinics/register`
+  público ya no (401 sin token).
+- Contraseña del super-admin (dev): `<redactado>`.
 
 ---
 

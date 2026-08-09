@@ -13,6 +13,7 @@ from app.api import (
     clinics,
     consents,
     consultations,
+    create_clinic,
     dashboard,
     dashboards,
     dose,
@@ -22,6 +23,7 @@ from app.api import (
     notifications,
     owner,
     pets,
+    platform,
     products,
     purchase_orders,
     reports,
@@ -77,6 +79,8 @@ app.include_router(notifications.router, prefix="/api/v1")
 app.include_router(audit.router, prefix="/api/v1")
 app.include_router(vaccination_plans.router, prefix="/api/v1")
 app.include_router(share.router, prefix="/api/v1")
+app.include_router(platform.router, prefix="/api/v1")
+app.include_router(create_clinic.router, prefix="/api/v1")
 
 # Media (MVP local). La URL pública /media/... es la que devuelven los endpoints.
 media_dir = Path(settings.media_root)

@@ -7,6 +7,7 @@ import { NavConfigProvider } from '@/lib/nav-config'
 import { PermissionsProvider } from '@/lib/permissions'
 import { SetupProvider } from '@/lib/setup'
 import { Activate } from '@/pages/auth/Activate'
+import { CreateClinic } from '@/pages/auth/CreateClinic'
 import { ForgotPassword } from '@/pages/auth/ForgotPassword'
 import { Login } from '@/pages/auth/Login'
 import { ResetPassword } from '@/pages/auth/ResetPassword'
@@ -29,6 +30,7 @@ import { PetDetail } from '@/pages/PetDetail'
 import { Pets } from '@/pages/Pets'
 import { Profile } from '@/pages/Profile'
 import { Products } from '@/pages/Products'
+import { Platform } from '@/pages/Platform'
 import { PurchaseOrders } from '@/pages/PurchaseOrders'
 import { Services } from '@/pages/Services'
 import { Settings } from '@/pages/Settings'
@@ -46,11 +48,21 @@ function App() {
               <BrowserRouter>
                 <Routes>
                   <Route path="/login" element={<Login />} />
+                  <Route path="/create-clinic" element={<CreateClinic />} />
                   <Route path="/activate" element={<Activate />} />
                   <Route path="/forgot-password" element={<ForgotPassword />} />
                   <Route path="/reset-password" element={<ResetPassword />} />
                   <Route path="/cartilla" element={<CartillaShare />} />
                   <Route path="/design-system" element={<DesignSystem />} />
+
+                  <Route
+                    path="/platform"
+                    element={
+                      <ProtectedRoute roles={['super-admin']}>
+                        <Platform />
+                      </ProtectedRoute>
+                    }
+                  />
 
                   <Route
                     path="/"

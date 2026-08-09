@@ -135,33 +135,14 @@ def _get_clinic_or_404(db: Session, clinic_id: str) -> Clinic:
     return clinic
 
 
-@router.post(
-    "/register",
-    response_model=LoginResponse,
-    status_code=status.HTTP_201_CREATED,
-    summary="Alta autogestionada de una clínica (modelo de un solo admin)",
-)
-def register_clinic(
-    body: ClinicCreate,
-    db: Session = Depends(get_db),
+def _create_clinic_with_admin(
+    db: Session, data: dict, admin_data: dict
 ) -> LoginResponse:
-    """Crea el tenant + su primer super-usuario (admin) y devuelve un token
-    de sesión, de modo que el admin arranca directo el wizard de configuración.
-
-    Sin nivel de plataforma: cada clínica se registra sola (idea del usuario).
-    """
-    if body.first_admin is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="El registro requiere el primer super-usuario (first_admin)",
-        )
-
-    data = body.model_dump(exclude={"first_admin"})
+    """Crea el tenant + su primer admin y devuelve un token de sesión."""
     clinic = Clinic(**data, setup_completed=False)
     db.add(clinic)
     db.flush()
 
-    admin_data = body.first_admin.model_dump()
     admin = User(
         clinic_id=clinic.id,
         role="admin",
@@ -187,6 +168,32 @@ def register_clinic(
         sub=str(admin.id),
         clinic_id=str(clinic.id),
         branch_id=None,
+    )
+
+
+@router.post(
+    "/register",
+    response_model=LoginResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Alta de clínica (solo super-admin)",
+)
+def register_clinic(
+    body: ClinicCreate,
+    db: Session = Depends(get_db),
+    _: object = Depends(require_roles("super-admin")),
+) -> LoginResponse:
+    """Crea el tenant + su primer super-usuario (admin) y devuelve un token
+    de sesión. Antes era autogestionado; ahora solo lo usa el super-admin
+    (el alta pública es vía link único en `/create-clinic`)."""
+    if body.first_admin is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El registro requiere el primer super-usuario (first_admin)",
+        )
+    return _create_clinic_with_admin(
+        db,
+        body.model_dump(exclude={"first_admin"}),
+        body.first_admin.model_dump(),
     )
 
 

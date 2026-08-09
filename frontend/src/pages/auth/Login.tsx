@@ -6,8 +6,7 @@ import {
   ChevronLeft,
   Loader2,
   Lock,
-  PawPrint,
-  Plus,
+  ShieldCheck,
   UserRound,
 } from 'lucide-react'
 
@@ -72,7 +71,6 @@ export function Login() {
   const navigate = useNavigate()
   const location = useLocation()
 
-  const [mode, setMode] = useState<'select' | 'register'>('select')
   const [candidates, setCandidates] = useState<Candidates | null>(null)
   const [loadingCandidates, setLoadingCandidates] = useState(true)
   const [selected, setSelected] = useState<LoginCandidate | null>(null)
@@ -80,11 +78,9 @@ export function Login() {
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
-  const [regName, setRegName] = useState('')
-  const [regFullName, setRegFullName] = useState('')
-  const [regEmail, setRegEmail] = useState('')
-  const [regPassword, setRegPassword] = useState('')
-  const [regTitle, setRegTitle] = useState('')
+  const [ownerMode, setOwnerMode] = useState(false)
+  const [ownerEmail, setOwnerEmail] = useState('')
+  const [ownerPassword, setOwnerPassword] = useState('')
 
   const loadCandidates = useCallback(async () => {
     try {
@@ -121,27 +117,19 @@ export function Login() {
     }
   }
 
-  const handleRegister = async (e: React.FormEvent) => {
+  const handleOwnerLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
     setSubmitting(true)
     try {
-      const res = await apiFetch<LoginResponse>('/clinics/register', {
+      const res = await apiFetch<LoginResponse>('/auth/login/super-admin', {
         method: 'POST',
-        body: JSON.stringify({
-          name: regName,
-          first_admin: {
-            full_name: regFullName,
-            email: regEmail,
-            password: regPassword,
-            professional_title: regTitle || null,
-          },
-        }),
+        body: JSON.stringify({ identifier: ownerEmail, password: ownerPassword }),
       })
       login(res.access_token)
-      navigate('/', { replace: true })
+      navigate('/platform', { replace: true })
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo crear la clínica')
+      setError(err instanceof Error ? err.message : 'Credenciales inválidas')
     } finally {
       setSubmitting(false)
     }
@@ -155,11 +143,9 @@ export function Login() {
 
   return (
     <AuthLayout
-      title={mode === 'register' ? 'Crear mi clínica' : 'Iniciar sesión'}
+      title={ownerMode ? 'Acceso del dueño' : 'Iniciar sesión'}
       subtitle={
-        mode === 'register'
-          ? 'Registra tu clínica y configúrala paso a paso'
-          : 'Selecciona tu perfil para continuar'
+        ownerMode ? 'Plataforma del producto (super-admin)' : 'Selecciona tu perfil para continuar'
       }
       footer={
         <Link to="/forgot-password" className="font-medium text-primary hover:text-primary-hover">
@@ -167,82 +153,36 @@ export function Login() {
         </Link>
       }
     >
-      {mode === 'register' ? (
-        <form onSubmit={handleRegister} className="space-y-4">
+      {ownerMode ? (
+        <form onSubmit={handleOwnerLogin} className="space-y-4">
           <button
             type="button"
-            onClick={() => setMode('select')}
+            onClick={() => setOwnerMode(false)}
             className="flex items-center gap-1 text-sm font-medium text-primary hover:text-primary-hover"
           >
             <ChevronLeft className="size-4" /> Volver al inicio de sesión
           </button>
 
           <div className="space-y-2">
-            <Label htmlFor="reg-name">Nombre de la clínica *</Label>
-            <div className="relative">
-              <Building2 className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                id="reg-name"
-                className="pl-9"
-                value={regName}
-                onChange={(e) => setRegName(e.target.value)}
-                placeholder="ej. Clínica VetCare"
-                required
-              />
-            </div>
+            <Label htmlFor="owner-email">Correo del dueño</Label>
+            <Input
+              id="owner-email"
+              type="email"
+              value={ownerEmail}
+              onChange={(e) => setOwnerEmail(e.target.value)}
+              placeholder="correo@producto.com"
+              required
+            />
           </div>
-
-          <div className="rounded-md border border-border p-4">
-            <div className="mb-3 flex items-center gap-2">
-              <PawPrint className="size-4 text-primary" aria-hidden="true" />
-              <p className="text-sm font-medium">Primer super-usuario (tú)</p>
-            </div>
-            <div className="space-y-3">
-              <div className="space-y-2">
-                <Label htmlFor="reg-fullname">Nombre completo *</Label>
-                <Input
-                  id="reg-fullname"
-                  value={regFullName}
-                  onChange={(e) => setRegFullName(e.target.value)}
-                  placeholder="Tu nombre"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="reg-email">Correo *</Label>
-                <Input
-                  id="reg-email"
-                  type="email"
-                  value={regEmail}
-                  onChange={(e) => setRegEmail(e.target.value)}
-                  placeholder="correo@ejemplo.com"
-                  required
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="reg-password">Contraseña *</Label>
-                  <Input
-                    id="reg-password"
-                    type="password"
-                    value={regPassword}
-                    onChange={(e) => setRegPassword(e.target.value)}
-                    minLength={8}
-                    placeholder="Mínimo 8 caracteres"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="reg-title">Título profesional</Label>
-                  <Input
-                    id="reg-title"
-                    value={regTitle}
-                    onChange={(e) => setRegTitle(e.target.value)}
-                    placeholder="ej. MVZ"
-                  />
-                </div>
-              </div>
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="owner-password">Contraseña</Label>
+            <Input
+              id="owner-password"
+              type="password"
+              value={ownerPassword}
+              onChange={(e) => setOwnerPassword(e.target.value)}
+              required
+            />
           </div>
 
           {error && (
@@ -253,8 +193,8 @@ export function Login() {
           )}
 
           <Button type="submit" className="w-full" disabled={submitting}>
-            {submitting ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Plus />}
-            {submitting ? 'Creando…' : 'Crear clínica y entrar'}
+            {submitting ? <Loader2 className="animate-spin" aria-hidden="true" /> : <ShieldCheck />}
+            {submitting ? 'Entrando…' : 'Entrar a la plataforma'}
           </Button>
         </form>
       ) : selected ? (
@@ -350,22 +290,21 @@ export function Login() {
             </div>
           ) : (
             <p className="py-4 text-center text-sm text-muted-foreground">
-              No hay perfiles todavía. Crea tu clínica para empezar.
+              No hay perfiles todavía. Las clínicas se crean con el enlace de invitación.
             </p>
           )}
 
-          <div className="border-t border-border pt-4">
-            <Button
+          <div className="flex justify-center">
+            <button
               type="button"
-              variant="outline"
-              className="w-full"
               onClick={() => {
-                setMode('register')
+                setOwnerMode(true)
                 setError(null)
               }}
+              className="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
             >
-              <Plus /> Crear mi clínica
-            </Button>
+              Acceso del dueño
+            </button>
           </div>
         </div>
       )}

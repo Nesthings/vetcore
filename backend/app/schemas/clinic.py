@@ -37,6 +37,11 @@ class FirstAdminCreate(BaseModel):
     cedula: str | None = Field(default=None, max_length=50)
 
 
+class CreateClinicInvited(ClinicCreate):
+    """Alta de clínica a través del link único del super-admin."""
+    token: str = Field(min_length=1)
+
+
 ClinicCreate.model_rebuild()
 
 
@@ -67,6 +72,29 @@ class ClinicRead(ClinicBase):
     stock_alert_threshold: float
     created_at: datetime
     updated_at: datetime
+
+
+class ClinicInviteCreate(BaseModel):
+    clinic_name: str | None = Field(default=None, max_length=200)
+    contact_email: str | None = Field(default=None, max_length=200)
+    expires_in_days: int = Field(default=30, ge=1, le=365)
+
+
+class ClinicInviteRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    token: str
+    clinic_name: str | None
+    contact_email: str | None
+    status: str
+    expires_at: datetime
+    used_at: datetime | None
+    created_at: datetime
+
+
+class StaffResetPassword(BaseModel):
+    new_password: str = Field(min_length=8, max_length=128)
 
 
 class ClinicBranchBase(BaseModel):
