@@ -178,12 +178,19 @@ def dashboard_day(
         db.scalar(select(func.count()).select_from(PurchaseOrder).where(*po_base)) or 0
     )
 
-    # Mascotas nuevas registradas en la ventana (Pet no tiene sucursal: es por clínica).
+    # Mascotas nuevas registradas en los ÚLTIMOS 7 DÍAS (fijo, sin importar el
+    # período; Pet no tiene sucursal: es por clínica).
+    week_start = today - timedelta(days=6)
+    week_start_dt = datetime.combine(week_start, time.min)
     nuevas_mascotas = (
         db.scalar(
             select(func.count())
             .select_from(Pet)
-            .where(Pet.clinic_id == clinic_id, Pet.created_at >= start, Pet.created_at <= end)
+            .where(
+                Pet.clinic_id == clinic_id,
+                Pet.created_at >= week_start_dt,
+                Pet.created_at <= end,
+            )
         )
         or 0
     )

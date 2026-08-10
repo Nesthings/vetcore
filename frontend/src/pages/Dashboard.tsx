@@ -1,11 +1,6 @@
 import { memo, useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  CalendarCheck2,
-  CalendarClock,
-  CalendarOff,
-  CalendarX2,
-  CheckCircle2,
   ChevronDown,
   ChevronUp,
   ClipboardPlus,
@@ -438,35 +433,6 @@ export function Dashboard() {
                   SECTION_LABELS.resumen,
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
                     <KpiCard
-                      label={period === 'day' ? 'Citas de hoy' : 'Citas del período'}
-                      value={data.citas_total}
-                      icon={CalendarCheck2}
-                      hint={`${data.citas_por_estado.confirmed} confirmadas`}
-                    />
-                    <KpiCard
-                      label="Pendientes"
-                      value={data.citas_por_estado.scheduled}
-                      icon={CalendarClock}
-                      hint="por confirmar"
-                    />
-                    <KpiCard
-                      label="Completadas"
-                      value={data.citas_por_estado.completed}
-                      icon={CheckCircle2}
-                    />
-                    <KpiCard
-                      label="Canceladas"
-                      value={data.citas_por_estado.cancelled}
-                      icon={CalendarX2}
-                      hint={`${data.citas_por_estado.no_show} no asistió`}
-                    />
-                    <KpiCard
-                      label="Bloques"
-                      value={data.bloques}
-                      icon={CalendarOff}
-                      hint="horario bloqueado"
-                    />
-                    <KpiCard
                       label="Mascotas atendidas"
                       value={data.mascotas_atendidas}
                       icon={PawPrint}
@@ -494,7 +460,7 @@ export function Dashboard() {
                       label="Mascotas nuevas"
                       value={data.nuevas_mascotas}
                       icon={Sparkles}
-                      hint={periodHint}
+                      hint="últimos 7 días"
                     />
                   </div>,
                 )
