@@ -75,7 +75,7 @@ interface StaffUser {
 }
 
 interface UserComponents {
-  catalog: { slug: string; label: string }[]
+  catalog: { slug: string; label: string; description?: string }[]
   defaults: string[]
   overrides: Record<string, boolean>
   effective: string[]
@@ -291,7 +291,13 @@ export function SetupWizard() {
         const br = await apiFetch<Branch[]>('/branches')
         setBranchOptions(br.map((b) => ({ id: b.id, name: b.name })))
       } else if (step === 3) {
-        const valid = team.filter((t) => t.full_name.trim() && t.email.trim())
+        const existingEmails = new Set(users.map((u) => u.email.toLowerCase()))
+        const valid = team.filter(
+          (t) =>
+            t.full_name.trim() &&
+            t.email.trim() &&
+            !existingEmails.has(t.email.trim().toLowerCase()),
+        )
         for (const t of valid) {
           await apiFetch('/users', {
             method: 'POST',
@@ -309,6 +315,11 @@ export function SetupWizard() {
         }
         const us = await apiFetch<StaffUser[]>('/users')
         setUsers(us)
+        setTeam((prev) =>
+          prev.filter(
+            (t) => !existingEmails.has(t.email.trim().toLowerCase()),
+          ),
+        )
         setReportsTo((prev) => {
           const next = { ...prev }
           for (const u of us) {
@@ -388,8 +399,16 @@ export function SetupWizard() {
         {/* Header */}
         <header className="mb-6 flex flex-wrap items-center justify-between gap-4 sm:mb-8">
           <div className="flex items-center gap-4">
-            <div className="flex size-12 items-center justify-center rounded-2xl bg-gradient-brand text-white shadow-elevated">
-              <PawPrint className="size-6" aria-hidden="true" />
+            <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-gradient-brand text-white shadow-elevated">
+              {logoFile || logoUrl ? (
+                <img
+                  src={logoFile ? URL.createObjectURL(logoFile) : logoUrl ?? ''}
+                  alt="Logo de la clínica"
+                  className="size-full object-cover"
+                />
+              ) : (
+                <PawPrint className="size-6" aria-hidden="true" />
+              )}
             </div>
             <div>
               <h1 className="font-display text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
@@ -837,6 +856,14 @@ export function SetupWizard() {
                                         }
                                         required
                                       />
+                                      {t.email.trim() &&
+                                        users.some(
+                                          (u) => u.email.toLowerCase() === t.email.trim().toLowerCase(),
+                                        ) && (
+                                          <p className="text-xs text-muted-foreground">
+                                            Este correo ya está registrado; no se duplicará.
+                                          </p>
+                                        )}
                                     </div>
                                   </div>
                                   <div className="grid gap-3 sm:grid-cols-2">
@@ -1023,9 +1050,16 @@ export function SetupWizard() {
                                 return (
                                   <div
                                     key={c.slug}
-                                    className="flex items-center justify-between rounded-lg border border-border/50 px-3 py-2 text-sm"
+                                    className="flex items-center justify-between gap-3 rounded-lg border border-border/50 px-3 py-2.5"
                                   >
-                                    <span>{c.label}</span>
+                                    <div className="min-w-0">
+                                      <p className="text-sm font-medium">{c.label}</p>
+                                      {c.description && (
+                                        <p className="text-xs text-muted-foreground">
+                                          {c.description}
+                                        </p>
+                                      )}
+                                    </div>
                                     <button
                                       type="button"
                                       onClick={() =>
