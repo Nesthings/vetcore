@@ -16,7 +16,17 @@ from app.api.appointments import _with_names
 from app.api.deps import CurrentClinic, get_current_clinic, require_component
 from app.core.clinic_settings import clinic_stock_threshold
 from app.db.session import get_db
-from app.models import Appointment, InventoryMovement, InventoryProduct, Pet, ScheduleBlock
+from app.models import (
+    Appointment,
+    AppointmentWaitlist,
+    InventoryMovement,
+    InventoryProduct,
+    Pet,
+    PetVaccinationDose,
+    PetVaccinationPlan,
+    PurchaseOrder,
+    ScheduleBlock,
+)
 
 router = APIRouter(
     prefix="/dashboard",
@@ -140,6 +150,66 @@ def dashboard_day(
         or 0
     )
 
+    # Mascotas distintas con al menos una cita completada en la ventana.
+    mascotas_atendidas = (
+        db.scalar(
+            select(func.count(func.distinct(Appointment.pet_id)))
+            .where(*base, Appointment.status == "completed", Appointment.pet_id.is_not(None))
+        )
+        or 0
+    )
+
+    # Lista de espera: cola ACTUAL de pacientes esperando hueco (no ligada al período).
+    wait_base = [
+        AppointmentWaitlist.clinic_id == clinic_id,
+        AppointmentWaitlist.status == "waiting",
+    ]
+    if selected_branch:
+        wait_base.append(AppointmentWaitlist.branch_id == selected_branch)
+    waitlist_count = (
+        db.scalar(select(func.count()).select_from(AppointmentWaitlist).where(*wait_base)) or 0
+    )
+
+    # Órdenes de compra sin recibir.
+    po_base = [PurchaseOrder.clinic_id == clinic_id, PurchaseOrder.status != "received"]
+    if selected_branch:
+        po_base.append(PurchaseOrder.branch_id == selected_branch)
+    pending_purchase_orders = (
+        db.scalar(select(func.count()).select_from(PurchaseOrder).where(*po_base)) or 0
+    )
+
+    # Mascotas nuevas registradas en la ventana (Pet no tiene sucursal: es por clínica).
+    nuevas_mascotas = (
+        db.scalar(
+            select(func.count())
+            .select_from(Pet)
+            .where(Pet.clinic_id == clinic_id, Pet.created_at >= start, Pet.created_at <= end)
+        )
+        or 0
+    )
+
+    # Dosis de vacuna programadas (status=scheduled) cuya fecha está dentro de la ventana.
+    vacuna_base = [
+        PetVaccinationPlan.clinic_id == clinic_id,
+        PetVaccinationDose.status == "scheduled",
+        PetVaccinationDose.due_date >= start_date,
+        PetVaccinationDose.due_date <= today,
+    ]
+    if selected_branch:
+        vacuna_base.append(PetVaccinationPlan.branch_id == selected_branch)
+    vacunas_hoy = (
+        db.scalar(
+            select(func.count())
+            .select_from(PetVaccinationDose)
+            .join(
+                PetVaccinationPlan,
+                PetVaccinationDose.pet_vaccination_plan_id == PetVaccinationPlan.id,
+            )
+            .where(*vacuna_base)
+        )
+        or 0
+    )
+
     return {
         "date": today.isoformat(),
         "period": period,
@@ -152,4 +222,9 @@ def dashboard_day(
         "bloques": bloques,
         "stock_alerts": stock_alerts,
         "pacientes_activos": pacientes_activos,
+        "mascotas_atendidas": mascotas_atendidas,
+        "waitlist_count": waitlist_count,
+        "pending_purchase_orders": pending_purchase_orders,
+        "nuevas_mascotas": nuevas_mascotas,
+        "vacunas_hoy": vacunas_hoy,
     }

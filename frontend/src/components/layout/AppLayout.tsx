@@ -34,6 +34,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate()
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [fullName, setFullName] = useState<string | null>(null)
+  const [profileLoading, setProfileLoading] = useState(true)
   const [clinicName, setClinicName] = useState<string>('')
   const [clinicLogoUrl, setClinicLogoUrl] = useState<string | null>(null)
   const [profileOpen, setProfileOpen] = useState(false)
@@ -68,8 +69,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   }, [])
 
   useEffect(() => {
-    if (!user?.clinic_id) return
+    if (!user?.clinic_id) {
+      setProfileLoading(false)
+      return
+    }
     let cancelled = false
+    setProfileLoading(true)
     Promise.all([
       apiFetch<{ photo_url?: string | null; full_name?: string | null }>('/auth/me'),
       apiFetch<{ name?: string; logo_url?: string | null }>('/clinics/me'),
@@ -82,6 +87,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         if (clinic.logo_url) setClinicLogoUrl(clinic.logo_url)
       })
       .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) setProfileLoading(false)
+      })
     return () => {
       cancelled = true
     }
@@ -256,9 +264,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 <Home className="size-4" aria-hidden="true" />
               </NavLink>
             )}
-            <p className="ml-1 hidden text-sm text-muted-foreground sm:block">
-              Hola, <span className="font-semibold text-foreground">{displayName}</span>
-            </p>
+            {profileLoading ? (
+              <span className="ml-1 hidden h-4 w-32 animate-pulse rounded bg-secondary sm:block" />
+            ) : (
+              <p className="ml-1 hidden text-sm text-muted-foreground sm:block">
+                Hola, <span className="font-semibold text-foreground">{displayName}</span>
+              </p>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <ThemeToggle />
@@ -282,7 +294,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 className="flex size-9 items-center justify-center overflow-hidden rounded-full border-2 border-primary/30 bg-secondary text-xs font-semibold text-secondary-foreground transition-colors hover:bg-accent"
                 aria-label="Menú de perfil"
               >
-                {avatarUrl ? (
+                {profileLoading ? (
+                  <span className="block size-full animate-pulse bg-secondary" />
+                ) : avatarUrl ? (
                   <img src={avatarUrl} alt={displayName} className="size-full object-cover" />
                 ) : (
                   <span>{displayName?.[0]?.toUpperCase() ?? user?.role?.[0]?.toUpperCase()}</span>

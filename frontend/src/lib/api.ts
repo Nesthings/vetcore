@@ -2,11 +2,26 @@ const BASE_URL = '/api/v1'
 
 const TOKEN_KEY = 'vetcore_token'
 
+function tokenFromStorage(): string | null {
+  try {
+    return localStorage.getItem(TOKEN_KEY)
+  } catch {
+    return null
+  }
+}
+
+// Token de la sesión actual de ESTA pestaña. Se guarda también en localStorage
+// para persistir entre recargas, pero las peticiones usan la variable en
+// memoria: así una pestaña con otra cuenta (o un login en otra pestaña) no
+// pisa la identidad de la sesión abierta.
+let currentToken: string | null = tokenFromStorage()
+
 export function getToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY)
+  return currentToken
 }
 
 export function setToken(token: string | null) {
+  currentToken = token
   if (token) {
     localStorage.setItem(TOKEN_KEY, token)
   } else {

@@ -3,7 +3,9 @@ import { Link } from 'react-router-dom'
 import {
   CalendarCheck2,
   CalendarClock,
+  CalendarOff,
   CalendarX2,
+  CheckCircle2,
   ChevronDown,
   ChevronUp,
   ClipboardPlus,
@@ -12,6 +14,10 @@ import {
   PanelTop,
   PawPrint,
   ShoppingBag,
+  ShoppingCart,
+  Sparkles,
+  Syringe,
+  Timer,
   TriangleAlert,
   X,
 } from 'lucide-react'
@@ -70,6 +76,11 @@ interface DayDashboard {
   bloques: number
   stock_alerts: { product_id: string; name: string; stock: number }[]
   pacientes_activos: number
+  mascotas_atendidas: number
+  waitlist_count: number
+  pending_purchase_orders: number
+  nuevas_mascotas: number
+  vacunas_hoy: number
 }
 
 type Period = 'day' | 'week' | 'month'
@@ -232,6 +243,9 @@ export function Dashboard() {
   const [trayBtnDragOver, setTrayBtnDragOver] = useState(false)
   const [dashData, setDashData] = useState<Record<string, unknown>>({})
   const [period, setPeriod] = useState<Period>('day')
+
+  const periodHint =
+    period === 'day' ? 'hoy' : period === 'week' ? 'últimos 7 días' : 'últimos 30 días'
 
   const userKey = user?.sub ?? 'anon'
   const [order, setOrder] = useState<SectionId[]>(() => {
@@ -424,7 +438,7 @@ export function Dashboard() {
                   SECTION_LABELS.resumen,
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
                     <KpiCard
-                      label="Citas de hoy"
+                      label={period === 'day' ? 'Citas de hoy' : 'Citas del período'}
                       value={data.citas_total}
                       icon={CalendarCheck2}
                       hint={`${data.citas_por_estado.confirmed} confirmadas`}
@@ -438,18 +452,49 @@ export function Dashboard() {
                     <KpiCard
                       label="Completadas"
                       value={data.citas_por_estado.completed}
-                      icon={CalendarCheck2}
+                      icon={CheckCircle2}
+                    />
+                    <KpiCard
+                      label="Canceladas"
+                      value={data.citas_por_estado.cancelled}
+                      icon={CalendarX2}
+                      hint={`${data.citas_por_estado.no_show} no asistió`}
                     />
                     <KpiCard
                       label="Bloques"
                       value={data.bloques}
-                      icon={CalendarX2}
+                      icon={CalendarOff}
                       hint="horario bloqueado"
                     />
                     <KpiCard
-                      label="Pacientes activos"
-                      value={data.pacientes_activos}
+                      label="Mascotas atendidas"
+                      value={data.mascotas_atendidas}
                       icon={PawPrint}
+                      hint={periodHint}
+                    />
+                    <KpiCard
+                      label="En lista de espera"
+                      value={data.waitlist_count}
+                      icon={Timer}
+                      hint="esperando hueco"
+                    />
+                    <KpiCard
+                      label="Vacunas por aplicar"
+                      value={data.vacunas_hoy}
+                      icon={Syringe}
+                      hint={period === 'day' ? 'para hoy' : 'del período'}
+                    />
+                    <KpiCard
+                      label="Órdenes pendientes"
+                      value={data.pending_purchase_orders}
+                      icon={ShoppingCart}
+                      hint="por recibir"
+                    />
+                    <KpiCard
+                      label="Mascotas nuevas"
+                      value={data.nuevas_mascotas}
+                      icon={Sparkles}
+                      hint={periodHint}
                     />
                   </div>,
                 )
