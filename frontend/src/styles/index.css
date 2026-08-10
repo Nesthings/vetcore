@@ -175,6 +175,16 @@
     text-rendering: optimizeLegibility;
   }
 
+  /* Evitar scroll horizontal accidental del documento en cualquier página
+     (elementos que ocasionalmente se ensanchan más que el viewport). 'clip'
+     recorta sin crear contenedor de scroll, así el header sticky y las tablas
+     internas con su propio scroll siguen funcionando. */
+  html,
+  body {
+    overflow-x: hidden;
+    overflow-x: clip;
+  }
+
   /* Jerarquía tipográfica base (display cálida) */
   h1,
   h2,

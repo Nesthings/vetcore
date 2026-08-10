@@ -40,7 +40,7 @@ import { cn } from '@/lib/utils'
 const SECTION_IDS = ['resumen', 'hoy', 'citas', 'modulos', 'dashboards'] as const
 type SectionId = (typeof SECTION_IDS)[number]
 
-const DEFAULT_SECTION_ORDER: SectionId[] = ['resumen', 'hoy', 'citas', 'modulos', 'dashboards']
+const DEFAULT_SECTION_ORDER: SectionId[] = ['resumen', 'modulos', 'hoy', 'dashboards', 'citas']
 
 const SECTION_LABELS: Record<SectionId, string> = {
   resumen: 'Resumen del día',
@@ -51,6 +51,9 @@ const SECTION_LABELS: Record<SectionId, string> = {
 }
 
 const SECTIONS_KEY_PREFIX = 'vetcore_dashboard_sections_'
+
+// Orden de las tarjetas del Módulo "Módulos" en el Inicio (el resto va después).
+const MODULE_CARD_ORDER = ['pets', 'agenda', 'inventory', 'products']
 
 interface DayDashboard {
   date: string
@@ -333,7 +336,11 @@ export function Dashboard() {
   const moduleItems = NAV_ROUTES.filter(
     (r) =>
       r.component !== 'dashboard' && !pinned.includes(r.component) && hasComponent(r.component),
-  )
+  ).sort((a, b) => {
+    const ai = MODULE_CARD_ORDER.indexOf(a.component)
+    const bi = MODULE_CARD_ORDER.indexOf(b.component)
+    return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi)
+  })
 
   const handleModulesDrop = (e: React.DragEvent) => {
     e.preventDefault()

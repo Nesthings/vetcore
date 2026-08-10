@@ -5,6 +5,7 @@ import { useAuth } from '@/lib/auth'
 // Módulos fijados en la barra lateral por defecto (el resto aparecen como
 // tarjetas en el Inicio y se pueden arrastrar para fijarlos).
 const DEFAULT_PINNED = [
+  'waitlist',
   'vaccination_plans',
   'purchase_orders',
   'automation',

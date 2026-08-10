@@ -157,7 +157,7 @@ export function NewConsultation() {
       setVaccMsg(null)
       const ow = p.owners?.find((o) => o.is_active) ?? null
       setOwner(ow)
-      setWeight(p.latest_weight_kg ? String(p.latest_weight_kg) : '')
+      setWeight('')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo cargar el paciente')
     }
@@ -823,12 +823,13 @@ export function NewConsultation() {
                 </div>
                 {pet && (
                   <Button
+                    type="button"
                     size="sm"
                     variant="outline"
                     onClick={() => {
                       setVaccOpen((o) => !o)
                       setVaccMsg(null)
-                      setVaccName(nextDose?.plan ?? carnetVaccines[0] ?? '')
+                      setVaccName(nextDose?.plan ?? '')
                       setVaccDate(new Date().toISOString().slice(0, 10))
                     }}
                   >

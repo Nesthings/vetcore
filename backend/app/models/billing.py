@@ -73,7 +73,11 @@ class InvoiceItem(UUIDPkMixin, Base):
         UUID(as_uuid=True), ForeignKey("service_catalog.id")
     )
     product_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("inventory_products.id")
+        UUID(as_uuid=True),
+        # Sin FK a propósito: `sale_products` (catálogo de venta usado por los
+        # checkouts de consulta/venta) e `inventory_products` (insumos usados
+        # por la facturación) son catálogos independientes (ver migración 0016),
+        # y una sola FK no puede referenciar ambas tablas.
     )
     description: Mapped[str] = mapped_column(String(200), nullable=False)
     quantity: Mapped[float] = mapped_column(
