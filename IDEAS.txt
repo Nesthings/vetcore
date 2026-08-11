@@ -1,5 +1,0 @@
-VETCORE TODO'S
-
-1. Anadir una pantalla al inicio donde se seleccione el usuario que va a acceder a sistema, con contrasena y con foto, dependiendo de quien entre se le daran los privilegios correspondientes.El super usuario podra agregar nuevos usuarios con foto, nombre, cargo,cedula profesional, descripcion etc.
-
-2. Hacer una pantalla que sea para cuando super usuario recien incie en el SaaS, tipo como lo hace Ubuntu 24.04, que cuando lo instalas te pide varias cosas, va a pedir el nombre de la clinica,elegir una foto, elegir el nombre del super usuario,cedula, titulo profesional, contraesna, etc y agregar a los dependientes, y hasta como un organigrama que se pueda hacer y el mismo super usuario les active desactive acceesos a ciertos componentes. Algo asi como un setup screen.
