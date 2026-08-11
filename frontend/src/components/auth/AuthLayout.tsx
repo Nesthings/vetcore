@@ -1,5 +1,3 @@
-import { PawPrint } from 'lucide-react'
-
 export function AuthLayout({
   title,
   subtitle,
@@ -13,10 +11,12 @@ export function AuthLayout({
 }) {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-8 bg-background px-4 py-12">
-      <div className="flex flex-col items-center gap-2 text-center">
-        <div className="flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-elevated">
-          <PawPrint className="size-6" aria-hidden="true" />
-        </div>
+      <div className="flex flex-col items-center gap-3 text-center">
+        <img
+          src="/vetcore-logo.png"
+          alt="VetCore"
+          className="size-20 rounded-2xl object-contain shadow-elevated"
+        />
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">VetCore</h1>
       </div>
 
