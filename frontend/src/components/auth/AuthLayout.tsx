@@ -15,7 +15,7 @@ export function AuthLayout({
         <img
           src="/vetcore-logo.png"
           alt="VetCore"
-          className="size-20 rounded-2xl object-contain shadow-elevated"
+          className="size-30 rounded-2xl object-contain shadow-elevated"
         />
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">VetCore</h1>
       </div>
