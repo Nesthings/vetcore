@@ -19,6 +19,7 @@ from app.db.session import get_db
 from app.models import (
     Appointment,
     AppointmentWaitlist,
+    Consultation,
     InventoryMovement,
     InventoryProduct,
     Pet,
@@ -90,20 +91,36 @@ def dashboard_day(
 
     appts = list(db.scalars(select(Appointment).where(*base).order_by(Appointment.start_time)))
 
+    # Flujo de pacientes: consultas REALIZADAS por hora/día/período (en vez de
+    # citas agendadas). Usa performed_at, con created_at como respaldo.
+    cons_base = [
+        Consultation.clinic_id == clinic_id,
+        Consultation.performed_at >= start,
+        Consultation.performed_at <= end,
+    ]
+    if selected_branch:
+        cons_base.append(Consultation.branch_id == selected_branch)
+    consultas = list(
+        db.scalars(select(Consultation).where(*cons_base).order_by(Consultation.performed_at))
+    )
+
+    def _consultation_ts(c: Consultation) -> datetime:
+        return c.performed_at or c.created_at
+
     if period == "day":
-        horas = Counter(a.start_time.astimezone().hour for a in appts)
-        citas_series = [
+        horas = Counter(_consultation_ts(c).astimezone().hour for c in consultas)
+        consultas_series = [
             {"label": f"{h:02d}:00", "count": horas.get(h, 0)} for h in range(7, 21)
         ]
     else:
         days = [start_date + timedelta(days=i) for i in range(window["days"] + 1)]
-        counts = Counter(a.start_time.astimezone().date() for a in appts)
+        counts = Counter(_consultation_ts(c).astimezone().date() for c in consultas)
         if period == "week":
-            citas_series = [
+            consultas_series = [
                 {"label": WEEKDAYS[d.weekday()], "count": counts.get(d, 0)} for d in days
             ]
         else:
-            citas_series = [
+            consultas_series = [
                 {"label": d.strftime("%d/%m"), "count": counts.get(d, 0)} for d in days
             ]
 
@@ -224,7 +241,7 @@ def dashboard_day(
         "branch_id": str(selected_branch) if selected_branch else None,
         "citas_total": total,
         "citas_por_estado": citas_por_estado,
-        "citas_series": citas_series,
+        "consultas_series": consultas_series,
         "citas": citas,
         "bloques": bloques,
         "stock_alerts": stock_alerts,

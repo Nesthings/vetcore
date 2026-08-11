@@ -37,6 +37,25 @@ class Settings(BaseSettings):
     # Media (MVP: storage local; R2 cuando existan credenciales)
     media_root: str = "media"
 
+    # WhatsApp Business (Meta Cloud API)
+    whatsapp_api_version: str = "v21.0"
+    whatsapp_graph_base: str = "https://graph.facebook.com"
+    whatsapp_webhook_verify_token: str = "vetcore-verify-2026"
+
+    # Cola de mensajes salientes (Amazon SQS)
+    sqs_queue_url: str = ""
+    sqs_region: str = "us-east-1"
+    aws_access_key_id: str = ""
+    aws_secret_access_key: str = ""
+
+    # SMTP (envío de correos)
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = ""
+    smtp_starttls: bool = True
+
     @property
     def resolved_database_url(self) -> str:
         if self.database_url:

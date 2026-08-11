@@ -1,19 +1,20 @@
 import { memo, useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
+  Cake,
   ChevronDown,
   ChevronUp,
   ClipboardPlus,
   GripVertical,
-  PackageMinus,
+  Loader2,
   PanelTop,
+  PartyPopper,
   PawPrint,
   ShoppingBag,
   ShoppingCart,
   Sparkles,
   Syringe,
   Timer,
-  TriangleAlert,
   X,
 } from 'lucide-react'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
@@ -28,6 +29,7 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState } from '@/components/ui/error-state'
 import { LoadingState } from '@/components/ui/loading-state'
 import { Separator } from '@/components/ui/separator'
+import { useToast } from '@/components/ui/toast'
 import { apiFetch } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
 import { usePermissions } from '@/lib/permissions'
@@ -44,7 +46,7 @@ const DEFAULT_SECTION_ORDER: SectionId[] = ['resumen', 'modulos', 'hoy', 'dashbo
 
 const SECTION_LABELS: Record<SectionId, string> = {
   resumen: 'Resumen del día',
-  hoy: 'Citas por hora y alertas',
+  hoy: 'Hoy · Flujo de pacientes',
   citas: 'Próximas citas',
   modulos: 'Módulos',
   dashboards: 'Dashboards',
@@ -61,7 +63,7 @@ interface DayDashboard {
   period_label: string
   citas_total: number
   citas_por_estado: Record<string, number>
-  citas_series: { label: string; count: number }[]
+  consultas_series: { label: string; count: number }[]
   citas: {
     id: string
     pet_name?: string
@@ -79,6 +81,27 @@ interface DayDashboard {
   pending_purchase_orders: number
   nuevas_mascotas: number
   vacunas_hoy: number
+}
+
+interface BirthdayPet {
+  pet_id: string
+  pet_name: string
+  pet_photo?: string | null
+  age?: number | null
+  owner_name?: string | null
+  owner_phone?: string | null
+  owner_email?: string | null
+  already_sent: boolean
+}
+
+interface BirthdayData {
+  pets: BirthdayPet[]
+  settings: {
+    message: string
+    send_email: boolean
+    send_whatsapp: boolean
+    clinic_name: string
+  }
 }
 
 type Period = 'day' | 'week' | 'month'
@@ -125,7 +148,7 @@ function KpiCard({
   )
 }
 
-const CitasBarChart = memo(function CitasBarChart({
+const FlujoBarChart = memo(function FlujoBarChart({
   data,
 }: {
   data: { label: string; count: number }[]
@@ -241,6 +264,9 @@ export function Dashboard() {
   const [trayBtnDragOver, setTrayBtnDragOver] = useState(false)
   const [dashData, setDashData] = useState<Record<string, unknown>>({})
   const [period, setPeriod] = useState<Period>('day')
+  const [birthdays, setBirthdays] = useState<BirthdayData | null>(null)
+  const [birthdayBusy, setBirthdayBusy] = useState<string | null>(null)
+  const { toast } = useToast()
 
   const periodHint =
     period === 'day' ? 'hoy' : period === 'week' ? 'últimos 7 días' : 'últimos 30 días'
@@ -311,6 +337,64 @@ export function Dashboard() {
       setError(err instanceof Error ? err.message : 'No se pudo cargar el dashboard')
     }
   }, [period])
+
+  const loadBirthdays = useCallback(async () => {
+    try {
+      setBirthdays(await apiFetch<BirthdayData>('/birthdays/today'))
+    } catch {
+      // sin datos
+    }
+  }, [])
+
+  useEffect(() => {
+    loadBirthdays()
+  }, [loadBirthdays])
+
+  const celebrateBirthday = async (pet: BirthdayPet) => {
+    const channels: string[] = []
+    if (birthdays?.settings.send_email) channels.push('email')
+    if (birthdays?.settings.send_whatsapp) channels.push('whatsapp')
+    if (channels.length === 0) {
+      toast({
+        title: 'Sin canales configurados',
+        description: 'Configura el correo o WhatsApp en Configuración de la clínica.',
+        variant: 'warning',
+      })
+      return
+    }
+    setBirthdayBusy(pet.pet_id)
+    try {
+      const res = await apiFetch<{ sent: string[]; already_sent: boolean; message?: string | null }>(
+        `/birthdays/${pet.pet_id}/celebrate`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ channels }),
+        },
+      )
+      if (res.already_sent) {
+        toast({
+          title: 'Ya se felicitó',
+          description: `${pet.pet_name} ya recibió su felicitación hoy.`,
+          variant: 'info',
+        })
+      } else {
+        toast({
+          title: 'Felicitación enviada',
+          description: `Se envió a ${pet.pet_name} por ${res.sent.join(' y ')}.`,
+          variant: 'success',
+        })
+      }
+      loadBirthdays()
+    } catch (err) {
+      toast({
+        title: 'No se pudo enviar',
+        description: err instanceof Error ? err.message : 'Ocurrió un error',
+        variant: 'error',
+      })
+    } finally {
+      setBirthdayBusy(null)
+    }
+  }
 
   useEffect(() => {
     load()
@@ -481,45 +565,101 @@ export function Dashboard() {
                     <Card className="shadow-card lg:col-span-2">
                       <CardHeader>
                         <CardTitle className="font-display">
-                          {period === 'day' ? 'Citas por hora' : 'Citas por período'}
+                          {period === 'day'
+                            ? 'Flujo de pacientes por hora'
+                            : 'Flujo de pacientes por período'}
                         </CardTitle>
                         <CardDescription>
                           {period === 'day'
-                            ? 'Distribución de citas de hoy'
+                            ? 'Consultas atendidas por hora hoy'
                             : period === 'week'
-                              ? 'Citas de los últimos 7 días'
-                              : 'Citas de los últimos 30 días'}
+                              ? 'Consultas atendidas en los últimos 7 días'
+                              : 'Consultas atendidas en los últimos 30 días'}
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="h-64">
-                        <CitasBarChart data={data.citas_series} />
+                        <FlujoBarChart data={data.consultas_series} />
                       </CardContent>
                     </Card>
 
                     <Card className="shadow-card">
                       <CardHeader>
-                        <CardTitle className="font-display">Alertas de stock</CardTitle>
-                        <CardDescription>Productos bajo el umbral mínimo</CardDescription>
+                        <CardTitle className="flex items-center gap-2 font-display">
+                          <Cake className="size-4 text-pink-500" aria-hidden="true" /> Cumpleaños del
+                          día
+                        </CardTitle>
+                        <CardDescription>Mascotas que cumplen años hoy</CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-3">
-                        {data.stock_alerts.length === 0 ? (
-                          <div className="flex items-center gap-2 rounded-lg bg-success/10 px-3 py-2 text-sm text-success">
-                            <PackageMinus className="size-4" aria-hidden="true" />
-                            Sin alertas de stock
+                        {!birthdays ? (
+                          <LoadingState label="Cargando…" />
+                        ) : birthdays.pets.length === 0 ? (
+                          <div className="flex items-center gap-2 rounded-lg bg-secondary/60 px-3 py-2 text-sm text-muted-foreground">
+                            <Cake className="size-4 shrink-0" aria-hidden="true" />
+                            Sin cumpleaños hoy
                           </div>
                         ) : (
-                          data.stock_alerts.map((p) => (
-                            <div
-                              key={p.product_id}
-                              className="flex items-center justify-between rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-sm"
-                            >
-                              <div className="flex items-center gap-2">
-                                <TriangleAlert className="size-4 text-warning" aria-hidden="true" />
-                                <span className="font-medium">{p.name}</span>
+                          <>
+                            {birthdays.pets.map((p) => (
+                              <div
+                                key={p.pet_id}
+                                className="flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2"
+                              >
+                                <div className="flex min-w-0 items-center gap-2">
+                                  <div className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-secondary">
+                                    {p.pet_photo ? (
+                                      <img
+                                        src={p.pet_photo}
+                                        alt={p.pet_name}
+                                        className="size-full object-cover"
+                                      />
+                                    ) : (
+                                      <Cake className="size-4 text-pink-500" aria-hidden="true" />
+                                    )}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="truncate text-sm font-medium">
+                                      {p.pet_name}
+                                      {p.age != null && (
+                                        <span className="text-muted-foreground">
+                                          {' '}
+                                          · {p.age} años
+                                        </span>
+                                      )}
+                                    </p>
+                                    {p.owner_name && (
+                                      <p className="truncate text-xs text-muted-foreground">
+                                        Dueño: {p.owner_name}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                                {p.already_sent ? (
+                                  <Badge variant="soft-success">Felicitado</Badge>
+                                ) : (
+                                  <Button
+                                    size="sm"
+                                    variant="soft"
+                                    onClick={() => celebrateBirthday(p)}
+                                    disabled={birthdayBusy === p.pet_id}
+                                  >
+                                    {birthdayBusy === p.pet_id ? (
+                                      <Loader2 className="animate-spin" />
+                                    ) : (
+                                      <PartyPopper className="size-3.5" />
+                                    )}
+                                    Felicitar
+                                  </Button>
+                                )}
                               </div>
-                              <Badge variant="warning">{p.stock} en stock</Badge>
-                            </div>
-                          ))
+                            ))}
+                            {!birthdays.settings.send_email && !birthdays.settings.send_whatsapp && (
+                              <p className="text-xs text-muted-foreground">
+                                Configura el mensaje y los canales (correo/WhatsApp) en
+                                Configuración de la clínica.
+                              </p>
+                            )}
+                          </>
                         )}
                       </CardContent>
                     </Card>

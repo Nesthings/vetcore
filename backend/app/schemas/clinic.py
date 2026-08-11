@@ -60,6 +60,9 @@ class ClinicUpdate(BaseModel):
     currency: str | None = Field(default=None, max_length=10)
     setup_completed: bool | None = None
     stock_alert_threshold: float | None = Field(default=None, ge=0, le=10000)
+    birthday_message: str | None = Field(default=None, max_length=2000)
+    birthday_send_email: bool | None = None
+    birthday_send_whatsapp: bool | None = None
 
 
 class ClinicRead(ClinicBase):
@@ -70,8 +73,51 @@ class ClinicRead(ClinicBase):
     logo_url: str | None = None
     setup_completed: bool
     stock_alert_threshold: float
+    birthday_message: str | None = None
+    birthday_send_email: bool = False
+    birthday_send_whatsapp: bool = False
+    whatsapp_phone_number: str | None = None
+    whatsapp_phone_number_id: str | None = None
+    whatsapp_business_account_id: str | None = None
+    whatsapp_enabled: bool = False
     created_at: datetime
     updated_at: datetime
+
+
+class WhatsAppConfig(BaseModel):
+    """Credenciales de WhatsApp Business (Cloud API) de la clínica.
+
+    El `access_token` es sensible: se cifra en la BD y nunca se devuelve.
+    """
+
+    phone_number: str | None = Field(default=None, max_length=30)
+    phone_number_id: str | None = Field(default=None, max_length=100)
+    business_account_id: str | None = Field(default=None, max_length=100)
+    access_token: str | None = Field(default=None, max_length=1024)
+    reminder_template: str | None = Field(default=None, max_length=100)
+    birthday_template: str | None = Field(default=None, max_length=100)
+    receipt_template: str | None = Field(default=None, max_length=100)
+    receipt_document_template: str | None = Field(default=None, max_length=100)
+    cartilla_template: str | None = Field(default=None, max_length=100)
+    template_language: str | None = Field(default=None, max_length=20)
+
+
+class WhatsAppTestRequest(BaseModel):
+    to: str = Field(default="", max_length=30, description="Teléfono E.164 de destino")
+
+
+class WhatsAppStatus(BaseModel):
+    enabled: bool
+    phone_number: str | None
+    phone_number_id: str | None
+    business_account_id: str | None
+    token_configured: bool
+    reminder_template: str | None = None
+    birthday_template: str | None = None
+    receipt_template: str | None = None
+    receipt_document_template: str | None = None
+    cartilla_template: str | None = None
+    template_language: str = "es_MX"
 
 
 class ClinicInviteCreate(BaseModel):

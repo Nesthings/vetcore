@@ -46,7 +46,7 @@ const ICON_STYLES: Record<ToastVariant, string> = {
 
 let counter = 0
 
-function Toaster() {
+function Toaster({ children }: { children?: React.ReactNode }) {
   const [toasts, setToasts] = React.useState<ToastItem[]>([])
 
   const dismiss = React.useCallback((id: number) => {
@@ -66,6 +66,7 @@ function Toaster() {
 
   return (
     <ToastContext.Provider value={{ toast }}>
+      {children}
       <div
         className="pointer-events-none fixed bottom-4 right-4 z-[100] flex w-full max-w-sm flex-col gap-2"
         aria-live="polite"

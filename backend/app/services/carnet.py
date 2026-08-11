@@ -8,6 +8,8 @@ dueño (`share.py`) y el portal (`owner.py`). Produce una estructura con:
   manuales), sin duplicar las que provienen de una dosis (`dose_id`).
 """
 
+from datetime import date, timedelta
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
@@ -25,7 +27,7 @@ from app.models import (
 )
 
 
-def _application_from_dose(dose: PetVaccinationDose, vet_names: dict) -> dict:
+def _application_from_dose(dose: PetVaccinationDose, vet_names: dict, vet_photos: dict) -> dict:
     return {
         "id": str(dose.id),
         "source": "plan",
@@ -34,10 +36,11 @@ def _application_from_dose(dose: PetVaccinationDose, vet_names: dict) -> dict:
         "lot": dose.lot,
         "notes": None,
         "vet_name": vet_names.get(str(dose.applied_by)),
+        "vet_photo_url": vet_photos.get(str(dose.applied_by)),
     }
 
 
-def _application_from_record(record: PetCarnetRecord, vet_names: dict) -> dict:
+def _application_from_record(record: PetCarnetRecord, vet_names: dict, vet_photos: dict) -> dict:
     return {
         "id": str(record.id),
         "source": "manual",
@@ -46,6 +49,7 @@ def _application_from_record(record: PetCarnetRecord, vet_names: dict) -> dict:
         "lot": record.lot,
         "notes": record.notes,
         "vet_name": vet_names.get(str(record.vet_user_id)),
+        "vet_photo_url": vet_photos.get(str(record.vet_user_id)),
     }
 
 
@@ -140,7 +144,22 @@ def build_carnet(db: Session, pet: Pet) -> dict:
         if r.vet_user_id
     } | {str(d.applied_by) for d in completed_doses if d.applied_by}
     vet_names = (
-        dict(db.execute(select(User.id, User.full_name).where(User.id.in_(user_ids))).all())
+        {
+            str(uid): name
+            for uid, name in db.execute(
+                select(User.id, User.full_name).where(User.id.in_(user_ids))
+            ).all()
+        }
+        if user_ids
+        else {}
+    )
+    vet_photos = (
+        {
+            str(uid): photo
+            for uid, photo in db.execute(
+                select(User.id, User.photo_url).where(User.id.in_(user_ids))
+            ).all()
+        }
         if user_ids
         else {}
     )
@@ -162,8 +181,38 @@ def build_carnet(db: Session, pet: Pet) -> dict:
         if record.dose_id is not None:
             continue  # ya representado por la dosis
         by_vaccine.setdefault(record.vaccine, []).append(
-            _application_from_record(record, vet_names)
+            _application_from_record(record, vet_names, vet_photos)
         )
+
+    def _next_application(
+        vaccine_doses: list[PetVaccinationDose],
+        steps: list[dict],
+        applications: list[dict],
+    ) -> dict | None:
+        """Siguiente aplicación según el esquema: la dosis real programada si el
+        plan está asignado; si no, se infiere de la última aplicación + intervalo."""
+        today = date.today()
+        upcoming = [
+            d for d in vaccine_doses if d.status == "scheduled" and d.due_date >= today
+        ]
+        if upcoming:
+            nxt = min(upcoming, key=lambda d: d.due_date)
+            return {"label": nxt.label, "due_date": nxt.due_date.isoformat()}
+        if steps:
+            if applications:
+                applied = len(applications)
+                if applied < len(steps):
+                    last = max(date.fromisoformat(a["date_applied"]) for a in applications)
+                    prev_offset = steps[applied - 1]["offset_days"]
+                    nxt_step = steps[applied]
+                    interval = nxt_step["offset_days"] - prev_offset
+                    return {
+                        "label": nxt_step["label"],
+                        "due_date": (last + timedelta(days=interval)).isoformat(),
+                    }
+            else:
+                return {"label": steps[0]["label"], "due_date": None}
+        return None
 
     vaccines: list[dict] = []
     seen = set()
@@ -171,7 +220,7 @@ def build_carnet(db: Session, pet: Pet) -> dict:
         name = _vaccine_key(plan)
         seen.add(name)
         app_from_doses = [
-            _application_from_dose(d, vet_names)
+            _application_from_dose(d, vet_names, vet_photos)
             for d in completed_doses
             if assign_plan_name.get(str(d.pet_vaccination_plan_id)) == name
         ]
@@ -205,6 +254,11 @@ def build_carnet(db: Session, pet: Pet) -> dict:
                     for d in assigned_doses
                 ],
                 "applications": applications,
+                "next_application": _next_application(
+                    assigned_doses,
+                    [{"label": s.label, "offset_days": s.offset_days} for s in (plan.steps or [])],
+                    applications,
+                ),
             }
         )
 
@@ -220,6 +274,7 @@ def build_carnet(db: Session, pet: Pet) -> dict:
                     "steps": [],
                     "doses": [],
                     "applications": apps,
+                    "next_application": None,
                 }
             )
             seen.add(vaccine)

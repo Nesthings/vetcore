@@ -130,6 +130,7 @@ interface CarnetApp {
   lot?: string | null
   notes?: string | null
   vet_name?: string | null
+  vet_photo_url?: string | null
   source?: string | null
 }
 
@@ -148,6 +149,7 @@ interface CarnetVaccine {
   steps: { label: string; offset_days: number }[]
   doses: CarnetDose[]
   applications: CarnetApp[]
+  next_application?: { label: string; due_date: string | null } | null
 }
 
 interface FamilyMember {
@@ -208,10 +210,22 @@ function CarnetApps({ apps, onRemove }: { apps: CarnetApp[]; onRemove: (id: stri
               </button>
             )}
           </div>
-          {(app.lot || app.vet_name) && (
-            <p className="mt-0.5 break-words text-xs text-muted-foreground">
-              {[app.lot && `Lote ${app.lot}`, app.vet_name].filter(Boolean).join(' · ')}
-            </p>
+          {app.lot && <p className="mt-0.5 break-words text-xs text-muted-foreground">Lote {app.lot}</p>}
+          {app.vet_name && (
+            <div className="mt-1 flex items-center gap-1.5">
+              {app.vet_photo_url ? (
+                <img
+                  src={app.vet_photo_url}
+                  alt={app.vet_name}
+                  className="size-5 shrink-0 rounded-full border border-border object-cover"
+                />
+              ) : (
+                <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-secondary text-[10px] font-semibold text-secondary-foreground">
+                  {app.vet_name[0]?.toUpperCase()}
+                </span>
+              )}
+              <span className="truncate text-xs font-medium text-foreground">{app.vet_name}</span>
+            </div>
           )}
           {app.notes && (
             <p className="mt-0.5 break-words text-xs text-muted-foreground">{app.notes}</p>
@@ -330,6 +344,36 @@ function sexLabel(sex?: string | null): string | null {
   if (isMale(sex)) return 'Macho'
   if (isFemale(sex)) return 'Hembra'
   return null
+}
+
+// Acento rosa/azul según el sexo, con el degradado persistente a lo largo de
+// la tarjeta (no solo en la parte de arriba), para un look unificado.
+function petAccent(sex?: string | null) {
+  if (isMale(sex)) {
+    return {
+      gradient: 'from-sky-500/[0.14] via-primary/[0.04] to-sky-500/[0.08]',
+      ring: 'border-sky-400/70',
+      speciesBg: 'bg-sky-500',
+      chip: 'bg-sky-500/10 text-sky-700 hover:bg-sky-500/10 dark:text-sky-300',
+      glow: 'shadow-[0_0_30px_-4px_rgba(14,165,233,0.55)]',
+    }
+  }
+  if (isFemale(sex)) {
+    return {
+      gradient: 'from-pink-500/[0.14] via-primary/[0.04] to-pink-500/[0.08]',
+      ring: 'border-pink-400/70',
+      speciesBg: 'bg-pink-500',
+      chip: 'bg-pink-500/10 text-pink-700 hover:bg-pink-500/10 dark:text-pink-300',
+      glow: 'shadow-[0_0_30px_-4px_rgba(236,72,153,0.55)]',
+    }
+  }
+  return {
+    gradient: 'from-slate-500/[0.10] via-primary/[0.03] to-slate-500/[0.06]',
+    ring: 'border-primary/20',
+    speciesBg: 'bg-primary',
+    chip: 'bg-primary/10 text-primary hover:bg-primary/10',
+    glow: 'shadow-glow',
+  }
 }
 
 function Stat({
@@ -621,40 +665,16 @@ export function PetDetail() {
       {loading && <LoadingState label="Cargando ficha…" />}
 
       {pet && !error && (
-        <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
+        <div className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-card">
+          <div
+            className={`pointer-events-none absolute inset-0 bg-gradient-to-b ${petAccent(pet.sex).gradient}`}
+            aria-hidden="true"
+          />
           <div className="relative overflow-hidden">
             {(() => {
-              const male = isMale(pet.sex)
-              const female = isFemale(pet.sex)
-              const accent = male
-                ? {
-                    gradient: 'from-sky-500/[0.16] via-primary/[0.03] to-transparent',
-                    ring: 'border-sky-400/70',
-                    speciesBg: 'bg-sky-500',
-                    chip: 'bg-sky-500/10 text-sky-700 hover:bg-sky-500/10 dark:text-sky-300',
-                    glow: 'shadow-[0_0_30px_-4px_rgba(14,165,233,0.55)]',
-                  }
-                : female
-                  ? {
-                      gradient: 'from-pink-500/[0.16] via-primary/[0.03] to-transparent',
-                      ring: 'border-pink-400/70',
-                      speciesBg: 'bg-pink-500',
-                      chip: 'bg-pink-500/10 text-pink-700 hover:bg-pink-500/10 dark:text-pink-300',
-                      glow: 'shadow-[0_0_30px_-4px_rgba(236,72,153,0.55)]',
-                    }
-                  : {
-                      gradient: 'from-slate-500/[0.12] via-primary/[0.03] to-transparent',
-                      ring: 'border-primary/20',
-                      speciesBg: 'bg-primary',
-                      chip: 'bg-primary/10 text-primary hover:bg-primary/10',
-                      glow: 'shadow-glow',
-                    }
+              const accent = petAccent(pet.sex)
               return (
                 <>
-                  <div
-                    className={`pointer-events-none absolute inset-0 bg-gradient-to-b ${accent.gradient}`}
-                    aria-hidden="true"
-                  />
                   <div className="relative flex flex-col items-center p-6 pt-8 text-center sm:p-8">
                     <div className="relative">
                       <PetQrCard
@@ -935,16 +955,21 @@ export function PetDetail() {
                     <Table className="table-fixed [&_th]:border-l [&_th:first-child]:border-l-0 [&_td]:border-l [&_td:first-child]:border-l-0">
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="w-[21%] whitespace-normal">Vacuna</TableHead>
-                          <TableHead className="w-[12%] whitespace-normal">Marca</TableHead>
-                          <TableHead className="w-[17%] whitespace-normal">
+                          <TableHead className="w-[17%] whitespace-normal">Vacuna</TableHead>
+                          <TableHead className="w-[10%] whitespace-normal">Marca</TableHead>
+                          <TableHead className="w-[14%] whitespace-normal">
                             Enfermedades que previene
                           </TableHead>
-                          <TableHead className="w-[23%] whitespace-normal">
+                          <TableHead className="w-[19%] whitespace-normal">
                             Esquema recomendado
                           </TableHead>
-                          <TableHead className="w-[15%] whitespace-normal">Aplicaciones</TableHead>
-                          <TableHead className="w-[12%] whitespace-normal text-right">
+                          <TableHead className="w-[19%] whitespace-normal">
+                            Última aplicación
+                          </TableHead>
+                          <TableHead className="w-[12%] whitespace-normal">
+                            Siguiente aplicación
+                          </TableHead>
+                          <TableHead className="w-[9%] whitespace-normal text-right">
                             Registrar
                           </TableHead>
                         </TableRow>
@@ -984,6 +1009,26 @@ export function PetDetail() {
                               <TableCell className="whitespace-normal">
                                 <CarnetApps apps={v.applications} onRemove={removeCarnetApp} />
                               </TableCell>
+                              <TableCell className="whitespace-normal text-xs">
+                                {v.next_application ? (
+                                  <>
+                                    <p className="font-medium text-foreground">
+                                      {v.next_application.label}
+                                    </p>
+                                    {v.next_application.due_date ? (
+                                      <p className="mt-0.5 text-muted-foreground">
+                                        {new Date(v.next_application.due_date).toLocaleDateString(
+                                          'es-MX',
+                                        )}
+                                      </p>
+                                    ) : (
+                                      <p className="mt-0.5 text-muted-foreground">por definir</p>
+                                    )}
+                                  </>
+                                ) : (
+                                  <span className="text-muted-foreground">—</span>
+                                )}
+                              </TableCell>
                               <TableCell className="text-right">
                                 <Button
                                   variant="outline"
@@ -996,7 +1041,7 @@ export function PetDetail() {
                             </TableRow>
                             {addingFor === v.name && (
                               <TableRow>
-                                <TableCell colSpan={6} className="bg-muted/30">
+                                <TableCell colSpan={7} className="bg-muted/30">
                                   <CarnetAppForm {...carnetFormProps(v.name)} />
                                 </TableCell>
                               </TableRow>
@@ -1049,10 +1094,28 @@ export function PetDetail() {
                         )}
                         <div className="mt-3">
                           <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                            Aplicaciones
+                            Última aplicación
                           </p>
                           <CarnetApps apps={v.applications} onRemove={removeCarnetApp} />
                         </div>
+                        {v.next_application && (
+                          <div className="mt-3">
+                            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                              Siguiente aplicación
+                            </p>
+                            <p className="text-sm">
+                              <span className="font-medium">{v.next_application.label}</span>
+                              {v.next_application.due_date ? (
+                                <span className="text-muted-foreground">
+                                  {' · '}
+                                  {new Date(v.next_application.due_date).toLocaleDateString('es-MX')}
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground"> · por definir</span>
+                              )}
+                            </p>
+                          </div>
+                        )}
                         {addingFor === v.name && (
                           <div className="mt-3 border-t border-border pt-3">
                             <CarnetAppForm {...carnetFormProps(v.name)} />

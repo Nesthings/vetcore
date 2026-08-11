@@ -24,6 +24,7 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { useToast } from '@/components/ui/toast'
 import { BrandCombobox } from '@/components/pets/BrandCombobox'
 import type { Pet, PetOwner } from '@/pages/Pets'
 import { apiFetch } from '@/lib/api'
@@ -78,6 +79,7 @@ const fmtDate = (iso: string) =>
 
 export function NewConsultation() {
   const params = useParams<{ id: string }>()
+  const { toast } = useToast()
   const [searchParams] = useSearchParams()
   const petParam = searchParams.get('pet') || params.id || ''
 
@@ -105,6 +107,13 @@ export function NewConsultation() {
   const [vaccDate, setVaccDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [vaccBusy, setVaccBusy] = useState(false)
   const [vaccMsg, setVaccMsg] = useState<string | null>(null)
+  const [lastVacc, setLastVacc] = useState<{
+    vaccine: string
+    brand?: string | null
+    date: string
+    lot?: string | null
+    source: string
+  } | null>(null)
 
   const [branchId, setBranchId] = useState('')
   const [vetUserId, setVetUserId] = useState('')
@@ -155,6 +164,7 @@ export function NewConsultation() {
       setCarnetBrands(carnet.brands ?? [])
       setVaccOpen(false)
       setVaccMsg(null)
+      setLastVacc(null)
       const ow = p.owners?.find((o) => o.is_active) ?? null
       setOwner(ow)
       setWeight('')
@@ -277,12 +287,28 @@ export function NewConsultation() {
           }),
         })
       }
+      const details = {
+        vaccine: vaccName,
+        brand: vaccBrand || null,
+        date: vaccDate,
+        lot: vaccLot || null,
+        source: dose ? 'Dosis del esquema completada' : 'Aplicación manual',
+      }
+      setLastVacc(details)
       setVaccOpen(false)
       setVaccBrand('')
       setVaccLot('')
       setVaccVet('')
       await reloadVaccination()
       setVaccMsg('Vacunación registrada.')
+      toast({
+        title: 'Vacunación registrada en el carnet',
+        description: `${details.vaccine}${details.brand ? ` · ${details.brand}` : ''} · ${fmtDate(
+          details.date,
+        )}${details.lot ? ` · Lote ${details.lot}` : ''} · ${details.source}`,
+        variant: 'success',
+        duration: 6000,
+      })
     } catch (err) {
       setVaccMsg(err instanceof Error ? err.message : 'No se pudo registrar la vacunación')
     } finally {
@@ -859,6 +885,22 @@ export function NewConsultation() {
                   <p className="text-sm text-muted-foreground">
                     Sin dosis de vacunación programadas.
                   </p>
+                )}
+
+                {lastVacc && (
+                  <div className="flex items-start gap-2 rounded-lg border border-success/30 bg-success/10 px-3 py-2.5">
+                    <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-success" aria-hidden="true" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-success">
+                        Vacunación registrada en el carnet
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {lastVacc.vaccine}
+                        {lastVacc.brand ? ` · ${lastVacc.brand}` : ''} · {fmtDate(lastVacc.date)}
+                        {lastVacc.lot ? ` · Lote ${lastVacc.lot}` : ''} · {lastVacc.source}
+                      </p>
+                    </div>
+                  </div>
                 )}
 
                 {vaccOpen && (

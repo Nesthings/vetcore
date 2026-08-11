@@ -28,12 +28,6 @@ export const DASHBOARD_CATALOG: DashboardDef[] = [
     chart: 'heatmap',
   },
   {
-    slug: 'appt_funnel',
-    title: 'Embudo de la cita',
-    desc: 'Agendadas → confirmadas → completadas → encuestadas',
-    chart: 'funnel',
-  },
-  {
     slug: 'procedures',
     title: 'Procedimientos de citas',
     desc: 'Tipos de cita más frecuentes',
@@ -58,16 +52,10 @@ export const DASHBOARD_CATALOG: DashboardDef[] = [
     chart: 'donut',
   },
   {
-    slug: 'upcoming_doses',
-    title: 'Próximas dosis',
-    desc: 'Dosis de vacunación por día (60 días)',
-    chart: 'line',
-  },
-  {
-    slug: 'stock_levels',
-    title: 'Niveles de stock',
-    desc: 'Productos agotados, bajos y sanos',
-    chart: 'radial',
+    slug: 'stock_alerts',
+    title: 'Alertas de stock',
+    desc: 'Productos de inventario bajo el umbral',
+    chart: 'stacked',
   },
   {
     slug: 'inv_movements',

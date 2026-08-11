@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.api.deps import CurrentClinic, get_current_clinic, require_component
 from app.api.inventory import allocate_fifo
 from app.core.events import record_audit
+from app.core.storage import public_url, save_media
 from app.db.session import get_db
 from app.models import (
     Clinic,
@@ -28,6 +29,7 @@ from app.models import (
 )
 from app.schemas.billing import InvoiceCreate, InvoiceItemCreate, InvoiceRead, InvoiceUpdate
 from app.services.pdf import build_invoice_receipt_pdf
+from app.services.whatsapp import send_receipt_summary
 
 router = APIRouter(
     prefix="/invoices",
@@ -189,6 +191,26 @@ def create_invoice(
     invoice.total = total.quantize(Decimal("0.01"))
     db.add(invoice)
     db.commit()
+
+    if body.send_receipt_whatsapp:
+        pet_name = "Venta mostrador"
+        if body.pet_id:
+            pet = db.get(Pet, body.pet_id)
+            pet_name = pet.name if pet else pet_name
+        clinic = db.get(Clinic, ctx.clinic["id"])
+        receipt_url = _receipt_pdf_url(db, invoice)
+        send_receipt_summary(
+            db,
+            ctx.clinic["id"],
+            body.owner_id,
+            pet_name,
+            float(invoice.total),
+            clinic.name if clinic else "",
+            str(invoice.id)[:8].upper(),
+            invoice.id,
+            receipt_pdf_url=receipt_url,
+        )
+        db.commit()
     return _with_names(db, [_get_invoice_or_404(db, ctx.clinic["id"], str(invoice.id))])[0]
 
 
@@ -202,8 +224,7 @@ def invoice_receipt(
     return receipt_response(db, invoice)
 
 
-def receipt_response(db: Session, invoice: Invoice) -> Response:
-    """Genera la respuesta PDF de un recibo (reutilizada por el dueño, 2.5)."""
+def _receipt_data(db: Session, invoice: Invoice) -> dict:
     clinic = db.get(Clinic, invoice.clinic_id)
     pet = db.get(Pet, invoice.pet_id) if invoice.pet_id else None
 
@@ -224,7 +245,7 @@ def receipt_response(db: Session, invoice: Invoice) -> Response:
             }
         )
 
-    data = {
+    return {
         "clinic_name": clinic.name if clinic else "—",
         "invoice_id": str(invoice.id)[:8].upper(),
         "pet_name": pet.name if pet else "—",
@@ -233,7 +254,17 @@ def receipt_response(db: Session, invoice: Invoice) -> Response:
         "items": items,
         "total": float(invoice.total),
     }
-    pdf = build_invoice_receipt_pdf(data)
+
+
+def _receipt_pdf_url(db: Session, invoice: Invoice) -> str:
+    pdf = build_invoice_receipt_pdf(_receipt_data(db, invoice))
+    rel = save_media("receipts", f"recibo_{invoice.id}.pdf", pdf)
+    return public_url(rel)
+
+
+def receipt_response(db: Session, invoice: Invoice) -> Response:
+    """Genera la respuesta PDF de un recibo (reutilizada por el dueño, 2.5)."""
+    pdf = build_invoice_receipt_pdf(_receipt_data(db, invoice))
     return Response(
         content=pdf,
         media_type="application/pdf",

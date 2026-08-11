@@ -26,7 +26,6 @@ interface TransferResult {
   owner_id: string
   reused: boolean
   links_revoked: number
-  invitation: { token: string; activation_url: string; expires_at: string }
 }
 
 export function TransferOwnerDialog({
@@ -44,6 +43,7 @@ export function TransferOwnerDialog({
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
   const [result, setResult] = useState<TransferResult | null>(null)
+  const [shareUrl, setShareUrl] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
@@ -53,6 +53,7 @@ export function TransferOwnerDialog({
     setPhone('')
     setEmail('')
     setResult(null)
+    setShareUrl('')
     setError(null)
     setCopied(false)
     apiFetch<OwnerLink[]>(`/pets/${petId}/owner-links`)
@@ -70,6 +71,8 @@ export function TransferOwnerDialog({
         body: JSON.stringify({ contact_phone: phone || null, contact_email: email || null }),
       })
       setResult(res)
+      const share = await apiFetch<{ url: string }>(`/pets/${petId}/share-link`, { method: 'POST' })
+      setShareUrl(`${window.location.origin}${share.url}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo transferir el dueño')
     } finally {
@@ -78,14 +81,11 @@ export function TransferOwnerDialog({
   }
 
   const copyLink = () => {
-    const link = `${window.location.origin}${result?.invitation.activation_url}`
-    navigator.clipboard?.writeText(link).then(() => {
+    navigator.clipboard?.writeText(shareUrl).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     })
   }
-
-  const fullLink = result ? `${window.location.origin}${result.invitation.activation_url}` : ''
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -161,11 +161,11 @@ export function TransferOwnerDialog({
             </div>
             <div>
               <p className="mb-1.5 text-sm font-medium">
-                Invita al nuevo dueño a activar su cuenta:
+                Comparte la cartilla con el nuevo dueño:
               </p>
               <div className="flex items-center gap-2">
                 <code className="min-w-0 flex-1 truncate rounded-md border border-border bg-muted px-3 py-2 text-xs">
-                  {fullLink}
+                  {shareUrl}
                 </code>
                 <Button type="button" variant="outline" size="sm" onClick={copyLink}>
                   <Copy /> {copied ? 'Copiado' : 'Copiar'}

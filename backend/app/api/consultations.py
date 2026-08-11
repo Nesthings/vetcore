@@ -45,6 +45,7 @@ from app.schemas.consultation import (
 )
 from app.schemas.crm import SurveyRead
 from app.services.pdf import build_consultation_summary_pdf, build_invoice_receipt_pdf
+from app.services.whatsapp import send_receipt_summary
 
 router = APIRouter(
     prefix="/consultations",
@@ -376,6 +377,20 @@ def checkout_consultation(
     receipt_rel = save_media("receipts", f"recibo_{invoice.id}.pdf", receipt_bytes)
     receipt_url = public_url(receipt_rel)
     db.commit()
+
+    if body.send_receipt_whatsapp:
+        send_receipt_summary(
+            db,
+            clinic_id,
+            owner_id,
+            summary_data["pet_name"],
+            float(invoice.total),
+            clinic.name,
+            str(invoice.id)[:8].upper(),
+            invoice.id,
+            receipt_pdf_url=receipt_url,
+        )
+        db.commit()
 
     return CheckoutResult(
         consultation_id=consultation.id,

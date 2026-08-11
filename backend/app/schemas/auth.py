@@ -25,11 +25,6 @@ class MeResponse(BaseModel):
     setup_completed: bool | None = None
 
 
-class ActivateRequest(BaseModel):
-    token: str
-    password: str = Field(min_length=8, max_length=128)
-
-
 class ForgotPasswordRequest(BaseModel):
     email: str
 

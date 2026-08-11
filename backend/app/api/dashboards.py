@@ -6,12 +6,13 @@ Financiero). El frontend arma la gráfica según el `slug`.
 """
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import text
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from app.api.deps import CurrentClinic, get_current_clinic
 from app.core.clinic_settings import clinic_stock_threshold
 from app.db.session import get_db
+from app.models import InventoryMovement, InventoryProduct
 
 router = APIRouter(prefix="/dashboards", tags=["dashboards"])
 
@@ -83,45 +84,6 @@ def _appt_heatmap(db: Session, cid: str, period: str) -> dict:
         "hours": list(range(8, 21)),
         "data": [{"day": r.day, "hour": r.hour, "value": r.value} for r in rows],
     }
-
-
-def _appt_funnel(db: Session, cid: str, period: str) -> list[dict]:
-    window = PERIOD_WINDOW[period]
-    total = db.execute(
-        text(
-            "SELECT count(*) FROM appointments WHERE clinic_id = :c AND start_time >= "
-            f"{window} AND status <> 'cancelled'"
-        ),
-        {"c": cid},
-    ).scalar() or 0
-    confirmed = db.execute(
-        text(
-            "SELECT count(*) FROM appointments WHERE clinic_id = :c AND start_time >= "
-            f"{window} AND status = 'confirmed'"
-        ),
-        {"c": cid},
-    ).scalar() or 0
-    completed = db.execute(
-        text(
-            "SELECT count(*) FROM appointments WHERE clinic_id = :c AND start_time >= "
-            f"{window} AND status = 'completed'"
-        ),
-        {"c": cid},
-    ).scalar() or 0
-    surveyed = db.execute(
-        text(
-            "SELECT count(*) FROM consultation_surveys s "
-            "JOIN consultations c ON c.id = s.consultation_id "
-            "WHERE c.clinic_id = :cid AND c.created_at >= " + window
-        ),
-        {"cid": cid},
-    ).scalar() or 0
-    return [
-        {"name": "Agendadas", "value": total},
-        {"name": "Confirmadas", "value": confirmed},
-        {"name": "Completadas", "value": completed},
-        {"name": "Encuestadas", "value": surveyed},
-    ]
 
 
 def _procedures(db: Session, cid: str, period: str) -> list[dict]:
@@ -245,40 +207,28 @@ def _vaccination(db: Session, cid: str, period: str, branch_id: str | None = Non
     return [{"name": labels.get(r.name, r.name), "value": r.value} for r in rows]
 
 
-def _upcoming_doses(db: Session, cid: str, period: str, branch_id: str | None = None) -> list[dict]:
-    days = {"day": 1, "week": 7, "month": 30}[period]
-    where = (
-        "p.clinic_id = :c AND d.status = 'scheduled' "
-        f"AND d.due_date BETWEEN current_date AND current_date + {days}"
-    )
-    params: dict = {"c": cid}
-    if branch_id:
-        where += " AND p.branch_id = :b"
-        params["b"] = branch_id
-    rows = db.execute(
-        text(
-            "SELECT to_char(due_date, 'MM-DD') AS label, count(*) AS value "
-            "FROM pet_vaccination_doses d "
-            "JOIN pet_vaccination_plans p ON p.id = d.pet_vaccination_plan_id "
-            f"WHERE {where} GROUP BY due_date ORDER BY due_date"
-        ),
-        params,
-    ).all()
-    return [{"label": r.label, "value": r.value} for r in rows]
-
-
-def _stock_levels(db: Session, cid: str, period: str) -> list[dict]:
+def _stock_alerts(db: Session, cid: str, period: str) -> list[dict]:
+    """Productos de inventario bajo el umbral (lista, no gráfica)."""
     threshold = clinic_stock_threshold(db, cid)
     rows = db.execute(
-        text(
-            "SELECT CASE WHEN stock_quantity <= 0 THEN 'Agotado' "
-            f"WHEN stock_quantity <= {threshold} THEN 'Bajo' ELSE 'Sano' END AS name, "
-            "count(*) AS value "
-            "FROM sale_products WHERE clinic_id = :c GROUP BY 1"
-        ),
-        {"c": cid},
+        select(
+            InventoryProduct.id,
+            InventoryProduct.name,
+            func.coalesce(func.sum(InventoryMovement.quantity_delta), 0).label("stock"),
+        )
+        .outerjoin(
+            InventoryMovement,
+            InventoryMovement.product_id == InventoryProduct.id,
+        )
+        .where(InventoryProduct.clinic_id == cid)
+        .group_by(InventoryProduct.id, InventoryProduct.name)
+        .having(func.coalesce(func.sum(InventoryMovement.quantity_delta), 0) <= threshold)
+        .order_by(InventoryProduct.name)
     ).all()
-    return [{"name": r.name, "value": r.value} for r in rows]
+    return [
+        {"product_id": str(r.id), "name": r.name, "stock": float(r.stock), "threshold": threshold}
+        for r in rows
+    ]
 
 
 def _inv_movements(db: Session, cid: str, period: str) -> list[dict]:
@@ -318,12 +268,10 @@ _BUILDERS = {
     "breeds": _breeds,
     "new_pets": _new_pets,
     "appt_heatmap": _appt_heatmap,
-    "appt_funnel": _appt_funnel,
     "procedures": _procedures,
     "vet_load": _vet_load,
     "vaccination": _vaccination,
-    "upcoming_doses": _upcoming_doses,
-    "stock_levels": _stock_levels,
+    "stock_alerts": _stock_alerts,
     "inv_movements": _inv_movements,
     "reasons": _reasons,
 }
@@ -342,7 +290,7 @@ def dashboard_data(
     out: dict = {}
     for slug in wanted:
         fn = _BUILDERS[slug]
-        if fn in (_vaccination, _upcoming_doses):
+        if fn is _vaccination:
             out[slug] = fn(db, ctx.clinic["id"], period, branch_id)
         else:
             out[slug] = fn(db, ctx.clinic["id"], period)

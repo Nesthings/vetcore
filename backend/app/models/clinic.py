@@ -36,6 +36,28 @@ class Clinic(UUIDPkMixin, Base):
     stock_alert_threshold: Mapped[float] = mapped_column(
         Numeric(10, 2), nullable=False, default=5, server_default="5"
     )
+    birthday_message: Mapped[str | None] = mapped_column(Text)
+    birthday_send_email: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    birthday_send_whatsapp: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    whatsapp_phone_number: Mapped[str | None] = mapped_column(String(30))
+    whatsapp_phone_number_id: Mapped[str | None] = mapped_column(String(100))
+    whatsapp_business_account_id: Mapped[str | None] = mapped_column(String(100))
+    whatsapp_access_token: Mapped[str | None] = mapped_column(Text)
+    whatsapp_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    whatsapp_reminder_template: Mapped[str | None] = mapped_column(String(100))
+    whatsapp_birthday_template: Mapped[str | None] = mapped_column(String(100))
+    whatsapp_receipt_template: Mapped[str | None] = mapped_column(String(100))
+    whatsapp_receipt_document_template: Mapped[str | None] = mapped_column(String(100))
+    whatsapp_cartilla_template: Mapped[str | None] = mapped_column(String(100))
+    whatsapp_template_language: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="es_MX", server_default="es_MX"
+    )
     setup_completed: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default="true"
     )

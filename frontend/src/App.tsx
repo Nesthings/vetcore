@@ -6,7 +6,6 @@ import { DashboardConfigProvider } from '@/lib/dashboard-config'
 import { NavConfigProvider } from '@/lib/nav-config'
 import { PermissionsProvider } from '@/lib/permissions'
 import { SetupProvider } from '@/lib/setup'
-import { Activate } from '@/pages/auth/Activate'
 import { CreateClinic } from '@/pages/auth/CreateClinic'
 import { ForgotPassword } from '@/pages/auth/ForgotPassword'
 import { Login } from '@/pages/auth/Login'
@@ -49,7 +48,6 @@ function App() {
                 <Routes>
                   <Route path="/login" element={<Login />} />
                   <Route path="/create-clinic" element={<CreateClinic />} />
-                  <Route path="/activate" element={<Activate />} />
                   <Route path="/forgot-password" element={<ForgotPassword />} />
                   <Route path="/reset-password" element={<ResetPassword />} />
                   <Route path="/cartilla" element={<CartillaShare />} />

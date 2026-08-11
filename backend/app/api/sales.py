@@ -19,6 +19,7 @@ from app.db.session import get_db
 from app.models import Clinic, ClinicBranch, Invoice, InvoiceItem, Pet, SaleProduct
 from app.schemas.sale import SaleCreate, SaleResult
 from app.services.pdf import build_invoice_receipt_pdf
+from app.services.whatsapp import send_receipt_summary
 
 router = APIRouter(
     prefix="/sales",
@@ -153,6 +154,21 @@ def create_sale(
     }
     receipt_bytes = build_invoice_receipt_pdf(receipt_data)
     receipt_rel = save_media("receipts", f"recibo_{invoice.id}.pdf", receipt_bytes)
+    db.commit()
+
+    if body.send_receipt_whatsapp:
+        send_receipt_summary(
+            db,
+            clinic_id,
+            owner_id,
+            receipt_data["pet_name"],
+            float(invoice.total),
+            clinic.name,
+            str(invoice.id)[:8].upper(),
+            invoice.id,
+            receipt_pdf_url=public_url(receipt_rel),
+        )
+        db.commit()
 
     return SaleResult(
         invoice_id=invoice.id,

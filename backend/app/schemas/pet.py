@@ -105,7 +105,6 @@ class OwnerTransferResponse(BaseModel):
     owner_id: uuid.UUID
     reused: bool
     links_revoked: int
-    invitation: dict
 
 
 class ClinicalAlertCreate(BaseModel):

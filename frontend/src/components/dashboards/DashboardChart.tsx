@@ -6,12 +6,7 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
-  Funnel,
-  FunnelChart,
-  LabelList,
   Legend,
-  Line,
-  LineChart,
   Pie,
   PieChart,
   PolarAngleAxis,
@@ -19,8 +14,6 @@ import {
   PolarRadiusAxis,
   Radar,
   RadarChart,
-  RadialBar,
-  RadialBarChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -195,19 +188,6 @@ function Heatmap({
   )
 }
 
-function FunnelCard({ data }: { data: NameValue[] }) {
-  return (
-    <ResponsiveContainer width="100%" height="100%" debounce={100}>
-      <FunnelChart>
-        <Funnel dataKey="value" data={data} isAnimationActive={false}>
-          <LabelList position="right" fill="var(--foreground)" stroke="none" dataKey="name" />
-          <Tooltip />
-        </Funnel>
-      </FunnelChart>
-    </ResponsiveContainer>
-  )
-}
-
 function RadarCard({
   data,
 }: {
@@ -232,56 +212,6 @@ function RadarCard({
         <Legend wrapperStyle={{ fontSize: 11 }} />
         <Tooltip />
       </RadarChart>
-    </ResponsiveContainer>
-  )
-}
-
-function LineChartCard({ data }: { data: { label: string; value: number }[] }) {
-  return (
-    <ResponsiveContainer width="100%" height="100%" debounce={100}>
-      <LineChart data={data} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-        <XAxis dataKey="label" tick={AXIS_TICK} tickLine={false} axisLine={false} />
-        <YAxis tick={AXIS_TICK} tickLine={false} axisLine={false} allowDecimals={false} />
-        <Tooltip />
-        <Line
-          type="monotone"
-          dataKey="value"
-          stroke="var(--chart-2)"
-          strokeWidth={2}
-          dot={{ r: 2 }}
-          isAnimationActive={false}
-        />
-      </LineChart>
-    </ResponsiveContainer>
-  )
-}
-
-function RadialCard({ data }: { data: NameValue[] }) {
-  return (
-    <ResponsiveContainer width="100%" height="100%" debounce={100}>
-      <RadialBarChart
-        data={data}
-        innerRadius="35%"
-        outerRadius="90%"
-        startAngle={90}
-        endAngle={-270}
-      >
-        <RadialBar dataKey="value" background={{ fill: 'var(--muted)' }} isAnimationActive={false}>
-          {data.map((_, i) => (
-            <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
-          ))}
-          <LabelList
-            dataKey="name"
-            position="insideStart"
-            fill="var(--foreground)"
-            stroke="none"
-            fontSize={11}
-          />
-        </RadialBar>
-        <Legend wrapperStyle={{ fontSize: 12 }} />
-        <Tooltip />
-      </RadialBarChart>
     </ResponsiveContainer>
   )
 }
@@ -336,17 +266,44 @@ export const DashboardChart = memo(function DashboardChart({
       return <AreaChartCard data={data as { label: string; value: number }[]} />
     case 'appt_heatmap':
       return <Heatmap data={data as never} />
-    case 'appt_funnel':
-      return <FunnelCard data={data as NameValue[]} />
     case 'vet_load':
       return <RadarCard data={data as never} />
-    case 'upcoming_doses':
-      return <LineChartCard data={data as { label: string; value: number }[]} />
-    case 'stock_levels':
-      return <RadialCard data={data as NameValue[]} />
+    case 'stock_alerts':
+      return (
+        <StockAlertsList
+          data={data as { product_id: string; name: string; stock: number; threshold: number }[]}
+        />
+      )
     case 'inv_movements':
       return <StackedBars data={data as never} />
     default:
       return <p className={cn('text-sm text-muted-foreground')}>Sin datos.</p>
   }
 })
+
+function StockAlertsList({
+  data,
+}: {
+  data: { product_id: string; name: string; stock: number; threshold: number }[]
+}) {
+  if (data.length === 0) {
+    return (
+      <div className="flex h-full items-center justify-center text-center text-sm text-muted-foreground">
+        Sin alertas de stock
+      </div>
+    )
+  }
+  return (
+    <div className="h-full space-y-1.5 overflow-y-auto pr-1">
+      {data.map((p) => (
+        <div
+          key={p.product_id}
+          className="flex items-center justify-between gap-2 rounded-lg border border-warning/30 bg-warning/5 px-2.5 py-1.5 text-sm"
+        >
+          <span className="min-w-0 truncate font-medium">{p.name}</span>
+          <span className="shrink-0 text-xs text-muted-foreground">{p.stock} en stock</span>
+        </div>
+      ))}
+    </div>
+  )
+}

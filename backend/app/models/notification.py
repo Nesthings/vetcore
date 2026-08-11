@@ -26,7 +26,10 @@ class OutboundNotification(UUIDPkMixin, Base):
     )
     owner_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("owners.id"))
     channel: Mapped[str] = mapped_column(String(20), nullable=False)
-    template: Mapped[str | None] = mapped_column(String(50))
+    template: Mapped[str | None] = mapped_column(String(200))
+    recipient: Mapped[str | None] = mapped_column(String(30))
+    external_id: Mapped[str | None] = mapped_column(String(100))
+    error: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str] = mapped_column(
         String(20), nullable=False, default="sent", server_default="sent"
     )

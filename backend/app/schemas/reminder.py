@@ -33,4 +33,6 @@ class PendingReminder(BaseModel):
 class ReminderRunResult(BaseModel):
     processed: int
     skipped_no_consent: int
+    not_configured: int = 0
+    failed: int = 0
     now: datetime

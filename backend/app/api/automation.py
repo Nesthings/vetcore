@@ -16,6 +16,8 @@ from app.api.deps import CurrentClinic, get_current_clinic, require_component
 from app.db.session import get_db
 from app.models import Appointment, OutboundNotification, Pet, User
 from app.schemas.reminder import PendingReminder, ReminderRunResult, ReminderSchedule, ReminderStage
+from app.services.queue import dispatch
+from app.services.whatsapp import normalize_mx
 
 router = APIRouter(
     prefix="/automation",
@@ -51,12 +53,13 @@ def _get_consent(db: Session, clinic_id: str, pet_id: str) -> tuple[str | None, 
 def _stage_status(
     db: Session, appointment_id: str, stage: str, window_time: datetime, consent: bool
 ) -> str:
-    exists = db.scalar(
+    sent = db.scalar(
         select(OutboundNotification.id).where(
-            OutboundNotification.template == _reminder_template(str(appointment_id), stage)
+            OutboundNotification.template == _reminder_template(str(appointment_id), stage),
+            OutboundNotification.status == "sent",
         )
     )
-    if exists:
+    if sent:
         return "sent"
     if not consent:
         return "not_consented"
@@ -133,33 +136,68 @@ def run_reminders(
 
     processed = 0
     skipped_no_consent = 0
+    not_configured = 0
+    failed = 0
+    clinic_name = ctx.clinic["name"]
     for appt in appointments:
         owner_id, consent = _get_consent(db, ctx.clinic["id"], str(appt.pet_id))
+        if owner_id is None:
+            continue
+        owner_phone = db.scalar(
+            text("SELECT phone FROM owners WHERE id = :o"), {"o": owner_id}
+        )
+        pet = db.get(Pet, appt.pet_id) if appt.pet_id else None
+        pet_name = pet.name if pet else (appt.walk_in_name or "tu mascota")
         for stage, hours in REMINDER_STAGES:
             if now < appt.start_time - timedelta(hours=hours):
                 continue  # la etapa aún no toca
             template = _reminder_template(str(appt.id), stage)
-            exists = db.scalar(
-                select(OutboundNotification.id).where(OutboundNotification.template == template)
+            sent = db.scalar(
+                select(OutboundNotification.id).where(
+                    OutboundNotification.template == template,
+                    OutboundNotification.status == "sent",
+                )
             )
-            if exists:
+            if sent:
                 continue
             if not consent:
                 skipped_no_consent += 1
                 continue
-            db.add(
-                OutboundNotification(
-                    clinic_id=ctx.clinic["id"],
-                    owner_id=owner_id,
-                    channel="whatsapp",
-                    template=template,
-                    status="sent",
-                )
+            start = appt.start_time.astimezone()
+            msg = (
+                f"Recordatorio · {pet_name}: tu cita ({appt.procedure_type}) "
+                f"es el {start.strftime('%d/%m')} a las {start.strftime('%H:%M')}."
+                f" — {clinic_name}"
             )
-            processed += 1
+            to = normalize_mx(owner_phone)
+            if not to:
+                failed += 1
+                continue
+            res = dispatch(
+                db,
+                ctx.clinic["id"],
+                "reminder",
+                to,
+                msg,
+                [pet_name, start.strftime("%d/%m"), start.strftime("%H:%M")],
+                template,
+                owner_id,
+            )
+            if res["ok"]:
+                processed += 1
+            elif res["error"] == "not_configured":
+                not_configured += 1
+            else:
+                failed += 1
 
     db.commit()
-    return ReminderRunResult(processed=processed, skipped_no_consent=skipped_no_consent, now=now)
+    return ReminderRunResult(
+        processed=processed,
+        skipped_no_consent=skipped_no_consent,
+        not_configured=not_configured,
+        failed=failed,
+        now=now,
+    )
 
 
 @router.get("/reminders/pending", response_model=list[PendingReminder])
@@ -192,7 +230,10 @@ def pending_reminders(
                 continue
             template = _reminder_template(str(appt.id), stage)
             exists = db.scalar(
-                select(OutboundNotification.id).where(OutboundNotification.template == template)
+                select(OutboundNotification.id).where(
+                    OutboundNotification.template == template,
+                    OutboundNotification.status == "sent",
+                )
             )
             if not exists:
                 next_stage = stage if consent else None

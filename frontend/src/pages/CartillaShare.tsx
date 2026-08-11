@@ -107,6 +107,7 @@ interface ShareApp {
   lot?: string | null
   notes?: string | null
   vet_name?: string | null
+  vet_photo_url?: string | null
   source?: string | null
 }
 
@@ -125,6 +126,7 @@ interface ShareVaccine {
   steps: { label: string; offset_days: number }[]
   doses: ShareDose[]
   applications: ShareApp[]
+  next_application?: { label: string; due_date: string | null } | null
 }
 
 interface ShareVaccinationPlan {
@@ -519,18 +521,18 @@ export function CartillaShare() {
   const female = isFemale(pet.sex)
   const accent = male
     ? {
-        gradient: 'from-sky-500/[0.16] via-primary/[0.03] to-transparent',
+        gradient: 'from-sky-500/[0.14] via-primary/[0.04] to-sky-500/[0.08]',
         ring: 'border-sky-400/70',
         chip: 'bg-sky-500/10 text-sky-700 hover:bg-sky-500/10 dark:text-sky-300',
       }
     : female
       ? {
-          gradient: 'from-pink-500/[0.16] via-primary/[0.03] to-transparent',
+          gradient: 'from-pink-500/[0.14] via-primary/[0.04] to-pink-500/[0.08]',
           ring: 'border-pink-400/70',
           chip: 'bg-pink-500/10 text-pink-700 hover:bg-pink-500/10 dark:text-pink-300',
         }
       : {
-          gradient: 'from-slate-500/[0.12] via-primary/[0.03] to-transparent',
+          gradient: 'from-slate-500/[0.10] via-primary/[0.03] to-slate-500/[0.06]',
           ring: 'border-primary/20',
           chip: 'bg-primary/10 text-primary hover:bg-primary/10',
         }
@@ -569,14 +571,13 @@ export function CartillaShare() {
       <main className="p-4">
         <div
           ref={cartillaRef}
-          className="overflow-hidden rounded-2xl border border-border bg-card shadow-card"
+          className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-card"
         >
-          <div className="relative overflow-hidden">
-            <div
-              className={`pointer-events-none absolute inset-0 bg-gradient-to-b ${accent.gradient}`}
-              aria-hidden="true"
-            />
-            <div className="relative flex flex-col items-center p-8 text-center">
+          <div
+            className={`pointer-events-none absolute inset-0 bg-gradient-to-b ${accent.gradient}`}
+            aria-hidden="true"
+          />
+          <div className="relative flex flex-col items-center p-8 text-center">
               <div className="relative">
                 <PetQrCard
                   photoUrl={pet.clinical_photo_url}
@@ -665,7 +666,6 @@ export function CartillaShare() {
                 </div>
               </div>
             </div>
-          </div>
 
           {error && (
             <p className="mx-5 mt-4 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
@@ -864,15 +864,20 @@ export function CartillaShare() {
                     <Table className="table-fixed [&_th]:border-l [&_th:first-child]:border-l-0 [&_td]:border-l [&_td:first-child]:border-l-0">
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="w-[24%] whitespace-normal">Vacuna</TableHead>
-                          <TableHead className="w-[13%] whitespace-normal">Marca</TableHead>
-                          <TableHead className="w-[21%] whitespace-normal">
+                          <TableHead className="w-[20%] whitespace-normal">Vacuna</TableHead>
+                          <TableHead className="w-[10%] whitespace-normal">Marca</TableHead>
+                          <TableHead className="w-[17%] whitespace-normal">
                             Enfermedades que previene
                           </TableHead>
-                          <TableHead className="w-[27%] whitespace-normal">
+                          <TableHead className="w-[22%] whitespace-normal">
                             Esquema recomendado
                           </TableHead>
-                          <TableHead className="w-[15%] whitespace-normal">Aplicaciones</TableHead>
+                          <TableHead className="w-[22%] whitespace-normal">
+                            Última aplicación
+                          </TableHead>
+                          <TableHead className="w-[9%] whitespace-normal">
+                            Siguiente aplicación
+                          </TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -919,16 +924,52 @@ export function CartillaShare() {
                                       <p className="font-medium">
                                         {new Date(app.date_applied).toLocaleDateString('es-MX')}
                                       </p>
-                                      {(app.lot || app.vet_name) && (
+                                      {app.lot && (
                                         <p className="mt-0.5 break-words text-xs text-muted-foreground">
-                                          {[app.lot && `Lote ${app.lot}`, app.vet_name]
-                                            .filter(Boolean)
-                                            .join(' · ')}
+                                          Lote {app.lot}
                                         </p>
+                                      )}
+                                      {app.vet_name && (
+                                        <div className="mt-1 flex items-center gap-1.5">
+                                          {app.vet_photo_url ? (
+                                            <img
+                                              src={app.vet_photo_url}
+                                              alt={app.vet_name}
+                                              className="size-5 shrink-0 rounded-full border border-border object-cover"
+                                            />
+                                          ) : (
+                                            <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-secondary text-[10px] font-semibold text-secondary-foreground">
+                                              {app.vet_name[0]?.toUpperCase()}
+                                            </span>
+                                          )}
+                                          <span className="truncate text-xs font-medium text-foreground">
+                                            {app.vet_name}
+                                          </span>
+                                        </div>
                                       )}
                                     </div>
                                   ))}
                                 </div>
+                              )}
+                            </TableCell>
+                            <TableCell className="whitespace-normal text-xs">
+                              {v.next_application ? (
+                                <>
+                                  <p className="font-medium text-foreground">
+                                    {v.next_application.label}
+                                  </p>
+                                  {v.next_application.due_date ? (
+                                    <p className="mt-0.5 text-muted-foreground">
+                                      {new Date(v.next_application.due_date).toLocaleDateString(
+                                        'es-MX',
+                                      )}
+                                    </p>
+                                  ) : (
+                                    <p className="mt-0.5 text-muted-foreground">por definir</p>
+                                  )}
+                                </>
+                              ) : (
+                                <span className="text-muted-foreground">—</span>
                               )}
                             </TableCell>
                           </TableRow>
@@ -956,7 +997,7 @@ export function CartillaShare() {
                         {v.applications.length > 0 && (
                           <div className="mt-3">
                             <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                              Aplicaciones
+                              Última aplicación
                             </p>
                             <div className="space-y-1.5">
                               {v.applications.map((app) => (
@@ -970,6 +1011,24 @@ export function CartillaShare() {
                                 </p>
                               ))}
                             </div>
+                          </div>
+                        )}
+                        {v.next_application && (
+                          <div className="mt-3">
+                            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                              Siguiente aplicación
+                            </p>
+                            <p className="text-sm">
+                              <span className="font-medium">{v.next_application.label}</span>
+                              {v.next_application.due_date ? (
+                                <span className="text-muted-foreground">
+                                  {' · '}
+                                  {new Date(v.next_application.due_date).toLocaleDateString('es-MX')}
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground"> · por definir</span>
+                              )}
+                            </p>
                           </div>
                         )}
                       </div>

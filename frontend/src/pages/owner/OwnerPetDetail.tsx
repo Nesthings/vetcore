@@ -57,7 +57,15 @@ interface OwnerCarnetVaccine {
   schedule?: string | null
   steps: { label: string; offset_days: number }[]
   doses: OwnerDose[]
-  applications: { id: string; brand?: string | null; date_applied: string; lot?: string | null }[]
+  applications: {
+    id: string
+    brand?: string | null
+    date_applied: string
+    lot?: string | null
+    vet_name?: string | null
+    vet_photo_url?: string | null
+  }[]
+  next_application?: { label: string; due_date: string | null } | null
 }
 
 interface OwnerPetDetailData extends OwnerPet {
@@ -427,6 +435,52 @@ export function OwnerPetDetail() {
                           <div className="mt-1.5">
                             <DoseStamps vaccine={v} />
                           </div>
+                          {v.applications.length > 0 && (
+                            <div className="mt-2 space-y-1">
+                              {v.applications.map((app) => (
+                                <div
+                                  key={app.id}
+                                  className="flex items-center gap-2 rounded-md border border-border/60 bg-muted/30 px-2.5 py-1.5 text-xs"
+                                >
+                                  <span className="font-medium">
+                                    {new Date(app.date_applied).toLocaleDateString('es-MX')}
+                                  </span>
+                                  {app.lot && (
+                                    <span className="text-muted-foreground">Lote {app.lot}</span>
+                                  )}
+                                  {app.vet_name && (
+                                    <span className="ml-auto flex items-center gap-1.5">
+                                      {app.vet_photo_url ? (
+                                        <img
+                                          src={app.vet_photo_url}
+                                          alt={app.vet_name}
+                                          className="size-5 shrink-0 rounded-full border border-border object-cover"
+                                        />
+                                      ) : (
+                                        <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-secondary text-[10px] font-semibold text-secondary-foreground">
+                                          {app.vet_name[0]?.toUpperCase()}
+                                        </span>
+                                      )}
+                                      <span className="font-medium text-foreground">
+                                        {app.vet_name}
+                                      </span>
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {v.next_application && (
+                            <p className="mt-2 text-xs text-muted-foreground">
+                              Siguiente:{' '}
+                              <span className="font-medium text-foreground">
+                                {v.next_application.label}
+                              </span>
+                              {v.next_application.due_date
+                                ? ` · ${new Date(v.next_application.due_date).toLocaleDateString('es-MX')}`
+                                : ' · por definir'}
+                            </p>
+                          )}
                         </div>
                       ))}
                     </div>

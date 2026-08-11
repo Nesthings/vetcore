@@ -8,7 +8,7 @@ principio 5) y la línea de tiempo que fusiona consultas y citas.
 
 import secrets
 import uuid
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
@@ -47,6 +47,7 @@ from app.data.breeds import (
 from app.db.session import get_db
 from app.models import (
     Appointment,
+    Clinic,
     ClinicalAlert,
     Consultation,
     ConsultationAttachment,
@@ -85,16 +86,9 @@ PET_MUTATORS = ("admin", "veterinario")
 MAX_IMAGE_BYTES = 5 * 1024 * 1024  # 5 MB
 
 
-class InvitationCreate(BaseModel):
-    contact_phone: str | None = Field(default=None, max_length=30)
-    contact_email: str | None = Field(default=None, max_length=200)
-    expires_in_days: int = Field(default=7, ge=1, le=30)
-
-
-class InvitationResponse(BaseModel):
-    token: str
-    activation_url: str
-    expires_at: datetime
+class SendCartillaRequest(BaseModel):
+    link: str = Field(min_length=1, max_length=1000)
+    to: str | None = Field(default=None, max_length=30)
 
 
 class CarnetCreate(BaseModel):
@@ -366,6 +360,8 @@ def _get_or_create_owner(
         owner = db.execute(
             text("SELECT id FROM owners WHERE email = :email"), {"email": email}
         ).scalar()
+    else:
+        owner = None
     if owner is None and phone:
         owner = db.execute(
             text("SELECT id FROM owners WHERE phone = :phone"), {"phone": phone}
@@ -995,56 +991,6 @@ def pet_timeline(
 
 
 @router.post(
-    "/{pet_id}/invitations",
-    response_model=InvitationResponse,
-    status_code=status.HTTP_201_CREATED,
-    summary="Genera la invitación del dueño (token de activación)",
-)
-def create_invitation(
-    pet_id: str,
-    body: InvitationCreate,
-    ctx: CurrentClinic = Depends(require_clinic_roles(*PET_MUTATORS)),
-    db: Session = Depends(get_db),
-) -> InvitationResponse:
-    """Cierra el flujo de invitación (Subfase 1.7): la clínica capturó el
-    teléfono/correo del dueño en persona y genera el token. El link se
-    comparte por WhatsApp/email (en dev se devuelve en la respuesta)."""
-    _get_pet_or_404(db, ctx.clinic["id"], pet_id)
-
-    if not body.contact_phone and not body.contact_email:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Se necesita al menos un teléfono o correo de contacto",
-        )
-
-    token = secrets.token_urlsafe(32)
-    expires_at = datetime.now(UTC) + timedelta(days=body.expires_in_days)
-    db.execute(
-        text(
-            "INSERT INTO owner_invitations "
-            "(clinic_id, pet_id, contact_phone, contact_email, token, status, "
-            "expires_at, created_by) "
-            "VALUES (:c, :p, :phone, :email, :token, 'pending', :expires, :by)"
-        ),
-        {
-            "c": ctx.clinic["id"],
-            "p": pet_id,
-            "phone": body.contact_phone,
-            "email": body.contact_email,
-            "token": token,
-            "expires": expires_at,
-            "by": ctx.user.sub,
-        },
-    )
-    db.commit()
-    return InvitationResponse(
-        token=token,
-        activation_url=f"/activate?token={token}",
-        expires_at=expires_at,
-    )
-
-
-@router.post(
     "/{pet_id}/share-link",
     summary="Genera el enlace de la cartilla para el dueño (sin login)",
 )
@@ -1115,6 +1061,99 @@ def resolve_pet_qr(
     if pet is None or not pet.is_active or str(pet.clinic_id) != me.clinic_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Paciente no encontrado")
     return {"pet_id": str(pet.id), "pet_name": pet.name}
+
+
+@router.post(
+    "/{pet_id}/send-cartilla",
+    summary="Envía la cartilla por WhatsApp (plantilla configurada o texto)",
+)
+def send_cartilla_whatsapp(
+    pet_id: str,
+    body: SendCartillaRequest,
+    ctx: CurrentClinic = Depends(require_clinic_roles(*PET_MUTATORS)),
+    db: Session = Depends(get_db),
+) -> dict:
+    pet = _get_pet_or_404(db, ctx.clinic["id"], pet_id)
+    to = _resolve_owner_contact(db, ctx.clinic["id"], pet_id, body.to, "phone")
+    if not to:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El dueño no tiene teléfono registrado; indica uno en 'to'.",
+        )
+    from app.services.queue import dispatch
+
+    res = dispatch(
+        db,
+        ctx.clinic["id"],
+        "cartilla",
+        to,
+        f"Cartilla digital de {pet.name}",
+        [pet.name, body.link],
+        f"cartilla:{pet_id}",
+        None,
+    )
+    db.commit()
+    return {"ok": res["ok"], "error": res.get("error")}
+
+
+@router.post(
+    "/{pet_id}/send-cartilla-email",
+    summary="Envía la cartilla por correo (SMTP)",
+)
+def send_cartilla_email(
+    pet_id: str,
+    body: SendCartillaRequest,
+    ctx: CurrentClinic = Depends(require_clinic_roles(*PET_MUTATORS)),
+    db: Session = Depends(get_db),
+) -> dict:
+    pet = _get_pet_or_404(db, ctx.clinic["id"], pet_id)
+    to = body.to or _resolve_owner_contact(db, ctx.clinic["id"], pet_id, None, "email")
+    if not to:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El dueño no tiene correo registrado; indica uno en 'to'.",
+        )
+    clinic = db.get(Clinic, ctx.clinic["id"])
+    from app.services.email import send_email
+
+    res = send_email(
+        db,
+        ctx.clinic["id"],
+        to,
+        f"Cartilla digital de {pet.name}",
+        f"Hola, aquí tienes la cartilla digital de {pet.name}:\n\n{body.link}\n\n— {clinic.name}",
+        clinic_name=clinic.name if clinic else None,
+        template=f"cartilla-email:{pet_id}",
+    )
+    db.commit()
+    return {"ok": res["ok"], "error": res.get("error")}
+
+
+def _resolve_owner_contact(
+    db: Session, clinic_id: str, pet_id: str, to: str | None, field: str
+) -> str | None:
+    """Resuelve el teléfono/correo del dueño activo de la mascota."""
+    if to:
+        if field == "phone":
+            from app.services.whatsapp import normalize_mx
+
+            return normalize_mx(to)
+        return to.strip() or None
+    value = db.scalar(
+        text(
+            f"SELECT o.{field} FROM owner_pet_links l JOIN owners o ON o.id = l.owner_id "
+            "WHERE l.pet_id = :p AND l.clinic_id = :c AND l.is_active = true "
+            "ORDER BY l.linked_at DESC LIMIT 1"
+        ),
+        {"p": pet_id, "c": clinic_id},
+    )
+    if not value:
+        return None
+    if field == "phone":
+        from app.services.whatsapp import normalize_mx
+
+        return normalize_mx(str(value))
+    return str(value) or None
 
 
 @router.get(
@@ -1269,25 +1308,6 @@ def transfer_owner(
         {"oid": owner, "pid": pet_id, "cid": ctx.clinic["id"]},
     )
 
-    token = secrets.token_urlsafe(32)
-    expires_at = datetime.now(UTC) + timedelta(days=7)
-    db.execute(
-        text(
-            "INSERT INTO owner_invitations "
-            "(clinic_id, pet_id, contact_phone, contact_email, token, status, "
-            "expires_at, created_by) "
-            "VALUES (:c, :p, :phone, :email, :token, 'pending', :expires, :by)"
-        ),
-        {
-            "c": ctx.clinic["id"],
-            "p": pet_id,
-            "phone": body.contact_phone,
-            "email": body.contact_email,
-            "token": token,
-            "expires": expires_at,
-            "by": ctx.user.sub,
-        },
-    )
     record_audit(
         db,
         clinic_id=ctx.clinic["id"],
@@ -1304,11 +1324,6 @@ def transfer_owner(
         owner_id=owner,
         reused=reused,
         links_revoked=revoked,
-        invitation={
-            "token": token,
-            "activation_url": f"/activate?token={token}",
-            "expires_at": expires_at.isoformat(),
-        },
     )
 
 

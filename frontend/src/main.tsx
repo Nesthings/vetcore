@@ -8,8 +8,9 @@ import { Toaster } from '@/components/ui/toast'
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ThemeProvider>
-      <App />
-      <Toaster />
+      <Toaster>
+        <App />
+      </Toaster>
     </ThemeProvider>
   </StrictMode>,
 )

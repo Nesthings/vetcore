@@ -47,6 +47,15 @@ from app.schemas.clinic import (
     ClinicSubscriptionEventRead,
     ClinicSummaryRead,
     ClinicUpdate,
+    WhatsAppConfig,
+    WhatsAppStatus,
+    WhatsAppTestRequest,
+)
+from app.services.whatsapp import (
+    clinic_whatsapp,
+    encrypt_token,
+    normalize_any,
+    send_template,
 )
 
 router = APIRouter(prefix="/clinics", tags=["clinics"])
@@ -370,3 +379,91 @@ def clinic_summary(
         subscription_status=clinic.subscription_status,
         **counts,
     )
+
+
+@router.get("/me/whatsapp", response_model=WhatsAppStatus, summary="Estado de WhatsApp Business")
+def whatsapp_status(
+    ctx: CurrentClinic = Depends(require_component("settings")),
+    db: Session = Depends(get_db),
+) -> dict:
+    return clinic_whatsapp(db, ctx.clinic["id"])
+
+
+@router.put(
+    "/me/whatsapp", response_model=WhatsAppStatus, summary="Guarda credenciales de WhatsApp"
+)
+def whatsapp_configure(
+    body: WhatsAppConfig,
+    ctx: CurrentClinic = Depends(require_component("settings")),
+    db: Session = Depends(get_db),
+) -> dict:
+    clinic = db.get(Clinic, ctx.clinic["id"])
+    if body.phone_number is not None:
+        clinic.whatsapp_phone_number = body.phone_number or None
+    if body.phone_number_id is not None:
+        clinic.whatsapp_phone_number_id = body.phone_number_id or None
+    if body.business_account_id is not None:
+        clinic.whatsapp_business_account_id = body.business_account_id or None
+    if body.access_token is not None:
+        clinic.whatsapp_access_token = (
+            encrypt_token(body.access_token) if body.access_token else None
+        )
+    if body.reminder_template is not None:
+        clinic.whatsapp_reminder_template = body.reminder_template or None
+    if body.birthday_template is not None:
+        clinic.whatsapp_birthday_template = body.birthday_template or None
+    if body.receipt_template is not None:
+        clinic.whatsapp_receipt_template = body.receipt_template or None
+    if body.receipt_document_template is not None:
+        clinic.whatsapp_receipt_document_template = body.receipt_document_template or None
+    if body.cartilla_template is not None:
+        clinic.whatsapp_cartilla_template = body.cartilla_template or None
+    if body.template_language is not None and body.template_language.strip():
+        clinic.whatsapp_template_language = body.template_language.strip()
+    clinic.whatsapp_enabled = bool(clinic.whatsapp_phone_number_id and clinic.whatsapp_access_token)
+    record_audit(
+        db,
+        clinic_id=ctx.clinic["id"],
+        actor_type="user",
+        actor_id=ctx.user.sub,
+        action="whatsapp_configured",
+        entity_type="clinic",
+        entity_id=clinic.id,
+    )
+    db.commit()
+    db.refresh(clinic)
+    return clinic_whatsapp(db, ctx.clinic["id"])
+
+
+@router.post(
+    "/me/whatsapp/test",
+    summary="Envía un mensaje de prueba para validar la conexión",
+)
+def whatsapp_test(
+    body: WhatsAppTestRequest,
+    ctx: CurrentClinic = Depends(require_component("settings")),
+    db: Session = Depends(get_db),
+) -> dict:
+    to = normalize_any(body.to or None)
+    if not to:
+        raise HTTPException(status_code=400, detail="Indica un teléfono de destino válido")
+    # Se usa la plantilla hello_world (existe en todas las apps de prueba) porque
+    # el texto libre solo se entrega dentro de la ventana 24h.
+    res = send_template(db, ctx.clinic["id"], to, "hello_world", "en_US")
+    return {"ok": res["ok"], "external_id": res["external_id"], "error": res["error"]}
+
+
+@router.post("/me/whatsapp/disable", response_model=WhatsAppStatus, summary="Desvincula WhatsApp")
+def whatsapp_disable(
+    ctx: CurrentClinic = Depends(require_component("settings")),
+    db: Session = Depends(get_db),
+) -> dict:
+    clinic = db.get(Clinic, ctx.clinic["id"])
+    clinic.whatsapp_phone_number = None
+    clinic.whatsapp_phone_number_id = None
+    clinic.whatsapp_business_account_id = None
+    clinic.whatsapp_access_token = None
+    clinic.whatsapp_enabled = False
+    db.commit()
+    db.refresh(clinic)
+    return clinic_whatsapp(db, ctx.clinic["id"])

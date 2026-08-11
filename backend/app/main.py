@@ -9,6 +9,7 @@ from app.api import (
     audit,
     auth,
     automation,
+    birthdays,
     branches,
     clinics,
     consents,
@@ -34,6 +35,7 @@ from app.api import (
     users,
     vaccination_plans,
     waitlist,
+    whatsapp,
 )
 from app.core.config import settings
 
@@ -63,6 +65,7 @@ app.include_router(appointments.router, prefix="/api/v1")
 app.include_router(schedule_blocks.router, prefix="/api/v1")
 app.include_router(dashboard.router, prefix="/api/v1")
 app.include_router(dashboards.router, prefix="/api/v1")
+app.include_router(birthdays.router, prefix="/api/v1")
 app.include_router(inventory.router, prefix="/api/v1")
 app.include_router(invoices.router, prefix="/api/v1")
 app.include_router(products.router, prefix="/api/v1")
@@ -81,6 +84,7 @@ app.include_router(vaccination_plans.router, prefix="/api/v1")
 app.include_router(share.router, prefix="/api/v1")
 app.include_router(platform.router, prefix="/api/v1")
 app.include_router(create_clinic.router, prefix="/api/v1")
+app.include_router(whatsapp.router, prefix="/api/v1")
 
 # Media (MVP local). La URL pública /media/... es la que devuelven los endpoints.
 media_dir = Path(settings.media_root)
