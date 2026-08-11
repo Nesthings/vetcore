@@ -40,3 +40,55 @@ variable "lambda_vpc_security_group_ids" {
   type        = list(string)
   default     = []
 }
+
+# --- Backend ECS (Fargate) ---
+variable "app_image_tag" {
+  description = "Tag de la imagen del backend en ECR"
+  type        = string
+  default     = "latest"
+}
+
+variable "app_port" {
+  description = "Puerto HTTP del contenedor (uvicorn)"
+  type        = number
+  default     = 8000
+}
+
+variable "sqs_queue_url" {
+  description = "URL de la cola SQS principal (productor del backend)"
+  type        = string
+  default     = ""
+}
+
+variable "sqs_region" {
+  description = "Región de la cola SQS"
+  type        = string
+  default     = "us-east-1"
+}
+
+# SMTP (envío de correos del backend)
+variable "smtp_host" {
+  type    = string
+  default = ""
+}
+variable "smtp_port" {
+  type    = number
+  default = 587
+}
+variable "smtp_user" {
+  type    = string
+  default = ""
+}
+variable "smtp_password" {
+  type      = string
+  default   = ""
+  sensitive = true
+}
+variable "smtp_from" {
+  type    = string
+  default = ""
+}
+variable "smtp_starttls" {
+  type    = bool
+  default = true
+}
