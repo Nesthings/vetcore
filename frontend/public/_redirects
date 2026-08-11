@@ -1,0 +1,11 @@
+# Netlify redirects / proxy — VetCore frontend
+# REEMPLAZA https://API-BACKEND-URL por la URL pública del backend FastAPI
+# (p. ej. https://vetcore-api.onrender.com) cuando lo despliegues.
+
+# Proxy del API hacia el backend
+/api/*    https://API-BACKEND-URL/api/:splat   200
+# Proxy de media (fotos, PDFs de recibos, etc.)
+/media/*  https://API-BACKEND-URL/media/:splat 200
+
+# Fallback SPA: todas las rutas sirven index.html (cartilla, mascotas, etc.)
+/*        /index.html                          200
