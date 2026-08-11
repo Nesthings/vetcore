@@ -200,6 +200,11 @@ resource "aws_ecs_task_definition" "backend" {
         { name = "SMTP_PASSWORD", value = var.smtp_password },
         { name = "SMTP_FROM", value = var.smtp_from },
         { name = "SMTP_STARTTLS", value = tostring(var.smtp_starttls) },
+        { name = "R2_ENDPOINT", value = var.r2_endpoint },
+        { name = "R2_ACCESS_KEY_ID", value = var.r2_access_key_id },
+        { name = "R2_SECRET_ACCESS_KEY", value = var.r2_secret_access_key },
+        { name = "R2_BUCKET_NAME", value = var.r2_bucket_name },
+        { name = "R2_PUBLIC_BASE_URL", value = var.r2_public_base_url },
       ]
       logConfiguration = {
         logDriver = "awslogs"

@@ -92,3 +92,32 @@ variable "smtp_starttls" {
   type    = bool
   default = true
 }
+
+# --- Cloudflare R2 (almacenamiento de media) ---
+variable "r2_endpoint" {
+  description = "Endpoint S3-compatible de R2 (https://<ACCOUNT_ID>.r2.cloudflarestorage.com)"
+  type        = string
+  default     = ""
+}
+variable "r2_access_key_id" {
+  description = "Access Key ID del token de API de R2"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+variable "r2_secret_access_key" {
+  description = "Secret Access Key del token de API de R2"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+variable "r2_bucket_name" {
+  description = "Nombre del bucket R2"
+  type        = string
+  default     = ""
+}
+variable "r2_public_base_url" {
+  description = "URL pública del bucket R2 (p. ej. https://pub-XXXX.r2.dev/vetcore-media)"
+  type        = string
+  default     = ""
+}
