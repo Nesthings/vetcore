@@ -72,7 +72,7 @@ export function PetQrCard({
           )}
         >
           {photoUrl ? (
-            <img src={photoUrl} alt={petName} className="size-full object-cover" />
+            <img src={photoUrl} alt={petName} crossOrigin="anonymous" className="size-full object-cover" />
           ) : (
             (placeholder ?? null)
           )}

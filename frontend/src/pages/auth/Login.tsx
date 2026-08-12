@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { AlertCircle, Lock, LogIn, Mail, UserRound } from 'lucide-react'
 
 import { AuthLayout } from '@/components/auth/AuthLayout'
@@ -14,7 +14,7 @@ interface LoginResponse {
 }
 
 export function Login() {
-  const { login } = useAuth()
+  const { login, isAuthenticated } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -52,6 +52,7 @@ export function Login() {
         </Link>
       }
     >
+      {isAuthenticated && <Navigate to="/" replace />}
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="login-email">Correo electrónico</Label>

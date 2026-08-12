@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { toPng } from 'html-to-image'
 import { Icon as MDIIcon } from '@mdi/react'
 import { mdiPaw } from '@mdi/js'
@@ -66,6 +66,7 @@ import {
 } from '@/components/ui/dialog'
 import { apiFetch } from '@/lib/api'
 import { SPECIES_ICONS, speciesLabel } from '@/lib/species'
+import { useToast } from '@/components/ui/toast'
 
 interface ShareOwner {
   owner_id: string
@@ -268,6 +269,8 @@ function isFemale(sex?: string | null): boolean {
 export function CartillaShare() {
   const [params] = useSearchParams()
   const token = params.get('token') ?? ''
+  const navigate = useNavigate()
+  const { toast } = useToast()
 
   const [data, setData] = useState<ShareData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -295,8 +298,9 @@ export function CartillaShare() {
   // solicitud de cita (lista de espera)
   const [waitlist, setWaitlist] = useState<ShareWaitlistEntry[]>([])
   const [reqBranch, setReqBranch] = useState('')
-  const [reqFrom, setReqFrom] = useState('')
-  const [reqTo, setReqTo] = useState('')
+  const [reqDay, setReqDay] = useState('')
+  const [reqStart, setReqStart] = useState('')
+  const [reqEnd, setReqEnd] = useState('')
   const [reqBusy, setReqBusy] = useState(false)
   const [reqMsg, setReqMsg] = useState<string | null>(null)
 
@@ -304,15 +308,25 @@ export function CartillaShare() {
     const el = cartillaRef.current
     if (!el || downloadBusy) return
     setDownloadBusy(true)
-    setError(null)
     try {
       const dataUrl = await toPng(el, { pixelRatio: 2, cacheBust: true })
       const link = document.createElement('a')
       link.download = `cartilla-${pet.name.replace(/\s+/g, '-')}.png`
       link.href = dataUrl
       link.click()
+      toast({
+        title: 'Cartilla descargada',
+        description: 'Se generó la imagen de la cartilla correctamente.',
+        variant: 'success',
+      })
     } catch (err) {
-      setError(err instanceof Error ? 'No se pudo generar la imagen' : 'Error al descargar')
+      console.error('download cartilla image:', err)
+      toast({
+        title: 'No se pudo descargar la cartilla',
+        description:
+          'Ocurrió un error al generar la imagen. Intenta de nuevo en unos segundos.',
+        variant: 'error',
+      })
     } finally {
       setDownloadBusy(false)
     }
@@ -346,14 +360,16 @@ export function CartillaShare() {
 
   const submitWaitlist = async () => {
     const branchId = reqBranch || data?.branches[0]?.id || ''
-    if (!branchId || !reqFrom || !reqTo) {
-      setReqMsg('Completa la sucursal y la ventana de tiempo.')
+    if (!branchId || !reqDay || !reqStart || !reqEnd) {
+      setReqMsg('Completa la sucursal, el día y el rango de horas.')
       return
     }
-    if (new Date(reqTo) <= new Date(reqFrom)) {
+    if (reqEnd <= reqStart) {
       setReqMsg('La hora de fin debe ser posterior a la de inicio.')
       return
     }
+    const from = new Date(`${reqDay}T${reqStart}`)
+    const to = new Date(`${reqDay}T${reqEnd}`)
     setReqBusy(true)
     setReqMsg(null)
     setError(null)
@@ -361,15 +377,24 @@ export function CartillaShare() {
       const fd = new FormData()
       fd.append('token', token)
       fd.append('branch_id', branchId)
-      fd.append('desired_from', new Date(reqFrom).toISOString())
-      fd.append('desired_to', new Date(reqTo).toISOString())
+      fd.append('desired_from', from.toISOString())
+      fd.append('desired_to', to.toISOString())
       await apiFetch('/share/cartilla/waitlist', { method: 'POST', body: fd })
-      setReqFrom('')
-      setReqTo('')
-      setReqMsg('Solicitud enviada. La clínica te contactará con un hueco disponible.')
+      setReqDay('')
+      setReqStart('')
+      setReqEnd('')
+      toast({
+        title: 'Hueco solicitado',
+        description: 'La clínica te contactará con un hueco disponible.',
+        variant: 'success',
+      })
       await load()
     } catch (err) {
-      setReqMsg(err instanceof Error ? err.message : 'No se pudo enviar la solicitud')
+      toast({
+        title: 'No se pudo solicitar el hueco',
+        description: err instanceof Error ? err.message : 'Intenta de nuevo más tarde.',
+        variant: 'error',
+      })
     } finally {
       setReqBusy(false)
     }
@@ -404,7 +429,11 @@ export function CartillaShare() {
       await apiFetch('/share/cartilla/photo', { method: 'POST', body: fd })
       await load()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo subir la foto')
+      toast({
+        title: 'No se pudo subir la foto',
+        description: err instanceof Error ? err.message : 'Intenta de nuevo.',
+        variant: 'error',
+      })
     } finally {
       setPhotoBusy(false)
     }
@@ -420,7 +449,11 @@ export function CartillaShare() {
       await apiFetch('/share/cartilla/owner-photo', { method: 'POST', body: fd })
       await load()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo subir tu foto')
+      toast({
+        title: 'No se pudo subir tu foto',
+        description: err instanceof Error ? err.message : 'Intenta de nuevo.',
+        variant: 'error',
+      })
     } finally {
       setOwnerPhotoBusy(false)
     }
@@ -439,7 +472,11 @@ export function CartillaShare() {
       setAlertDesc('')
       await load()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo agregar la alerta')
+      toast({
+        title: 'No se pudo agregar la alerta',
+        description: err instanceof Error ? err.message : 'Intenta de nuevo.',
+        variant: 'error',
+      })
     } finally {
       setAlertBusy(false)
     }
@@ -455,7 +492,11 @@ export function CartillaShare() {
           })
           await load()
         } catch (err) {
-          setError(err instanceof Error ? err.message : 'No se pudo eliminar la alerta')
+          toast({
+            title: 'No se pudo eliminar la alerta',
+            description: err instanceof Error ? err.message : 'Intenta de nuevo.',
+            variant: 'error',
+          })
         }
         setConfirm(null)
       },
@@ -475,7 +516,11 @@ export function CartillaShare() {
       setSignature(null)
       await load()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo firmar')
+      toast({
+        title: 'No se pudo firmar',
+        description: err instanceof Error ? err.message : 'Intenta de nuevo.',
+        variant: 'error',
+      })
     } finally {
       setSignBusy(false)
     }
@@ -508,9 +553,14 @@ export function CartillaShare() {
         <TriangleAlert className="size-10 text-destructive" aria-hidden="true" />
         <h1 className="text-lg font-semibold">No se pudo abrir la cartilla</h1>
         <p className="max-w-sm text-sm text-muted-foreground">{error}</p>
-        <Link to="/" className="text-sm font-medium text-primary hover:underline">
-          Ir al inicio
-        </Link>
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => navigate(-1)}>
+            Volver
+          </Button>
+          <Button size="sm" onClick={() => load()}>
+            Reintentar
+          </Button>
+        </div>
       </div>
     )
   }
@@ -627,11 +677,6 @@ export function CartillaShare() {
                 {male && <Badge className={accent.chip}>Macho</Badge>}
                 {female && <Badge className={accent.chip}>Hembra</Badge>}
               </div>
-              {pet.allergies && (
-                <p className="mt-2 text-xs text-muted-foreground">
-                  <span className="font-medium text-foreground">Alergias:</span> {pet.allergies}
-                </p>
-              )}
 
               <div className="mt-6 grid w-full grid-cols-2 gap-3 sm:grid-cols-3">
                 <div className="rounded-xl border border-border/60 bg-card/80 px-3 py-2.5 text-left">
@@ -697,6 +742,7 @@ export function CartillaShare() {
                             <img
                               src={o.profile_photo_url}
                               alt={o.full_name ?? 'Dueño'}
+                              crossOrigin="anonymous"
                               className="size-full object-cover"
                             />
                           ) : (
@@ -1043,7 +1089,7 @@ export function CartillaShare() {
             <SectionHeading
               icon={CalendarDays}
               title="Solicitar cita"
-              subtitle="Elige una ventana de tiempo; entra a la lista de espera de la clínica"
+              subtitle="Elige un día y un rango de horas en que puedas acudir; entras a la lista de espera de la clínica"
             />
             <div className="mt-3 space-y-3">
               <div className="grid gap-3 sm:grid-cols-2">
@@ -1061,23 +1107,33 @@ export function CartillaShare() {
                     ))}
                   </select>
                 </div>
+                <div className="space-y-1.5">
+                  <Label>Día</Label>
+                  <Input
+                    type="date"
+                    min={new Date().toISOString().slice(0, 10)}
+                    value={reqDay}
+                    onChange={(e) => setReqDay(e.target.value)}
+                    className="w-full"
+                  />
+                </div>
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label>Desde</Label>
+                  <Label>Desde (hora)</Label>
                   <Input
-                    type="datetime-local"
-                    value={reqFrom}
-                    onChange={(e) => setReqFrom(e.target.value)}
+                    type="time"
+                    value={reqStart}
+                    onChange={(e) => setReqStart(e.target.value)}
                     className="w-full"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Hasta</Label>
+                  <Label>Hasta (hora)</Label>
                   <Input
-                    type="datetime-local"
-                    value={reqTo}
-                    onChange={(e) => setReqTo(e.target.value)}
+                    type="time"
+                    value={reqEnd}
+                    onChange={(e) => setReqEnd(e.target.value)}
                     className="w-full"
                   />
                 </div>
@@ -1368,7 +1424,7 @@ export function CartillaShare() {
                     {data.consents.map((c) => (
                       <div
                         key={c.id}
-                        className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card p-3 shadow-sm"
+                        className="flex flex-col gap-3 rounded-xl border border-border/60 bg-card p-3 shadow-sm sm:flex-row sm:items-center sm:justify-between"
                       >
                         <div className="flex items-center gap-3">
                           <div
@@ -1393,7 +1449,7 @@ export function CartillaShare() {
                             </p>
                           </div>
                         </div>
-                        <div className="flex shrink-0 items-center gap-2">
+                        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:shrink-0">
                           {c.attachment_url && (
                             <a
                               href={c.attachment_url}

@@ -193,18 +193,54 @@ def list_pets(
         stmt = stmt.where(Pet.species == species)
     stmt = stmt.order_by(Pet.name).limit(limit).offset(offset)
     pets = list(db.scalars(stmt))
-    if pets:
-        pet_ids = [p.id for p in pets]
-        counts = dict(
-            db.execute(
-                select(ClinicalAlert.pet_id, func.count())
-                .where(ClinicalAlert.pet_id.in_(pet_ids))
-                .group_by(ClinicalAlert.pet_id)
-            ).all()
-        )
-        for pet in pets:
-            pet.alert_count = counts.get(pet.id, 0)
-    return [_with_owners(db, _pet_with_latest_weight(db, pet)) for pet in pets]
+    if not pets:
+        return []
+
+    pet_ids = [p.id for p in pets]
+
+    # alert_count en batch (1 consulta)
+    counts = dict(
+        db.execute(
+            select(ClinicalAlert.pet_id, func.count())
+            .where(ClinicalAlert.pet_id.in_(pet_ids))
+            .group_by(ClinicalAlert.pet_id)
+        ).all()
+    )
+
+    # último peso en batch (1 consulta con ventana, en vez de 1 por mascota)
+    weight_rows = db.execute(
+        text(
+            "SELECT pet_id, weight_kg FROM ("
+            "  SELECT pet_id, weight_kg, "
+            "         ROW_NUMBER() OVER (PARTITION BY pet_id "
+            "           ORDER BY recorded_at DESC, id DESC) AS rn "
+            "  FROM pet_weight_records WHERE pet_id = ANY(:pids)"
+            ") t WHERE rn = 1"
+        ),
+        {"pids": list(pet_ids)},
+    ).all()
+    weights: dict = {pet_id: weight_kg for pet_id, weight_kg in weight_rows}
+
+    # dueños en batch (1 consulta, en vez de 1 por mascota)
+    owner_rows = db.execute(
+        text(
+            "SELECT l.pet_id AS pet_id, o.id AS owner_id, o.full_name, o.phone, o.email, "
+            "o.profile_photo_url, o.alt_contact_name, o.alt_phone, l.linked_at, l.is_active "
+            "FROM owner_pet_links l JOIN owners o ON o.id = l.owner_id "
+            "WHERE l.pet_id = ANY(:pids) AND l.clinic_id = :cid "
+            "ORDER BY l.linked_at DESC"
+        ),
+        {"pids": list(pet_ids), "cid": ctx.clinic["id"]},
+    ).mappings().all()
+    owners_by_pet: dict = {}
+    for r in owner_rows:
+        owners_by_pet.setdefault(r["pet_id"], []).append(OwnerLinkRead(**dict(r)))
+
+    for pet in pets:
+        pet.alert_count = counts.get(pet.id, 0)
+        pet.latest_weight_kg = Decimal(weights[pet.id]) if pet.id in weights else None
+        pet.owners = owners_by_pet.get(pet.id, [])
+    return pets
 
 
 @router.get("/species", summary="Especies presentes en la clínica (con conteo)")

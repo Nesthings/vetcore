@@ -723,12 +723,6 @@ export function PetDetail() {
                         </Badge>
                       )}
                     </div>
-                    {pet.allergies && (
-                      <p className="mt-2 text-xs text-muted-foreground">
-                        <span className="font-medium text-foreground">Alergias:</span>{' '}
-                        {pet.allergies}
-                      </p>
-                    )}
 
                     <div className="mt-7 grid w-full max-w-2xl grid-cols-2 gap-3 sm:grid-cols-4">
                       <Stat

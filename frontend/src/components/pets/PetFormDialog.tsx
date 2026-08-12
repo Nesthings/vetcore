@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Loader2, Plus, Syringe, Trash2, UserRound } from 'lucide-react'
+import { Check, Loader2, Plus, Syringe, Trash2, UserRound } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -12,8 +12,10 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
+import { useToast } from '@/components/ui/toast'
+import { ClinicalAlertSelector, type PendingAlert } from '@/components/pets/ClinicalAlertSelector'
 import { apiFetch } from '@/lib/api'
+import { speciesLabel } from '@/lib/species'
 
 interface BreedsCatalog {
   species: { key: string; label: string }[]
@@ -83,8 +85,7 @@ export function PetFormDialog({
   const [birthDate, setBirthDate] = useState('')
   const [ageYears, setAgeYears] = useState('')
   const [ageMonths, setAgeMonths] = useState('')
-  const [allergies, setAllergies] = useState('')
-  const [alertText, setAlertText] = useState('')
+  const [pendingAlerts, setPendingAlerts] = useState<PendingAlert[]>([])
 
   const [ownerName, setOwnerName] = useState('')
   const [ownerPhone, setOwnerPhone] = useState('')
@@ -92,6 +93,11 @@ export function PetFormDialog({
   const [altContactName, setAltContactName] = useState('')
   const [altPhone, setAltPhone] = useState('')
   const [ownerAcceptsReminders, setOwnerAcceptsReminders] = useState(false)
+  const [ownerResults, setOwnerResults] = useState<
+    { id: string; full_name: string | null; phone: string | null; email: string | null }[]
+  >([])
+  const [ownerDropdownOpen, setOwnerDropdownOpen] = useState(false)
+  const ownerResultsRef = useRef<HTMLDivElement>(null)
 
   const [submitting, setSubmitting] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -99,14 +105,18 @@ export function PetFormDialog({
   const [error, setError] = useState<string | null>(null)
 
   const [assignPlan, setAssignPlan] = useState(false)
-  const [planId, setPlanId] = useState('')
+  const [selectedPlans, setSelectedPlans] = useState<string[]>([])
   const [planBranchId, setPlanBranchId] = useState('')
   const [planVetId, setPlanVetId] = useState('')
   const [planStartDate, setPlanStartDate] = useState('')
   const [planStartTime, setPlanStartTime] = useState('10:00')
-  const [plans, setPlans] = useState<{ id: string; name: string }[]>([])
+  const [plans, setPlans] = useState<
+    { id: string; name: string; species: string | null }[]
+  >([])
   const [branches, setBranches] = useState<{ id: string; name: string }[]>([])
   const [vets, setVets] = useState<{ id: string; full_name: string }[]>([])
+
+  const { toast } = useToast()
 
   const loadCatalog = useCallback(async () => {
     try {
@@ -124,7 +134,9 @@ export function PetFormDialog({
   useEffect(() => {
     if (!open) return
     Promise.all([
-      apiFetch<{ id: string; name: string }[]>('/vaccination-plans?active_only=true'),
+      apiFetch<{ id: string; name: string; species: string | null }[]>(
+        '/vaccination-plans?active_only=true',
+      ),
       apiFetch<{ id: string; name: string }[]>('/branches'),
       apiFetch<{ id: string; full_name: string; role: string }[]>('/users'),
     ])
@@ -136,6 +148,44 @@ export function PetFormDialog({
       })
       .catch(() => undefined)
   }, [open])
+
+  useEffect(() => {
+    if (!open || pet) return
+    const term = ownerName.trim()
+    if (term.length < 2) {
+      setOwnerResults([])
+      return
+    }
+    const handle = window.setTimeout(async () => {
+      try {
+        const res = await apiFetch<
+          { id: string; full_name: string | null; phone: string | null; email: string | null }[]
+        >(`/owners?search=${encodeURIComponent(term)}`)
+        setOwnerResults(res)
+        setOwnerDropdownOpen(true)
+      } catch {
+        setOwnerResults([])
+      }
+    }, 300)
+    return () => window.clearTimeout(handle)
+  }, [ownerName, open, pet])
+
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (ownerResultsRef.current && !ownerResultsRef.current.contains(e.target as Node)) {
+        setOwnerDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onClick)
+    return () => document.removeEventListener('mousedown', onClick)
+  }, [])
+
+  const pickOwner = (o: { full_name: string | null; phone: string | null; email: string | null }) => {
+    setOwnerName(o.full_name ?? '')
+    setOwnerPhone(o.phone ?? '')
+    setOwnerEmail(o.email ?? '')
+    setOwnerDropdownOpen(false)
+  }
 
   useEffect(() => {
     if (!open) return
@@ -157,8 +207,6 @@ export function PetFormDialog({
         setAgeYears('')
         setAgeMonths('')
       }
-      setAllergies(pet.allergies ?? '')
-      setAlertText(pet.clinical_alert_text ?? '')
     } else {
       setName('')
       setSpecies('perro')
@@ -171,19 +219,20 @@ export function PetFormDialog({
       setBirthDate('')
       setAgeYears('')
       setAgeMonths('')
-      setAllergies('')
-      setAlertText('')
     }
+    setPendingAlerts([])
     setOwnerName('')
     setOwnerPhone('')
     setOwnerEmail('')
+    setOwnerResults([])
+    setOwnerDropdownOpen(false)
     setAltContactName('')
     setAltPhone('')
     setConfirmDelete(false)
     setDeleting(false)
     setSubmitting(false)
     setAssignPlan(false)
-    setPlanId('')
+    setSelectedPlans([])
     setPlanVetId('')
     setPlanStartDate(new Date().toISOString().slice(0, 10))
     setPlanStartTime('10:00')
@@ -193,6 +242,11 @@ export function PetFormDialog({
   const allBreeds = catalog?.breeds[species] ?? ['Mestizo']
   const allColors = catalog?.colors[species] ?? []
   const allMarkings = catalog?.markings[species] ?? []
+
+  const speciesPlans = useMemo(
+    () => plans.filter((p) => species == null || p.species == null || p.species === species),
+    [plans, species],
+  )
 
   const onAgeChange = (years: string, months: string) => {
     const y = Number(years) || 0
@@ -270,8 +324,6 @@ export function PetFormDialog({
         markings: markings || null,
         sex: sex || null,
         birth_date: birthDate || null,
-        allergies: allergies || null,
-        clinical_alert_text: alertText || null,
       }
       if (pet) {
         await apiFetch(`/pets/${pet.id}`, {
@@ -279,8 +331,8 @@ export function PetFormDialog({
           body: JSON.stringify(payload),
         })
       } else {
-        if (assignPlan && (!planId || !planBranchId)) {
-          setError('Selecciona el plan de vacunación y la sucursal.')
+        if (assignPlan && selectedPlans.length === 0) {
+          setError('Selecciona al menos un plan de vacunación y la sucursal.')
           return
         }
         const owner =
@@ -298,20 +350,38 @@ export function PetFormDialog({
           method: 'POST',
           body: JSON.stringify({ ...payload, owner }),
         })
-        if (assignPlan) {
-          await apiFetch('/vaccination-plans/assign', {
+        for (const alert of pendingAlerts) {
+          await apiFetch(`/pets/${created.id}/alerts`, {
             method: 'POST',
-            body: JSON.stringify({
-              pet_id: created.id,
-              plan_id: planId,
-              branch_id: planBranchId,
-              vet_user_id: planVetId || null,
-              start_date: planStartDate,
-              start_time: planStartTime ? `${planStartTime}:00` : '10:00:00',
-              duration_minutes: 30,
-            }),
+            body: JSON.stringify({ type: alert.type, description: alert.description }),
           })
         }
+        if (assignPlan) {
+          for (const pid of selectedPlans) {
+            await apiFetch('/vaccination-plans/assign', {
+              method: 'POST',
+              body: JSON.stringify({
+                pet_id: created.id,
+                plan_id: pid,
+                branch_id: planBranchId,
+                vet_user_id: planVetId || null,
+                start_date: planStartDate,
+                start_time: planStartTime ? `${planStartTime}:00` : '10:00:00',
+                duration_minutes: 30,
+              }),
+            })
+          }
+        }
+        toast({
+          title: 'Mascota registrada',
+          description:
+            selectedPlans.length > 0
+              ? `Se asignaron ${selectedPlans.length} plan(es) de vacunación.`
+              : pendingAlerts.length > 0
+                ? `Se guardaron ${pendingAlerts.length} alerta(s) clínica(s).`
+                : 'El expediente se creó correctamente.',
+          variant: 'success',
+        })
       }
       onSaved()
     } catch (err) {
@@ -551,22 +621,15 @@ export function PetFormDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="allergies">Alergias</Label>
-            <Textarea
-              id="allergies"
-              value={allergies}
-              onChange={(e) => setAllergies(e.target.value)}
-              placeholder="Ej. Penicilina, alimentos con maíz…"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="alert">Alerta clínica</Label>
-            <Textarea
-              id="alert"
-              value={alertText}
-              onChange={(e) => setAlertText(e.target.value)}
-              placeholder="Ej. Muerde al ser manipulado; epiléptico…"
-            />
+            <Label>Alertas clínicas</Label>
+            <p className="text-xs text-muted-foreground">
+              Alergias, comportamiento y medidas especiales — el mismo selector de la cartilla.
+            </p>
+            {pet ? (
+              <ClinicalAlertSelector petId={pet.id} />
+            ) : (
+              <ClinicalAlertSelector pending={pendingAlerts} onPendingChange={setPendingAlerts} />
+            )}
           </div>
 
           {!pet && (
@@ -584,21 +647,44 @@ export function PetFormDialog({
               {assignPlan && (
                 <div className="mt-3 grid gap-3">
                   <div className="space-y-2">
-                    <Label htmlFor="vp-plan">Plan de vacunación *</Label>
-                    <select
-                      id="vp-plan"
-                      value={planId}
-                      onChange={(e) => setPlanId(e.target.value)}
-                      className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                      required
-                    >
-                      <option value="">— Selecciona un plan —</option>
-                      {plans.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name}
-                        </option>
-                      ))}
-                    </select>
+                    <Label>Planes de vacunación * (puedes elegir varios)</Label>
+                    <div className="max-h-44 space-y-1.5 overflow-y-auto rounded-md border border-border p-2">
+                      {speciesPlans.length === 0 && (
+                        <p className="px-2 py-1.5 text-sm text-muted-foreground">
+                          No hay planes disponibles para esta especie.
+                        </p>
+                      )}
+                      {speciesPlans.map((p) => {
+                        const checked = selectedPlans.includes(p.id)
+                        return (
+                          <label
+                            key={p.id}
+                            className={`flex cursor-pointer items-center gap-2 rounded-md border px-2.5 py-2 text-sm transition-colors ${
+                              checked
+                                ? 'border-primary/50 bg-primary/5'
+                                : 'border-border hover:bg-accent'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() =>
+                                setSelectedPlans((prev) =>
+                                  checked ? prev.filter((x) => x !== p.id) : [...prev, p.id],
+                                )
+                              }
+                              className="size-4 rounded border-border"
+                            />
+                            <span className="min-w-0 flex-1 truncate">{p.name}</span>
+                            {checked && <Check className="size-4 shrink-0 text-primary" />}
+                          </label>
+                        )
+                      })}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Se muestran solo los planes de la especie {speciesLabel(species)}. Cada plan
+                      se agendará por separado.
+                    </p>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
@@ -674,12 +760,42 @@ export function PetFormDialog({
               <div className="grid gap-3">
                 <div className="space-y-2">
                   <Label htmlFor="owner-name">Nombre</Label>
-                  <Input
-                    id="owner-name"
-                    value={ownerName}
-                    onChange={(e) => setOwnerName(e.target.value)}
-                    placeholder="Nombre del dueño"
-                  />
+                  <div className="relative" ref={ownerResultsRef}>
+                    <Input
+                      id="owner-name"
+                      value={ownerName}
+                      onChange={(e) => {
+                        setOwnerName(e.target.value)
+                        setOwnerDropdownOpen(true)
+                      }}
+                      onFocus={() => {
+                        if (ownerResults.length > 0) setOwnerDropdownOpen(true)
+                      }}
+                      placeholder="Nombre del dueño — busca si ya existe"
+                      autoComplete="off"
+                    />
+                    {ownerDropdownOpen && ownerResults.length > 0 && (
+                      <div className="absolute z-20 mt-1 max-h-52 w-full overflow-y-auto rounded-md border border-border bg-card p-1 shadow-card">
+                        {ownerResults.map((o) => (
+                          <button
+                            key={o.id}
+                            type="button"
+                            onClick={() => pickOwner(o)}
+                            className="block w-full rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
+                          >
+                            <span className="block font-medium">{o.full_name ?? 'Dueño'}</span>
+                            <span className="block text-xs text-muted-foreground">
+                              {[o.phone, o.email].filter(Boolean).join(' · ') || 'Sin contacto'}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Si el dueño ya tiene otra mascota, selecciónalo para vincularlas (aparecerán en
+                    familia) y evitar duplicados.
+                  </p>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">

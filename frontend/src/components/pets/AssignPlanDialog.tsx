@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { apiFetch } from '@/lib/api'
+import { useToast } from '@/components/ui/toast'
 
 function todayISO() {
   const d = new Date()
@@ -54,6 +55,7 @@ export function AssignPlanDialog({
   const [startTime, setStartTime] = useState('10:00')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const { toast } = useToast()
 
   useEffect(() => {
     if (!open) return
@@ -106,6 +108,11 @@ export function AssignPlanDialog({
       setPlanId('')
       setBranchId('')
       setVetId('')
+      toast({
+        title: 'Plan asignado',
+        description: `El plan de vacunación quedó asignado a ${petName}. Las dosis y citas se generaron en la agenda.`,
+        variant: 'success',
+      })
       onAssigned()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo asignar el plan')

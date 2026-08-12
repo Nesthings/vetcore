@@ -26,6 +26,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/components/ui/toast'
 import { BrandCombobox } from '@/components/pets/BrandCombobox'
+import { ClinicalAlertSelector } from '@/components/pets/ClinicalAlertSelector'
 import type { Pet, PetOwner } from '@/pages/Pets'
 import { apiFetch } from '@/lib/api'
 import type { SaleProduct } from '@/lib/product'
@@ -637,6 +638,19 @@ export function NewConsultation() {
                     Esta mascota no tiene un dueño vinculado. Los datos del dueño no aplican.
                   </p>
                 )}
+              </CardContent>
+            </Card>
+
+            <Card className="shadow-card">
+              <CardHeader>
+                <CardTitle>Alertas clínicas</CardTitle>
+                <CardDescription>
+                  Alergias, comportamiento y medidas especiales de {pet.name} (se guardan en el
+                  expediente con el mismo selector de la cartilla)
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ClinicalAlertSelector petId={pet.id} />
               </CardContent>
             </Card>
 

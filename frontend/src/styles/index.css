@@ -208,6 +208,17 @@
   ::selection {
     @apply bg-primary/20 text-primary;
   }
+
+  /* iOS Safari hace zoom automático al enfocar inputs con font-size < 16px,
+     lo que "acerca" la pantalla y habilita scroll horizontal. En pantallas
+     pequeñas forzamos 16px en los campos de formulario para evitarlo. */
+  @media (max-width: 640px) {
+    input,
+    select,
+    textarea {
+      font-size: 16px;
+    }
+  }
 }
 
 @layer utilities {
