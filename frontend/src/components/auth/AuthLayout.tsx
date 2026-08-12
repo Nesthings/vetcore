@@ -14,8 +14,15 @@ export function AuthLayout({
   const { theme } = useTheme()
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-8 bg-background px-4 py-12">
-      <div className="flex flex-col items-center gap-3 text-center">
+    <div className="relative flex min-h-screen flex-col items-center justify-center gap-8 overflow-hidden bg-background px-4 py-12">
+      <div
+        className="pointer-events-none absolute inset-0 bg-cover bg-center"
+        style={{ backgroundImage: "url('/collage.png')" }}
+        aria-hidden="true"
+      />
+      <div className="pointer-events-none absolute inset-0 bg-background/85" aria-hidden="true" />
+
+      <div className="relative flex flex-col items-center gap-3 text-center">
         <img
           src={theme === 'dark' ? '/logo_for_darkmode.png' : '/logo_for_whitemode.png'}
           alt="VetCore"
@@ -24,7 +31,7 @@ export function AuthLayout({
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">VetCore</h1>
       </div>
 
-      <div className="w-full max-w-md rounded-xl border border-border bg-card p-8 shadow-card">
+      <div className="relative w-full max-w-md rounded-xl border border-border bg-card p-8 shadow-card">
         <div className="mb-6">
           <h2 className="text-lg font-semibold text-foreground">{title}</h2>
           <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
@@ -32,7 +39,7 @@ export function AuthLayout({
         {children}
       </div>
 
-      {footer && <p className="text-sm text-muted-foreground">{footer}</p>}
+      {footer && <p className="relative text-sm text-muted-foreground">{footer}</p>}
     </div>
   )
 }
