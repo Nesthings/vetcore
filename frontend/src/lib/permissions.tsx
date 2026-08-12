@@ -15,7 +15,9 @@ const PermissionsContext = createContext<PermissionsContextValue | null>(null)
 export function PermissionsProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth()
   const [components, setComponents] = useState<string[]>([])
-  const [loading, setLoading] = useState(false)
+  // Empieza en "loading" cuando hay sesión: evita que una URL directa redirija
+  // a inicio antes de que se carguen los componentes (carrera en ProtectedRoute).
+  const [loading, setLoading] = useState<boolean>(() => Boolean(user?.clinic_id))
 
   const load = useCallback(async () => {
     if (!user?.clinic_id) {
