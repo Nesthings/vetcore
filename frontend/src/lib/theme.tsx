@@ -1,8 +1,8 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 
-type Theme = 'light' | 'dark'
+import { useAuth } from '@/lib/auth'
 
-const THEME_KEY = 'vetcore_theme'
+type Theme = 'light' | 'dark'
 
 interface ThemeContextValue {
   theme: Theme
@@ -11,9 +11,15 @@ interface ThemeContextValue {
 
 const ThemeContext = createContext<ThemeContextValue | null>(null)
 
-function getInitialTheme(): Theme {
+// El tema se guarda POR USUARIO (última elección recordada). Sin sesión
+// (login/signup) usa una clave genérica.
+function themeKey(userId?: string): string {
+  return userId ? `vetcore_theme:${userId}` : 'vetcore_theme'
+}
+
+function readStored(key: string): Theme {
   try {
-    const stored = localStorage.getItem(THEME_KEY)
+    const stored = localStorage.getItem(key)
     if (stored === 'light' || stored === 'dark') return stored
   } catch {
     // sin almacenamiento
@@ -22,16 +28,23 @@ function getInitialTheme(): Theme {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>(getInitialTheme)
+  const { user } = useAuth()
+  const key = themeKey(user?.sub)
+  const [theme, setTheme] = useState<Theme>(() => readStored(key))
+
+  // Al cambiar de usuario (login/logout) se carga el tema de ESE usuario.
+  useEffect(() => {
+    setTheme(readStored(key))
+  }, [key])
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark')
     try {
-      localStorage.setItem(THEME_KEY, theme)
+      localStorage.setItem(key, theme)
     } catch {
       // ignorar
     }
-  }, [theme])
+  }, [theme, key])
 
   const value: ThemeContextValue = {
     theme,

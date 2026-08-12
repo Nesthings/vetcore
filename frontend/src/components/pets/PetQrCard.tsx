@@ -65,13 +65,14 @@ export function PetQrCard({
       <div
         className={cn(
           'relative size-full transition-transform duration-500 [transform-style:preserve-3d]',
-          showBack && '[transform:rotateY(180deg)]',
+          showBack && !flipToBack && '[transform:rotateY(180deg)]',
         )}
       >
         <div
           className={cn(
             'absolute inset-0 overflow-hidden [backface-visibility:hidden]',
             frontClassName,
+            flipToBack && 'hidden',
           )}
         >
           {photoUrl ? (
@@ -91,8 +92,9 @@ export function PetQrCard({
         </div>
         <div
           className={cn(
-            'absolute inset-0 flex flex-col items-center justify-center gap-1 rounded-[2rem] bg-white p-3 [transform:rotateY(180deg)] [backface-visibility:hidden]',
+            'absolute inset-0 flex flex-col items-center justify-center gap-1 rounded-[2rem] bg-white p-3 [backface-visibility:hidden]',
             backClassName,
+            !flipToBack && '[transform:rotateY(180deg)]',
           )}
         >
           {qrDataUrl ? (

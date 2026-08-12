@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { AuthProvider } from '@/lib/auth'
+import { ThemeProvider } from '@/lib/theme'
 import { DashboardConfigProvider } from '@/lib/dashboard-config'
 import { NavConfigProvider } from '@/lib/nav-config'
 import { PermissionsProvider } from '@/lib/permissions'
@@ -40,7 +41,8 @@ import { Waitlist } from '@/pages/Waitlist'
 function App() {
   return (
     <AuthProvider>
-      <PermissionsProvider>
+      <ThemeProvider>
+        <PermissionsProvider>
         <SetupProvider>
           <NavConfigProvider>
             <DashboardConfigProvider>
@@ -255,6 +257,7 @@ function App() {
           </NavConfigProvider>
         </SetupProvider>
       </PermissionsProvider>
+      </ThemeProvider>
     </AuthProvider>
   )
 }

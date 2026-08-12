@@ -3,7 +3,7 @@
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.api.deps import CurrentUser, require_staff
@@ -64,9 +64,21 @@ def mark_read(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Notificación no encontrada"
         )
-    if notification.read_at is None:
-        notification.read_at = datetime.now(UTC)
-        db.commit()
+    now = datetime.now(UTC)
+    # Se marca como leída la MISMA notificación (mismo evento) para TODOS los
+    # usuarios de la clínica: así el aviso de la campanita se borra para todos.
+    db.execute(
+        update(InternalNotification)
+        .where(
+            InternalNotification.clinic_id == notification.clinic_id,
+            InternalNotification.type == notification.type,
+            InternalNotification.message == notification.message,
+            InternalNotification.link == notification.link,
+            InternalNotification.read_at.is_(None),
+        )
+        .values(read_at=now)
+    )
+    db.commit()
 
 
 @router.post("/read-all", status_code=status.HTTP_204_NO_CONTENT)
@@ -74,14 +86,18 @@ def mark_all_read(
     me: CurrentUser = Depends(require_staff),
     db: Session = Depends(get_db),
 ) -> None:
-    notifications = list(
-        db.scalars(
-            select(InternalNotification).where(
-                InternalNotification.user_id == me.sub,
-                InternalNotification.read_at.is_(None),
-            )
+    if not me.clinic_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Sin clínica asociada"
         )
+    # "Leer todas" aplica a TODA la clínica: la campanita se limpia para el
+    # usuario actual y para el resto del personal.
+    db.execute(
+        update(InternalNotification)
+        .where(
+            InternalNotification.clinic_id == me.clinic_id,
+            InternalNotification.read_at.is_(None),
+        )
+        .values(read_at=datetime.now(UTC))
     )
-    for n in notifications:
-        n.read_at = datetime.now(UTC)
     db.commit()

@@ -1,3 +1,5 @@
+import { useTheme } from '@/lib/theme'
+
 export function AuthLayout({
   title,
   subtitle,
@@ -9,11 +11,13 @@ export function AuthLayout({
   children: React.ReactNode
   footer?: React.ReactNode
 }) {
+  const { theme } = useTheme()
+
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-8 bg-background px-4 py-12">
       <div className="flex flex-col items-center gap-3 text-center">
         <img
-          src="/vetcore-logo.png"
+          src={theme === 'dark' ? '/logo_for_darkmode.png' : '/logo_for_whitemode.png'}
           alt="VetCore"
           className="size-30 rounded-2xl object-contain shadow-elevated"
         />

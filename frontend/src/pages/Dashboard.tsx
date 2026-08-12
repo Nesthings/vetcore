@@ -456,7 +456,6 @@ export function Dashboard() {
           <h1 className="font-display text-2xl font-bold tracking-tight">Inicio</h1>
           <p className="text-sm text-muted-foreground">
             {data ? `Resumen del día · ${data.period_label}` : 'Resumen operativo de la clínica'}
-            {' — arrastra las secciones o usa las flechas para ordenarlas a tu gusto'}
           </p>
         </div>
       </div>
@@ -475,6 +474,10 @@ export function Dashboard() {
           </Link>
         </Button>
       </div>
+
+      <p className="mb-5 text-xs text-muted-foreground">
+        Arrastra las secciones o usa las flechas para ordenarlas a tu gusto
+      </p>
 
       {error && <ErrorState description={error} onRetry={load} className="mb-6" />}
       {!data && !error && <LoadingState label="Cargando dashboard…" />}
