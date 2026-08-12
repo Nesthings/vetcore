@@ -69,6 +69,7 @@ ROLE_DEFAULT_COMPONENTS: dict[str, set[str]] = {
         "pets",
         "inventory",
         "audit",
+        "hospitalization",
     },
 }
 
