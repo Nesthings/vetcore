@@ -14,6 +14,13 @@ import {
 } from 'lucide-react'
 
 import { AppLayout } from '@/components/layout/AppLayout'
+import { CareSection } from '@/components/hospitalizacion/CareSection'
+import { CostsSection } from '@/components/hospitalizacion/CostsSection'
+import { DischargeSection } from '@/components/hospitalizacion/DischargeSection'
+import { EvolutionSection } from '@/components/hospitalizacion/EvolutionSection'
+import { MedicationsSection } from '@/components/hospitalizacion/MedicationsSection'
+import { TasksSection } from '@/components/hospitalizacion/TasksSection'
+import { VitalsSection } from '@/components/hospitalizacion/VitalsSection'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -28,7 +35,6 @@ import { ErrorState } from '@/components/ui/error-state'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { LoadingState } from '@/components/ui/loading-state'
-import { SectionHeading } from '@/components/ui/section-heading'
 import { useToast } from '@/components/ui/toast'
 import { apiFetch } from '@/lib/api'
 import {
@@ -257,8 +263,35 @@ export function HospitalizacionPaciente() {
           </div>
         )}
 
-        <div className="mt-6">
-          <SectionHeading icon={BedDouble} title="Siguientes módulos" subtitle="Tareas, signos vitales, medicamentos y evolución llegarán en los próximos hitos." />
+        <div className="mt-6 rounded-xl border border-border bg-card p-4 shadow-sm">
+          <TasksSection hospitalizationId={data.id} />
+        </div>
+
+        <div className="mt-4 rounded-xl border border-border bg-card p-4 shadow-sm">
+          <VitalsSection
+            hospitalizationId={data.id}
+            monitoringLevel={data.monitoring_level}
+          />
+        </div>
+
+        <div className="mt-4 rounded-xl border border-border bg-card p-4 shadow-sm">
+          <MedicationsSection hospitalizationId={data.id} branchId={data.branch_id} />
+        </div>
+
+        <div className="mt-4 rounded-xl border border-border bg-card p-4 shadow-sm">
+          <CareSection hospitalizationId={data.id} />
+        </div>
+
+        <div className="mt-4 rounded-xl border border-border bg-card p-4 shadow-sm">
+          <EvolutionSection hospitalizationId={data.id} />
+        </div>
+
+        <div className="mt-4 rounded-xl border border-border bg-card p-4 shadow-sm">
+          <CostsSection hospitalizationId={data.id} />
+        </div>
+
+        <div className="mt-4 rounded-xl border border-border bg-card p-4 shadow-sm">
+          <DischargeSection hospitalizationId={data.id} status={data.status} />
         </div>
       </div>
 

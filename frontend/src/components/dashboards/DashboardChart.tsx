@@ -280,6 +280,8 @@ export const DashboardChart = memo(function DashboardChart({
       return <StackedBars data={data as never} />
     case 'smart_alerts':
       return <SmartAlertsList data={data as SmartAlertsData} />
+    case 'hosp_admissions':
+      return <AreaChartCard data={data as { label: string; value: number }[]} />
     default:
       return <p className={cn('text-sm text-muted-foreground')}>Sin datos.</p>
   }

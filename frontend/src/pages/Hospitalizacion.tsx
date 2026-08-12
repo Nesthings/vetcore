@@ -1,18 +1,22 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
+  ArrowDownUp,
   BedDouble,
   CalendarClock,
   Loader2,
   PawPrint,
   Plus,
   Search,
+  Settings2,
   Stethoscope,
   UserRound,
   Weight,
 } from 'lucide-react'
 
 import { AppLayout } from '@/components/layout/AppLayout'
+import { HospConfigDialog } from '@/components/hospitalizacion/HospConfigDialog'
+import { ShiftDialog } from '@/components/hospitalizacion/ShiftDialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -31,7 +35,9 @@ import { LoadingState } from '@/components/ui/loading-state'
 import { StatChip } from '@/components/ui/stat-chip'
 import { useToast } from '@/components/ui/toast'
 import { apiFetch } from '@/lib/api'
+import { useAuth } from '@/lib/auth'
 import {
+  ACCOMMODATION_TYPE_LABELS,
   ISOLATION_META,
   MONITORING_LABELS,
   OPERATIONAL_META,
@@ -41,7 +47,9 @@ import {
 import type {
   Accommodation,
   HospitalizationItem,
+  HospOverview,
   HospStatus,
+  OperationalStatus,
 } from '@/lib/hospitalization'
 
 interface Branch {
@@ -51,8 +59,20 @@ interface Branch {
 
 const ACTIVE_STATUSES: HospStatus[] = ['planned', 'admitted', 'active', 'discharge_pending']
 
+const SEVERITY_ORDER: Record<OperationalStatus, number> = {
+  critical: 0,
+  delicate: 1,
+  monitoring: 2,
+  stable: 3,
+}
+
+type SortKey = 'elapsed' | 'priority' | 'accommodation' | 'vet' | 'name'
+
 export function Hospitalizacion() {
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'admin'
   const [items, setItems] = useState<HospitalizationItem[]>([])
+  const [overview, setOverview] = useState<HospOverview | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -60,9 +80,26 @@ export function Hospitalizacion() {
   const [branchId, setBranchId] = useState('')
   const [statusFilter, setStatusFilter] = useState('active')
   const [search, setSearch] = useState('')
+  const [spaceFilter, setSpaceFilter] = useState('')
+  const [vetFilter, setVetFilter] = useState('')
+  const [monitoringFilter, setMonitoringFilter] = useState('')
+  const [isolationFilter, setIsolationFilter] = useState('')
+  const [sortBy, setSortBy] = useState<SortKey>('priority')
 
   const [createOpen, setCreateOpen] = useState(false)
   const [spacesOpen, setSpacesOpen] = useState(false)
+  const [shiftOpen, setShiftOpen] = useState(false)
+  const [configOpen, setConfigOpen] = useState(false)
+
+  const loadOverview = useCallback(async () => {
+    try {
+      const params = new URLSearchParams()
+      if (branchId) params.set('branch_id', branchId)
+      setOverview(await apiFetch<HospOverview>(`/hospitalization/overview?${params}`))
+    } catch {
+      setOverview(null)
+    }
+  }, [branchId])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -85,6 +122,10 @@ export function Hospitalizacion() {
   }, [load])
 
   useEffect(() => {
+    loadOverview()
+  }, [loadOverview])
+
+  useEffect(() => {
     apiFetch<Branch[]>('/branches')
       .then((b) => {
         setBranches(b)
@@ -93,18 +134,48 @@ export function Hospitalizacion() {
       .catch(() => undefined)
   }, [])
 
-  const summary = useMemo(() => {
-    const active = items.filter((i) => ACTIVE_STATUSES.includes(i.status))
-    return {
-      activos: active.length,
-      criticos: active.filter((i) => i.operational_status === 'critical').length,
-      vigilancia: active.filter((i) => i.operational_status === 'monitoring').length,
-      alta_pendiente: active.filter((i) => i.status === 'discharge_pending').length,
-      aislamiento: active.filter((i) => i.isolation_status !== 'normal').length,
-    }
-  }, [items])
+  const summary = overview?.summary
 
   const visibleStatuses = statusFilter === 'active' ? ACTIVE_STATUSES : [statusFilter as HospStatus]
+
+  const filtered = useMemo(() => {
+    let list = items.filter((i) => visibleStatuses.includes(i.status))
+    if (spaceFilter) list = list.filter((i) => i.accommodation_id === spaceFilter)
+    if (vetFilter) list = list.filter((i) => i.vet_user_id === vetFilter)
+    if (monitoringFilter) list = list.filter((i) => i.monitoring_level === monitoringFilter)
+    if (isolationFilter)
+      list = list.filter((i) => (isolationFilter === 'normal' ? i.isolation_status === 'normal' : i.isolation_status === isolationFilter))
+    const sorted = [...list]
+    sorted.sort((a, b) => {
+      switch (sortBy) {
+        case 'name':
+          return (a.pet?.name ?? '').localeCompare(b.pet?.name ?? '')
+        case 'elapsed':
+          return b.elapsed_minutes - a.elapsed_minutes
+        case 'accommodation':
+          return (a.accommodation?.code ?? '~').localeCompare(b.accommodation?.code ?? '~')
+        case 'vet':
+          return (a.vet?.full_name ?? '~').localeCompare(b.vet?.full_name ?? '~')
+        case 'priority':
+          return (
+            SEVERITY_ORDER[a.operational_status] - SEVERITY_ORDER[b.operational_status] ||
+            b.elapsed_minutes - a.elapsed_minutes
+          )
+        default:
+          return 0
+      }
+    })
+    return sorted
+  }, [items, visibleStatuses, spaceFilter, vetFilter, monitoringFilter, isolationFilter, sortBy])
+
+  const uniqueSpaces = useMemo(
+    () => Array.from(new Map(items.map((i) => [i.accommodation_id, i.accommodation])).values()).filter(Boolean),
+    [items],
+  )
+  const uniqueVets = useMemo(
+    () => Array.from(new Map(items.map((i) => [i.vet_user_id, i.vet])).values()).filter(Boolean),
+    [items],
+  )
 
   return (
     <AppLayout>
@@ -114,6 +185,14 @@ export function Hospitalizacion() {
           <p className="text-sm text-muted-foreground">Pacientes internados, espacios y operación</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {isAdmin && (
+            <Button variant="outline" size="sm" onClick={() => setConfigOpen(true)}>
+              <Settings2 /> Configuración
+            </Button>
+          )}
+          <Button variant="outline" size="sm" onClick={() => setShiftOpen(true)}>
+            <CalendarClock /> Turno
+          </Button>
           <Button variant="outline" size="sm" onClick={() => setSpacesOpen(true)}>
             <BedDouble /> Espacios
           </Button>
@@ -124,19 +203,17 @@ export function Hospitalizacion() {
       </div>
 
       <div className="mb-4 flex flex-wrap gap-2">
-        <StatChip label="Hospitalizados" value={summary.activos} icon={BedDouble} tint="bg-primary/10 text-primary" />
-        <StatChip label="Críticos" value={summary.criticos} icon={Stethoscope} tint="bg-destructive/10 text-destructive" />
-        <StatChip label="En vigilancia" value={summary.vigilancia} icon={CalendarClock} tint="bg-info/10 text-info" />
-        <StatChip label="Alta pendiente" value={summary.alta_pendiente} icon={PawPrint} tint="bg-warning/10 text-warning" />
-        <StatChip label="Aislamiento" value={summary.aislamiento} icon={Stethoscope} tint="bg-orange-500/10 text-orange-600 dark:text-orange-300" />
+        <StatChip label="Hospitalizados" value={summary?.active ?? 0} icon={BedDouble} tint="bg-primary/10 text-primary" />
+        <StatChip label="Críticos" value={summary?.critical ?? 0} icon={Stethoscope} tint="bg-destructive/10 text-destructive" />
+        <StatChip label="En vigilancia" value={summary?.monitoring ?? 0} icon={CalendarClock} tint="bg-info/10 text-info" />
+        <StatChip label="Alta pendiente" value={summary?.discharge_pending ?? 0} icon={PawPrint} tint="bg-warning/10 text-warning" />
+        <StatChip label="Aislamiento" value={summary?.isolation ?? 0} icon={Stethoscope} tint="bg-orange-500/10 text-orange-600 dark:text-orange-300" />
+        <StatChip label="Ingresos hoy" value={summary?.admitted_today ?? 0} icon={Plus} tint="bg-success/10 text-success" />
+        <StatChip label="Alta hoy" value={summary?.expected_discharge_today ?? 0} icon={CalendarClock} tint="bg-emerald-500/10 text-emerald-600 dark:text-emerald-300" />
       </div>
 
-      <div className="mb-6 flex flex-col gap-2 sm:flex-row">
-        <select
-          value={branchId}
-          onChange={(e) => setBranchId(e.target.value)}
-          className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-        >
+      <div className="mb-6 flex flex-col gap-2 lg:flex-row">
+        <select value={branchId} onChange={(e) => setBranchId(e.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-sm">
           <option value="">Todas las sucursales</option>
           {branches.map((b) => (
             <option key={b.id} value={b.id}>
@@ -144,11 +221,7 @@ export function Hospitalizacion() {
             </option>
           ))}
         </select>
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-        >
+        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-sm">
           <option value="active">Activos</option>
           <option value="planned">Planeadas</option>
           <option value="admitted">Admitidos</option>
@@ -156,14 +229,47 @@ export function Hospitalizacion() {
           <option value="discharged">Dados de alta</option>
           <option value="cancelled">Canceladas</option>
         </select>
+        <select value={spaceFilter} onChange={(e) => setSpaceFilter(e.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-sm">
+          <option value="">Todos los espacios</option>
+          {uniqueSpaces.map((a) => (
+            <option key={a!.id} value={a!.id}>
+              {a!.code} · {a!.name}
+            </option>
+          ))}
+        </select>
+        <select value={vetFilter} onChange={(e) => setVetFilter(e.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-sm">
+          <option value="">Todos los veterinarios</option>
+          {uniqueVets.map((v) => (
+            <option key={v!.id} value={v!.id}>
+              {v!.full_name}
+            </option>
+          ))}
+        </select>
+        <select value={monitoringFilter} onChange={(e) => setMonitoringFilter(e.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-sm">
+          <option value="">Toda monitorización</option>
+          <option value="basic">Básico</option>
+          <option value="intermediate">Intermedio</option>
+          <option value="intensive">Intensivo</option>
+        </select>
+        <select value={isolationFilter} onChange={(e) => setIsolationFilter(e.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-sm">
+          <option value="">Sin filtro aislamiento</option>
+          <option value="normal">Normal</option>
+          <option value="precaution">Precaución</option>
+          <option value="isolation">Aislamiento</option>
+        </select>
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por paciente…"
-            className="pl-9"
-          />
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por paciente…" className="pl-9" />
+        </div>
+        <div className="relative">
+          <ArrowDownUp className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value as SortKey)} className="h-9 rounded-md border border-input bg-background pl-9 pr-3 text-sm">
+            <option value="priority">Prioridad</option>
+            <option value="elapsed">Tiempo internado</option>
+            <option value="accommodation">Espacio</option>
+            <option value="vet">Veterinario</option>
+            <option value="name">Nombre</option>
+          </select>
         </div>
       </div>
 
@@ -172,7 +278,46 @@ export function Hospitalizacion() {
 
       {!loading && !error && (
         <>
-          {items.length === 0 ? (
+          {overview && overview.accommodations.length > 0 && (
+            <div className="mb-6">
+              <div className="mb-2 flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-foreground">Ocupación de espacios</h2>
+                <span className="text-xs text-muted-foreground">
+                  {overview.accommodations.filter((a) => a.occupied).length}/{overview.accommodations.length} ocupados
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+                {overview.accommodations.map((a) => (
+                  <div
+                    key={a.id}
+                    className={`rounded-lg border px-3 py-2.5 ${
+                      a.occupied
+                        ? 'border-destructive/40 bg-destructive/5'
+                        : a.status === 'unavailable' || a.status === 'maintenance'
+                          ? 'border-border bg-muted/40 opacity-60'
+                          : 'border-border bg-card'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-semibold">{a.code}</p>
+                      <span
+                        className={`size-2.5 rounded-full ${
+                          a.occupied ? 'bg-destructive' : a.status === 'maintenance' ? 'bg-warning' : 'bg-success'
+                        }`}
+                        aria-hidden="true"
+                      />
+                    </div>
+                    <p className="truncate text-xs text-muted-foreground">{a.name}</p>
+                    <p className="mt-0.5 text-[11px] capitalize text-muted-foreground">
+                      {ACCOMMODATION_TYPE_LABELS[a.type] ?? a.type} · {a.active_count}/{a.capacity}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {filtered.length === 0 ? (
             <EmptyState
               title="Sin hospitalizaciones"
               description="No hay pacientes internados con estos filtros."
@@ -180,9 +325,7 @@ export function Hospitalizacion() {
             />
           ) : (
             <div className="space-y-3">
-              {items
-                .filter((i) => visibleStatuses.includes(i.status))
-                .map((h) => {
+              {filtered.map((h) => {
                   const op = OPERATIONAL_META[h.operational_status]
                   const iso = ISOLATION_META[h.isolation_status]
                   return (
@@ -260,6 +403,18 @@ export function Hospitalizacion() {
         branches={branches}
         branchId={branchId}
         onChanged={() => load()}
+      />
+
+      <ShiftDialog open={shiftOpen} onOpenChange={setShiftOpen} branchId={branchId} />
+
+      <HospConfigDialog
+        open={configOpen}
+        onOpenChange={setConfigOpen}
+        onSaved={() => {
+          setConfigOpen(false)
+          load()
+          loadOverview()
+        }}
       />
     </AppLayout>
   )

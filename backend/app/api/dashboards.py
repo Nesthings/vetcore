@@ -68,6 +68,23 @@ def _new_pets(db: Session, cid: str, period: str) -> list[dict]:
     return [{"label": r.label, "value": r.value} for r in rows]
 
 
+def _hosp_admissions(db: Session, cid: str, period: str) -> list[dict]:
+    """Ingresos de hospitalización por día (series para el área del Inicio)."""
+    window = PERIOD_WINDOW[period]
+    trunc, label = ("hour", "HH24:00") if period == "day" else ("day", "DD/MM")
+    rows = db.execute(
+        text(
+            f"SELECT to_char(date_trunc('{trunc}', admitted_at), '{label}') AS label, "
+            f"count(*) AS value "
+            f"FROM hospitalizations WHERE clinic_id = :c AND admitted_at >= {window} "
+            f"GROUP BY date_trunc('{trunc}', admitted_at) "
+            f"ORDER BY date_trunc('{trunc}', admitted_at)"
+        ),
+        {"c": cid},
+    ).all()
+    return [{"label": r.label, "value": r.value} for r in rows]
+
+
 def _appt_heatmap(db: Session, cid: str, period: str) -> dict:
     window = PERIOD_WINDOW[period]
     rows = db.execute(
@@ -188,10 +205,7 @@ def _vet_load(db: Session, cid: str, period: str) -> dict:
 def _vaccination(db: Session, cid: str, period: str, branch_id: str | None = None) -> list[dict]:
     labels = {"completed": "Completadas", "scheduled": "Programadas", "skipped": "Omitidas"}
     days = {"day": 1, "week": 7, "month": 30}[period]
-    where = (
-        "p.clinic_id = :c "
-        f"AND d.due_date >= (current_date - interval '{days} days')"
-    )
+    where = f"p.clinic_id = :c AND d.due_date >= (current_date - interval '{days} days')"
     params: dict = {"c": cid}
     if branch_id:
         where += " AND p.branch_id = :b"
@@ -281,6 +295,7 @@ _BUILDERS = {
     "inv_movements": _inv_movements,
     "reasons": _reasons,
     "smart_alerts": _smart_alerts,
+    "hosp_admissions": _hosp_admissions,
 }
 
 

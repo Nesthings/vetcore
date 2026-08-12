@@ -75,6 +75,12 @@ export const DASHBOARD_CATALOG: DashboardDef[] = [
     desc: 'Pacientes que requieren atención',
     chart: 'stacked',
   },
+  {
+    slug: 'hosp_admissions',
+    title: 'Ingresos de hospitalización',
+    desc: 'Pacientes internados por día',
+    chart: 'area',
+  },
 ]
 
 export const CHART_LABELS: Record<ChartKind, string> = {

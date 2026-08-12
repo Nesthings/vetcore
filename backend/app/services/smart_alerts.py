@@ -34,6 +34,7 @@ ALERT_RESOLVED = "resolved"
 ALERT_DISMISSED = "dismissed"
 
 ENTITY_PET = "pet"
+ENTITY_HOSPITALIZATION = "hospitalization"
 
 
 @dataclass
@@ -364,6 +365,146 @@ def _evaluate_cita_cancelada(db: Session, clinic_id, params: dict) -> list[Evalu
 # Registro de reglas
 # ---------------------------------------------------------------------------
 
+
+def _hosp_medication_overdue(db: Session, clinic_id, params: dict) -> list[EvaluatedAlert]:
+    rows = (
+        db.execute(
+            text(
+                "SELECT h.id AS hosp_id, p.name AS pet_name, count(*) AS overdue "
+                "FROM hospitalization_medication_administrations a "
+                "JOIN hospitalization_medication_orders o ON o.id = a.order_id "
+                "  AND o.clinic_id = :cid "
+                "JOIN hospitalizations h ON h.id = o.hospitalization_id "
+                "  AND h.clinic_id = :cid "
+                "  AND h.status IN ('admitted','active','discharge_pending') "
+                "JOIN pets p ON p.id = h.pet_id "
+                "WHERE a.status = 'pending' AND a.scheduled_at < now() "
+                "GROUP BY h.id, p.name"
+            ),
+            {"cid": clinic_id},
+        )
+        .mappings()
+        .all()
+    )
+    out: list[EvaluatedAlert] = []
+    for r in rows:
+        out.append(
+            EvaluatedAlert(
+                rule_key="hosp_medication_overdue",
+                entity_type=ENTITY_HOSPITALIZATION,
+                entity_id=str(r["hosp_id"]),
+                message=(
+                    f"{r['pet_name']} tiene {r['overdue']} medicamento(s) "
+                    "pendiente(s) de administrar."
+                ),
+                link=f"/hospitalizacion/{r['hosp_id']}",
+                metadata={"pet_name": r["pet_name"], "count": r["overdue"]},
+            )
+        )
+    return out
+
+
+def _hosp_vitals_overdue(db: Session, clinic_id, params: dict) -> list[EvaluatedAlert]:
+    rows = (
+        db.execute(
+            text(
+                "SELECT h.id AS hosp_id, p.name AS pet_name, count(*) AS overdue "
+                "FROM hospitalization_tasks t "
+                "JOIN hospitalizations h ON h.id = t.hospitalization_id "
+                "  AND h.clinic_id = :cid "
+                "  AND h.status IN ('admitted','active','discharge_pending') "
+                "JOIN pets p ON p.id = h.pet_id "
+                "WHERE t.type = 'vitals' AND t.status = 'pending' AND t.scheduled_at < now() "
+                "GROUP BY h.id, p.name"
+            ),
+            {"cid": clinic_id},
+        )
+        .mappings()
+        .all()
+    )
+    out: list[EvaluatedAlert] = []
+    for r in rows:
+        out.append(
+            EvaluatedAlert(
+                rule_key="hosp_vitals_overdue",
+                entity_type=ENTITY_HOSPITALIZATION,
+                entity_id=str(r["hosp_id"]),
+                message=(
+                    f"{r['pet_name']} tiene {r['overdue']} toma(s) de signos vitales atrasadas."
+                ),
+                link=f"/hospitalizacion/{r['hosp_id']}",
+                metadata={"pet_name": r["pet_name"], "count": r["overdue"]},
+            )
+        )
+    return out
+
+
+def _hosp_expected_discharge(db: Session, clinic_id, params: dict) -> list[EvaluatedAlert]:
+    rows = (
+        db.execute(
+            text(
+                "SELECT h.id AS hosp_id, p.name AS pet_name, h.expected_discharge_at AS expected "
+                "FROM hospitalizations h JOIN pets p ON p.id = h.pet_id "
+                "WHERE h.clinic_id = :cid "
+                "  AND (h.status = 'discharge_pending' "
+                "       OR (h.status IN ('admitted','active') "
+                "           AND h.expected_discharge_at IS NOT NULL "
+                "           AND h.expected_discharge_at <= now() + interval '24 hours'))"
+            ),
+            {"cid": clinic_id},
+        )
+        .mappings()
+        .all()
+    )
+    out: list[EvaluatedAlert] = []
+    for r in rows:
+        out.append(
+            EvaluatedAlert(
+                rule_key="hosp_expected_discharge",
+                entity_type=ENTITY_HOSPITALIZATION,
+                entity_id=str(r["hosp_id"]),
+                message=f"{r['pet_name']} está próximo a su alta.",
+                link=f"/hospitalizacion/{r['hosp_id']}",
+                metadata={"pet_name": r["pet_name"]},
+            )
+        )
+    return out
+
+
+def _hosp_stay_long(db: Session, clinic_id, params: dict) -> list[EvaluatedAlert]:
+    days = int(params.get("days_without_expected_discharge", 7))
+    rows = (
+        db.execute(
+            text(
+                "SELECT h.id AS hosp_id, p.name AS pet_name, "
+                "  extract(epoch from (now() - h.admitted_at)) / 86400.0 AS days "
+                "FROM hospitalizations h JOIN pets p ON p.id = h.pet_id "
+                "WHERE h.clinic_id = :cid AND h.status IN ('admitted','active') "
+                "  AND h.expected_discharge_at IS NULL "
+                "  AND h.admitted_at < now() - :days * interval '1 day'"
+            ),
+            {"cid": clinic_id, "days": days},
+        )
+        .mappings()
+        .all()
+    )
+    out: list[EvaluatedAlert] = []
+    for r in rows:
+        out.append(
+            EvaluatedAlert(
+                rule_key="hosp_stay_long",
+                entity_type=ENTITY_HOSPITALIZATION,
+                entity_id=str(r["hosp_id"]),
+                message=(
+                    f"{r['pet_name']} lleva {int(r['days'])} días hospitalizado sin alta estimada."
+                ),
+                link=f"/hospitalizacion/{r['hosp_id']}",
+                metadata={"pet_name": r["pet_name"], "days": int(r["days"])},
+            )
+        )
+    return out
+
+
 RULES: dict[str, RuleDef] = {
     "vacuna_proxima": RuleDef(
         key="vacuna_proxima",
@@ -418,6 +559,42 @@ RULES: dict[str, RuleDef] = {
         message_template="La cita de {mascota} fue cancelada y no se ha reprogramado.",
         default_params={"days_without_reschedule": 3},
         evaluate=_evaluate_cita_cancelada,
+    ),
+    "hosp_medication_overdue": RuleDef(
+        key="hosp_medication_overdue",
+        name="Medicamento atrasado",
+        category="hospitalización",
+        severity=SEVERITY_WARNING,
+        message_template="{mascota} tiene medicamento(s) pendiente(s) de administrar.",
+        default_params={},
+        evaluate=_hosp_medication_overdue,
+    ),
+    "hosp_vitals_overdue": RuleDef(
+        key="hosp_vitals_overdue",
+        name="Signos vitales pendientes",
+        category="hospitalización",
+        severity=SEVERITY_WARNING,
+        message_template="{mascota} tiene signos vitales atrasados.",
+        default_params={},
+        evaluate=_hosp_vitals_overdue,
+    ),
+    "hosp_expected_discharge": RuleDef(
+        key="hosp_expected_discharge",
+        name="Alta pendiente / próxima",
+        category="hospitalización",
+        severity=SEVERITY_INFO,
+        message_template="{mascota} está próximo a su alta.",
+        default_params={},
+        evaluate=_hosp_expected_discharge,
+    ),
+    "hosp_stay_long": RuleDef(
+        key="hosp_stay_long",
+        name="Estancia sin alta estimada",
+        category="hospitalización",
+        severity=SEVERITY_WARNING,
+        message_template="{mascota} lleva demasiado tiempo hospitalizado sin alta estimada.",
+        default_params={"days_without_expected_discharge": 7},
+        evaluate=_hosp_stay_long,
     ),
 }
 

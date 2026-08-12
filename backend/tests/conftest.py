@@ -62,7 +62,8 @@ def clean_tables(_database):
     try:
         session.execute(
             text(
-                "TRUNCATE smart_alerts, smart_alert_rules, pet_vaccination_doses, "
+                "TRUNCATE smart_alerts, smart_alert_rules, hospitalizations, "
+                "hospitalization_accommodations, pet_vaccination_doses, "
                 "pet_vaccination_plans, pet_carnet_records, pet_weight_records, "
                 "consultations, appointments, pet_photos, vaccination_plan_steps, "
                 "vaccination_plans, clinic_branches, pets, clinics "
