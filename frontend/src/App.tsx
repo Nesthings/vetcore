@@ -35,6 +35,7 @@ import { PurchaseOrders } from '@/pages/PurchaseOrders'
 import { Services } from '@/pages/Services'
 import { Settings } from '@/pages/Settings'
 import { SetupWizard } from '@/pages/SetupWizard'
+import { SmartAlerts } from '@/pages/SmartAlerts'
 import { VaccinationPlans } from '@/pages/VaccinationPlans'
 import { Waitlist } from '@/pages/Waitlist'
 
@@ -205,6 +206,14 @@ function App() {
                     element={
                       <ProtectedRoute roles={['admin']} component="settings">
                         <Settings />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/alerts"
+                    element={
+                      <ProtectedRoute component="dashboard">
+                        <SmartAlerts />
                       </ProtectedRoute>
                     }
                   />

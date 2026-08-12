@@ -21,6 +21,7 @@ from app.models.inventory import (
 from app.models.notification import InternalNotification, OutboundNotification
 from app.models.pet import ClinicalAlert, CustomBreed, Pet, PetPhoto, PetWeightRecord
 from app.models.product import SaleProduct
+from app.models.smart_alert import SmartAlert, SmartAlertRule
 from app.models.staff import User, UserComponentPermission
 from app.models.vaccination import (
     PetCarnetRecord,
@@ -64,6 +65,8 @@ __all__ = [
     "SaleProduct",
     "ScheduleBlock",
     "ServiceCatalog",
+    "SmartAlert",
+    "SmartAlertRule",
     "User",
     "UserComponentPermission",
     "VaccinationPlan",

@@ -22,6 +22,8 @@ import {
 
 import { CHART_COLORS } from '@/lib/dashboards'
 import { cn } from '@/lib/utils'
+import { SmartAlertsList } from '@/components/dashboards/SmartAlertsList'
+import type { SmartAlertsData } from '@/lib/smart-alerts'
 
 const AXIS_TICK = { fontSize: 11, fill: 'var(--muted-foreground)' }
 
@@ -276,6 +278,8 @@ export const DashboardChart = memo(function DashboardChart({
       )
     case 'inv_movements':
       return <StackedBars data={data as never} />
+    case 'smart_alerts':
+      return <SmartAlertsList data={data as SmartAlertsData} />
     default:
       return <p className={cn('text-sm text-muted-foreground')}>Sin datos.</p>
   }

@@ -69,6 +69,12 @@ export const DASHBOARD_CATALOG: DashboardDef[] = [
     desc: 'Motivos más frecuentes (30 días)',
     chart: 'barh',
   },
+  {
+    slug: 'smart_alerts',
+    title: 'Alertas inteligentes',
+    desc: 'Pacientes que requieren atención',
+    chart: 'stacked',
+  },
 ]
 
 export const CHART_LABELS: Record<ChartKind, string> = {

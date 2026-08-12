@@ -1,3 +1,6 @@
+import asyncio
+import logging
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -33,18 +36,49 @@ from app.api import (
     schedule_blocks,
     services,
     share,
+    smart_alerts,
     users,
     vaccination_plans,
     waitlist,
     whatsapp,
 )
 from app.core.config import settings
+from app.services import smart_alerts as smart_alerts_service
+
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    sweep_seconds = getattr(settings, "smart_alerts_sweep_seconds", 900)
+    task = None
+    if sweep_seconds and sweep_seconds > 0:
+        async def _sweep() -> None:
+            while True:
+                await asyncio.sleep(sweep_seconds)
+                try:
+                    # El contenedor corre UNA instancia (desired_count=1): el
+                    # barrido no se duplica. Best-effort: si falla una clínica,
+                    # se registra y continúa en el siguiente ciclo.
+                    smart_alerts_service.sweep_all_clinics()
+                except Exception:  # noqa: BLE001
+                    logger.exception("Barrido periódico de alertas falló")
+
+        task = asyncio.create_task(_sweep())
+        logger.info("Barrido periódico de alertas activado cada %ss", sweep_seconds)
+    try:
+        yield
+    finally:
+        if task is not None:
+            task.cancel()
+
 
 app = FastAPI(
     title=settings.app_name,
     version="0.1.0",
     description="API de VetCore — Sistema de Gestión Veterinaria (SaaS multi-tenant).",
     debug=settings.debug,
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -84,6 +118,7 @@ app.include_router(notifications.router, prefix="/api/v1")
 app.include_router(audit.router, prefix="/api/v1")
 app.include_router(vaccination_plans.router, prefix="/api/v1")
 app.include_router(share.router, prefix="/api/v1")
+app.include_router(smart_alerts.router, prefix="/api/v1")
 app.include_router(platform.router, prefix="/api/v1")
 app.include_router(create_clinic.router, prefix="/api/v1")
 app.include_router(whatsapp.router, prefix="/api/v1")

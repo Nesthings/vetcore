@@ -56,6 +56,9 @@ class Settings(BaseSettings):
     smtp_from: str = ""
     smtp_starttls: bool = True
 
+    # Alertas inteligentes: barrido periódico (segundos; 0 = desactivado)
+    smart_alerts_sweep_seconds: int = 900
+
     @property
     def resolved_database_url(self) -> str:
         if self.database_url:

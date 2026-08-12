@@ -263,6 +263,12 @@ def _reasons(db: Session, cid: str, period: str) -> list[dict]:
     return [{"name": r.name, "value": r.value} for r in rows]
 
 
+def _smart_alerts(db: Session, cid, period: str, branch_id: str | None = None) -> dict:
+    from app.services import smart_alerts as alerts_service
+
+    return alerts_service.get_alerts_summary(db, cid, branch_id, limit=12)
+
+
 _BUILDERS = {
     "species": _species,
     "breeds": _breeds,
@@ -274,6 +280,7 @@ _BUILDERS = {
     "stock_alerts": _stock_alerts,
     "inv_movements": _inv_movements,
     "reasons": _reasons,
+    "smart_alerts": _smart_alerts,
 }
 
 
@@ -290,7 +297,7 @@ def dashboard_data(
     out: dict = {}
     for slug in wanted:
         fn = _BUILDERS[slug]
-        if fn is _vaccination:
+        if fn in (_vaccination, _smart_alerts):
             out[slug] = fn(db, ctx.clinic["id"], period, branch_id)
         else:
             out[slug] = fn(db, ctx.clinic["id"], period)
