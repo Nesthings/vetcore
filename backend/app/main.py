@@ -22,6 +22,7 @@ from app.api import (
     dashboards,
     dose,
     health,
+    hospitalization,
     inventory,
     invoices,
     notifications,
@@ -90,6 +91,7 @@ app.add_middleware(
 )
 
 app.include_router(health.router, prefix="/api/v1")
+app.include_router(hospitalization.router, prefix="/api/v1")
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(clinics.router, prefix="/api/v1")
 app.include_router(branches.router, prefix="/api/v1")

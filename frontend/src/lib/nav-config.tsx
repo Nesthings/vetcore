@@ -12,6 +12,7 @@ const DEFAULT_PINNED = [
   'audit',
   'financial',
   'services',
+  'hospitalizacion',
 ]
 
 interface NavConfigValue {

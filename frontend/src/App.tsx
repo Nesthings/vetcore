@@ -18,6 +18,8 @@ import { CartillaShare } from '@/pages/CartillaShare'
 import { Dashboard } from '@/pages/Dashboard'
 import { DesignSystem } from '@/pages/DesignSystem'
 import { FinancialDashboard } from '@/pages/FinancialDashboard'
+import { Hospitalizacion } from '@/pages/Hospitalizacion'
+import { HospitalizacionPaciente } from '@/pages/HospitalizacionPaciente'
 import { Inventory } from '@/pages/Inventory'
 import { Invoices } from '@/pages/Invoices'
 import { Movil } from '@/pages/Movil'
@@ -190,6 +192,22 @@ function App() {
                     element={
                       <ProtectedRoute roles={['admin']} component="services">
                         <Services />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/hospitalizacion"
+                    element={
+                      <ProtectedRoute component="hospitalizacion">
+                        <Hospitalizacion />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/hospitalizacion/:id"
+                    element={
+                      <ProtectedRoute component="hospitalizacion">
+                        <HospitalizacionPaciente />
                       </ProtectedRoute>
                     }
                   />

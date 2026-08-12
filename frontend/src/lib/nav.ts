@@ -1,4 +1,5 @@
 import {
+  BedDouble,
   BellRing,
   CalendarDays,
   History,
@@ -47,6 +48,7 @@ export const NAV_ROUTES: NavRoute[] = [
   { to: '/automation', label: 'Recordatorios', component: 'automation' },
   { to: '/reports/financial', label: 'Finanzas', component: 'financial' },
   { to: '/services', label: 'Servicios', component: 'services' },
+  { to: '/hospitalizacion', label: 'Hospitalización', component: 'hospitalizacion' },
 ]
 
 export const MODULE_META: Record<string, ModuleMeta> = {
@@ -164,6 +166,13 @@ export const MODULE_META: Record<string, ModuleMeta> = {
     text: 'text-pink-700 dark:text-pink-300',
     iconBg: 'bg-pink-500/15',
     pageBg: 'from-pink-100/80 dark:from-pink-500/[0.12]',
+  },
+  hospitalizacion: {
+    icon: BedDouble,
+    desc: 'Pacientes hospitalizados',
+    text: 'text-emerald-700 dark:text-emerald-300',
+    iconBg: 'bg-emerald-500/15',
+    pageBg: 'from-emerald-100/80 dark:from-emerald-500/[0.12]',
   },
 }
 

@@ -27,6 +27,7 @@ COMPONENTS: dict[str, str] = {
     "financial": "Finanzas",
     "audit": "Bitácora",
     "settings": "Configuración",
+    "hospitalization": "Hospitalización",
 }
 
 # Breve descripción de cada módulo (para el wizard y la configuración).
@@ -45,6 +46,7 @@ COMPONENT_DESCRIPTIONS: dict[str, str] = {
     "financial": "Dashboard financiero: ingresos, gastos y reportes.",
     "audit": "Bitácora de auditoría de las acciones del sistema.",
     "settings": "Configuración de la clínica, usuarios y sucursales.",
+    "hospitalization": "Pacientes hospitalizados: estancias, espacios, tareas y monitoreo.",
 }
 
 # Acceso por defecto según el rol (espejo del comportamiento actual del panel)
@@ -58,6 +60,7 @@ ROLE_DEFAULT_COMPONENTS: dict[str, set[str]] = {
         "inventory",
         "vaccination_plans",
         "audit",
+        "hospitalization",
     },
     "recepcion": {
         "dashboard",

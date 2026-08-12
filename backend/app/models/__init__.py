@@ -11,6 +11,10 @@ from app.models.consultation import (
     ConsultationSummaryPdf,
 )
 from app.models.expense import FinancialExpense
+from app.models.hospitalization import (
+    Hospitalization,
+    HospitalizationAccommodation,
+)
 from app.models.inventory import (
     InventoryLot,
     InventoryMovement,
@@ -47,6 +51,8 @@ __all__ = [
     "DigitalConsent",
     "CustomBreed",
     "FinancialExpense",
+    "Hospitalization",
+    "HospitalizationAccommodation",
     "InventoryLot",
     "InventoryMovement",
     "InventoryProduct",
