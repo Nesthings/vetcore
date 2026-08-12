@@ -47,6 +47,34 @@ export function PetQrCard({
     }
   }, [qrUrl])
 
+  // Durante el EXPORT (imagen/PDF) se renderiza una tarjeta estática SOLO con
+  // el QR: sin transformaciones 3D ni la foto, para que html-to-image la
+  // capture siempre derecha y legible, sin importar si el usuario la volteó.
+  if (flipToBack) {
+    return (
+      <div
+        className={cn(
+          'flex flex-col items-center justify-center gap-1 overflow-hidden rounded-[2rem] bg-white p-3',
+          containerClassName,
+          backClassName,
+        )}
+      >
+        {qrDataUrl ? (
+          <img
+            src={qrDataUrl}
+            alt={`QR de la cartilla de ${petName}`}
+            className="size-full object-contain"
+          />
+        ) : (
+          <Loader2 className="size-8 animate-spin text-primary" aria-hidden="true" />
+        )}
+        <span className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground">
+          <QrCode className="size-3" aria-hidden="true" /> {petName}
+        </span>
+      </div>
+    )
+  }
+
   return (
     <div
       className={cn('[perspective:1000px]', containerClassName)}

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { toPng } from 'html-to-image'
 import jsPDF from 'jspdf'
@@ -322,12 +323,14 @@ export function CartillaShare() {
   const captureCard = async (): Promise<string> => {
     const el = cartillaRef.current
     if (!el) throw new Error('Sin elemento de cartilla')
-    setDownloadFlip(true)
-    await new Promise((r) => setTimeout(r, 80))
+    // flushSync: aplica flipToBack (tarjeta QR estática) de forma SINCRÓNICA
+    // antes de capturar, para que el PNG/PDF SIEMPRE salga con el QR derecha.
+    flushSync(() => setDownloadFlip(true))
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
     try {
       return await toPng(el, { pixelRatio: 2, cacheBust: true, backgroundColor: '#ffffff' })
     } finally {
-      setDownloadFlip(false)
+      flushSync(() => setDownloadFlip(false))
     }
   }
 
