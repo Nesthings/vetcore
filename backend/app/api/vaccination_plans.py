@@ -129,6 +129,75 @@ def _enrich_assignment(db: Session, assignment: PetVaccinationPlan) -> dict:
     return data
 
 
+def _enrich_assignments(db: Session, assignments: list[PetVaccinationPlan]) -> list[dict]:
+    """Enriquece varias asignaciones con QUERIES EN BATCH (evita el N+1)."""
+    if not assignments:
+        return []
+    plan_ids = {a.plan_id for a in assignments}
+    branch_ids = {a.branch_id for a in assignments}
+    vet_ids = {a.vet_user_id for a in assignments if a.vet_user_id}
+    all_dose_ids = [d.id for a in assignments for d in a.doses]
+
+    plans = {
+        p.id: p
+        for p in db.scalars(select(VaccinationPlan).where(VaccinationPlan.id.in_(plan_ids))).all()
+    }
+    branches = {
+        b.id: b
+        for b in db.scalars(select(ClinicBranch).where(ClinicBranch.id.in_(branch_ids))).all()
+    }
+    vets = {}
+    if vet_ids:
+        vets = {
+            u.id: u for u in db.scalars(select(User).where(User.id.in_(vet_ids))).all()
+        }
+    steps: dict = {}
+    if plan_ids:
+        for s in db.scalars(
+            select(VaccinationPlanStep)
+            .where(VaccinationPlanStep.plan_id.in_(plan_ids))
+            .order_by(VaccinationPlanStep.plan_id, VaccinationPlanStep.position)
+        ).all():
+            steps.setdefault(s.plan_id, []).append(s)
+    starts: dict = {}
+    if all_dose_ids:
+        starts = dict(
+            db.execute(
+                select(PetVaccinationDose.id, Appointment.start_time)
+                .join(Appointment, Appointment.id == PetVaccinationDose.appointment_id)
+                .where(PetVaccinationDose.id.in_(all_dose_ids))
+            ).all()
+        )
+
+    result: list[dict] = []
+    for assignment in assignments:
+        plan = plans.get(assignment.plan_id)
+        branch = branches.get(assignment.branch_id)
+        vet = vets.get(assignment.vet_user_id) if assignment.vet_user_id else None
+        data = PetVaccinationPlanRead.model_validate(assignment).model_dump()
+        data.update(
+            plan_name=plan.name if plan else None,
+            compound=plan.compound if plan else None,
+            prevents=plan.prevents if plan else None,
+            branch_name=branch.name if branch else None,
+            vet_name=vet.full_name if vet else None,
+        )
+        if plan is not None:
+            data["steps"] = [
+                {
+                    "id": str(s.id),
+                    "label": s.label,
+                    "offset_days": s.offset_days,
+                    "position": s.position,
+                }
+                for s in steps.get(plan.id, [])
+            ]
+        for dose in data["doses"]:
+            dose["appointment_start"] = starts.get(dose["id"])
+        result.append(data)
+    return result
+
+
 @router.get("", response_model=list[VaccinationPlanRead])
 def list_plans(
     ctx: CurrentClinic = Depends(get_current_clinic),
@@ -388,7 +457,7 @@ def pet_vaccination_history(
             .order_by(PetVaccinationPlan.created_at)
         )
     )
-    return [_enrich_assignment(db, a) for a in assignments]
+    return _enrich_assignments(db, assignments)
 
 
 @router.patch("/doses/{dose_id}", response_model=DoseRead)

@@ -5,7 +5,6 @@ admin (Dashboard financiero, Subfase 2.6). Este dashboard es operativo y lo
 puede ver todo el staff.
 """
 
-from collections import Counter
 from datetime import date, datetime, time, timedelta
 
 from fastapi import APIRouter, Depends, Query
@@ -89,7 +88,14 @@ def dashboard_day(
         for s in ("scheduled", "confirmed", "completed", "cancelled", "no_show")
     }
 
-    appts = list(db.scalars(select(Appointment).where(*base).order_by(Appointment.start_time)))
+    appts = list(
+        db.scalars(
+            select(Appointment)
+            .where(*base)
+            .order_by(Appointment.start_time)
+            .limit(50)
+        )
+    )
 
     # Flujo de pacientes: consultas REALIZADAS por hora/día/período (en vez de
     # citas agendadas). Usa performed_at, con created_at como respaldo.
@@ -100,28 +106,32 @@ def dashboard_day(
     ]
     if selected_branch:
         cons_base.append(Consultation.branch_id == selected_branch)
-    consultas = list(
-        db.scalars(select(Consultation).where(*cons_base).order_by(Consultation.performed_at))
-    )
-
-    def _consultation_ts(c: Consultation) -> datetime:
-        return c.performed_at or c.created_at
-
+    # Flujo de pacientes: consultas REALIZADAS por hora/día/período. Se agrega
+    # en SQL (date_trunc/extract) para no traer miles de filas a Python.
+    ts = func.coalesce(Consultation.performed_at, Consultation.created_at)
     if period == "day":
-        horas = Counter(_consultation_ts(c).astimezone().hour for c in consultas)
+        hour_rows = db.execute(
+            select(func.extract("hour", ts).label("hour"), func.count())
+            .where(*cons_base)
+            .group_by("hour")
+        ).all()
+        hour_counts = {int(h): c for h, c in hour_rows}
         consultas_series = [
-            {"label": f"{h:02d}:00", "count": horas.get(h, 0)} for h in range(7, 21)
+            {"label": f"{h:02d}:00", "count": hour_counts.get(h, 0)} for h in range(7, 21)
         ]
     else:
+        day_rows = db.execute(
+            select(func.date(ts).label("d"), func.count()).where(*cons_base).group_by("d")
+        ).all()
+        day_counts = {d: c for d, c in day_rows}
         days = [start_date + timedelta(days=i) for i in range(window["days"] + 1)]
-        counts = Counter(_consultation_ts(c).astimezone().date() for c in consultas)
         if period == "week":
             consultas_series = [
-                {"label": WEEKDAYS[d.weekday()], "count": counts.get(d, 0)} for d in days
+                {"label": WEEKDAYS[d.weekday()], "count": day_counts.get(d, 0)} for d in days
             ]
         else:
             consultas_series = [
-                {"label": d.strftime("%d/%m"), "count": counts.get(d, 0)} for d in days
+                {"label": d.strftime("%d/%m"), "count": day_counts.get(d, 0)} for d in days
             ]
 
     citas = _with_names(db, appts[:50])

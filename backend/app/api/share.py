@@ -16,7 +16,7 @@ familia) es de solo lectura desde aquí.
 
 import base64
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from sqlalchemy import func, select, text
@@ -396,17 +396,27 @@ def share_request_waitlist(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Sucursal no encontrada"
         )
-    active = db.scalar(
-        select(AppointmentWaitlist).where(
-            AppointmentWaitlist.pet_id == pet.id,
-            AppointmentWaitlist.clinic_id == pet.clinic_id,
-            AppointmentWaitlist.status.in_(("waiting", "offered")),
+    # Tope anti-spam: máximo 5 solicitudes por mascota en las últimas 24 h.
+    # Se permiten varias solicitudes activas a la vez (no se bloquea por una
+    # sola "en espera", como antes).
+    cutoff = datetime.now(UTC) - timedelta(hours=24)
+    recent = (
+        db.scalar(
+            select(func.count())
+            .select_from(AppointmentWaitlist)
+            .where(
+                AppointmentWaitlist.pet_id == pet.id,
+                AppointmentWaitlist.clinic_id == pet.clinic_id,
+                AppointmentWaitlist.created_at >= cutoff,
+            )
         )
+        or 0
     )
-    if active is not None:
+    if recent >= 5:
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Ya tienes una solicitud de cita en espera para esta mascota",
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Llegaste al límite de 5 solicitudes de cita por mascota en 24 horas. "
+            "Puedes cancelar las anteriores o esperar a que pase el día.",
         )
 
     row = AppointmentWaitlist(

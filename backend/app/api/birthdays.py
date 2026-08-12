@@ -92,27 +92,31 @@ def birthdays_today(
     ).mappings().all()
 
     day_token = today.isoformat()
-    pets = []
-    for r in rows:
-        already = db.scalar(
-            text(
-                "SELECT count(*) FROM outbound_notifications "
-                "WHERE clinic_id = :c AND template = :t"
-            ),
-            {"c": ctx.clinic["id"], "t": f"bday:{r['pet_id']}:{day_token}"},
+    templates = [f"bday:{r['pet_id']}:{day_token}" for r in rows]
+    sent_templates: set[str] = set()
+    if templates:
+        sent_templates = set(
+            db.execute(
+                text(
+                    "SELECT template FROM outbound_notifications "
+                    "WHERE clinic_id = :c AND template = ANY(:templates)"
+                ),
+                {"c": ctx.clinic["id"], "templates": templates},
+            ).scalars().all()
         )
-        pets.append(
-            {
-                "pet_id": str(r["pet_id"]),
-                "pet_name": r["pet_name"],
-                "pet_photo": r["pet_photo"],
-                "age": _age(r["birth_date"]) if r["birth_date"] else None,
-                "owner_name": r["owner_name"],
-                "owner_phone": r["owner_phone"],
-                "owner_email": r["owner_email"],
-                "already_sent": bool(already),
-            }
-        )
+    pets = [
+        {
+            "pet_id": str(r["pet_id"]),
+            "pet_name": r["pet_name"],
+            "pet_photo": r["pet_photo"],
+            "age": _age(r["birth_date"]) if r["birth_date"] else None,
+            "owner_name": r["owner_name"],
+            "owner_phone": r["owner_phone"],
+            "owner_email": r["owner_email"],
+            "already_sent": f"bday:{r['pet_id']}:{day_token}" in sent_templates,
+        }
+        for r in rows
+    ]
     return {"pets": pets, "settings": settings}
 
 

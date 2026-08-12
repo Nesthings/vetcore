@@ -10,6 +10,7 @@ export function PetQrCard({
   qrUrl,
   placeholder,
   frontOverlay,
+  flipToBack = false,
   containerClassName = 'size-56',
   frontClassName = '',
   backClassName = 'border-4 border-primary/30',
@@ -19,12 +20,14 @@ export function PetQrCard({
   qrUrl: string
   placeholder?: React.ReactNode
   frontOverlay?: React.ReactNode
+  flipToBack?: boolean
   containerClassName?: string
   frontClassName?: string
   backClassName?: string
 }) {
   const [flipped, setFlipped] = useState(false)
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
+  const showBack = flipToBack || flipped
 
   useEffect(() => {
     let alive = true
@@ -49,8 +52,8 @@ export function PetQrCard({
       className={cn('[perspective:1000px]', containerClassName)}
       role="button"
       tabIndex={0}
-      title={flipped ? 'Volver a la foto' : 'Ver el QR de la cartilla'}
-      aria-label={`${petName}: ${flipped ? 'volver a la foto' : 'ver el QR de la cartilla'}`}
+      title={showBack ? 'Volver a la foto' : 'Ver el QR de la cartilla'}
+      aria-label={`${petName}: ${showBack ? 'volver a la foto' : 'ver el QR de la cartilla'}`}
       onClick={() => setFlipped((f) => !f)}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -62,7 +65,7 @@ export function PetQrCard({
       <div
         className={cn(
           'relative size-full transition-transform duration-500 [transform-style:preserve-3d]',
-          flipped && '[transform:rotateY(180deg)]',
+          showBack && '[transform:rotateY(180deg)]',
         )}
       >
         <div

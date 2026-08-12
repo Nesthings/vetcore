@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { toPng } from 'html-to-image'
+import jsPDF from 'jspdf'
 import { Icon as MDIIcon } from '@mdi/react'
 import { mdiPaw } from '@mdi/js'
 import {
@@ -12,6 +13,7 @@ import {
   FileSignature,
   FileText,
   History,
+  Image as ImageIcon,
   Loader2,
   Lock,
   Mail,
@@ -291,9 +293,12 @@ export function CartillaShare() {
   const [signBusy, setSignBusy] = useState(false)
   const [confirm, setConfirm] = useState<{ title: string; onConfirm: () => void } | null>(null)
 
-  // descarga como imagen
+  // descarga como imagen/PDF
   const cartillaRef = useRef<HTMLDivElement>(null)
   const [downloadBusy, setDownloadBusy] = useState(false)
+  const [downloadFlip, setDownloadFlip] = useState(false)
+  const [dlOpen, setDlOpen] = useState(false)
+  const dlMenuRef = useRef<HTMLDivElement>(null)
 
   // solicitud de cita (lista de espera)
   const [waitlist, setWaitlist] = useState<ShareWaitlistEntry[]>([])
@@ -304,27 +309,104 @@ export function CartillaShare() {
   const [reqBusy, setReqBusy] = useState(false)
   const [reqMsg, setReqMsg] = useState<string | null>(null)
 
-  const downloadImage = async () => {
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (dlMenuRef.current && !dlMenuRef.current.contains(e.target as Node)) {
+        setDlOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onClick)
+    return () => document.removeEventListener('mousedown', onClick)
+  }, [])
+
+  const captureCard = async (): Promise<string> => {
     const el = cartillaRef.current
-    if (!el || downloadBusy) return
+    if (!el) throw new Error('Sin elemento de cartilla')
+    setDownloadFlip(true)
+    await new Promise((r) => setTimeout(r, 80))
+    try {
+      return await toPng(el, { pixelRatio: 2, cacheBust: true, backgroundColor: '#ffffff' })
+    } finally {
+      setDownloadFlip(false)
+    }
+  }
+
+  const downloadImage = async () => {
+    if (downloadBusy) return
     setDownloadBusy(true)
     try {
-      const dataUrl = await toPng(el, { pixelRatio: 2, cacheBust: true })
+      const dataUrl = await captureCard()
       const link = document.createElement('a')
       link.download = `cartilla-${pet.name.replace(/\s+/g, '-')}.png`
       link.href = dataUrl
       link.click()
       toast({
         title: 'Cartilla descargada',
-        description: 'Se generó la imagen de la cartilla correctamente.',
+        description: 'Se generó la imagen con el QR.',
         variant: 'success',
       })
     } catch (err) {
       console.error('download cartilla image:', err)
       toast({
         title: 'No se pudo descargar la cartilla',
-        description:
-          'Ocurrió un error al generar la imagen. Intenta de nuevo en unos segundos.',
+        description: 'Ocurrió un error al generar la imagen. Intenta de nuevo en unos segundos.',
+        variant: 'error',
+      })
+    } finally {
+      setDownloadBusy(false)
+    }
+  }
+
+  const downloadPdf = async () => {
+    if (downloadBusy) return
+    setDownloadBusy(true)
+    try {
+      const dataUrl = await captureCard()
+      const img = new Image()
+      img.src = dataUrl
+      await img.decode()
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+      const pageW = pdf.internal.pageSize.getWidth()
+      const pageH = pdf.internal.pageSize.getHeight()
+      const margin = 8
+      const contentW = pageW - margin * 2
+      const contentH = pageH - margin * 2
+      const scale = contentW / img.width
+      const slicePx = Math.floor(contentH / scale)
+      let y = 0
+      let first = true
+      while (y < img.height) {
+        const canvas = document.createElement('canvas')
+        canvas.width = img.width
+        canvas.height = Math.min(slicePx, img.height - y)
+        const ctx = canvas.getContext('2d')
+        if (!ctx) throw new Error('canvas')
+        ctx.fillStyle = '#ffffff'
+        ctx.fillRect(0, 0, canvas.width, canvas.height)
+        ctx.drawImage(img, 0, y, img.width, canvas.height, 0, 0, img.width, canvas.height)
+        if (!first) pdf.addPage()
+        pdf.addImage(
+          canvas.toDataURL('image/jpeg', 0.92),
+          'JPEG',
+          margin,
+          margin,
+          contentW,
+          canvas.height * scale,
+        )
+        y += canvas.height
+        first = false
+      }
+      pdf.save(`cartilla-${pet.name.replace(/\s+/g, '-')}.pdf`)
+      toast({
+        title: 'Cartilla descargada',
+        description: 'Se generó el PDF con el QR.',
+        variant: 'success',
+      })
+    } catch (err) {
+      console.error('download cartilla pdf:', err)
+      toast({
+        title: 'No se pudo descargar el PDF',
+        description: 'Ocurrió un error al generar el PDF. Intenta de nuevo en unos segundos.',
         variant: 'error',
       })
     } finally {
@@ -607,15 +689,41 @@ export function CartillaShare() {
             <p className="truncate text-xs text-muted-foreground">Cartilla digital</p>
           </div>
         </div>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={downloadImage}
-          disabled={downloadBusy}
-          className="shrink-0"
-        >
-          {downloadBusy ? <Loader2 className="size-4 animate-spin" /> : <Download />} Descargar
-        </Button>
+        <div className="relative shrink-0" ref={dlMenuRef}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setDlOpen((o) => !o)}
+            disabled={downloadBusy}
+            className="shrink-0"
+          >
+            {downloadBusy ? <Loader2 className="size-4 animate-spin" /> : <Download />} Descargar
+          </Button>
+          {dlOpen && (
+            <div className="absolute right-0 z-30 mt-1 w-48 overflow-hidden rounded-lg border border-border bg-card p-1 shadow-dialog">
+              <button
+                type="button"
+                onClick={() => {
+                  setDlOpen(false)
+                  downloadImage()
+                }}
+                className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm hover:bg-accent"
+              >
+                <ImageIcon className="size-4 text-primary" aria-hidden="true" /> Imagen (PNG)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setDlOpen(false)
+                  downloadPdf()
+                }}
+                className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm hover:bg-accent"
+              >
+                <FileText className="size-4 text-primary" aria-hidden="true" /> PDF
+              </button>
+            </div>
+          )}
+        </div>
       </header>
 
       <main className="p-4">
@@ -633,6 +741,7 @@ export function CartillaShare() {
                   photoUrl={pet.clinical_photo_url}
                   petName={pet.name}
                   qrUrl={data.qr_url ?? ''}
+                  flipToBack={downloadFlip}
                   placeholder={<PawPrint className="size-16 text-primary" aria-hidden="true" />}
                   containerClassName="size-48"
                   frontClassName={`rounded-[2rem] border-4 ${accent.ring} bg-secondary/60 shadow-elevated`}
