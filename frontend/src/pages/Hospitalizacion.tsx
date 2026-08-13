@@ -49,6 +49,7 @@ import type {
   HospitalizationItem,
   HospOverview,
   HospStatus,
+  LatestVitals,
   OperationalStatus,
 } from '@/lib/hospitalization'
 
@@ -73,6 +74,7 @@ export function Hospitalizacion() {
   const isAdmin = user?.role === 'admin'
   const [items, setItems] = useState<HospitalizationItem[]>([])
   const [overview, setOverview] = useState<HospOverview | null>(null)
+  const [latestVitals, setLatestVitals] = useState<LatestVitals>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -95,7 +97,12 @@ export function Hospitalizacion() {
     try {
       const params = new URLSearchParams()
       if (branchId) params.set('branch_id', branchId)
-      setOverview(await apiFetch<HospOverview>(`/hospitalization/overview?${params}`))
+      const [ov, vit] = await Promise.all([
+        apiFetch<HospOverview>(`/hospitalization/overview?${params}`),
+        apiFetch<LatestVitals>(`/hospitalization/vitals/latest-all?${params}`),
+      ])
+      setOverview(ov)
+      setLatestVitals(vit)
     } catch {
       setOverview(null)
     }
@@ -289,6 +296,7 @@ export function Hospitalizacion() {
               <CageVisualizer
                 accommodations={overview.accommodations}
                 hospitalizations={items}
+                latestVitals={latestVitals}
               />
             </div>
           )}

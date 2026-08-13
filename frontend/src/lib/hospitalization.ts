@@ -391,6 +391,11 @@ export interface HospCosts {
   total: number
 }
 
+export type LatestVitals = Record<
+  string,
+  Record<string, { value: number | null; unit: string | null; observed_at: string }>
+>
+
 export interface DischargeChecklistItem {
   item: string
   done: boolean

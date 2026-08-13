@@ -477,7 +477,11 @@ def list_hospitalizations(
 ) -> list[dict]:
     stmt = select(Hospitalization).where(Hospitalization.clinic_id == ctx.clinic["id"])
     if status_filter:
-        stmt = stmt.where(Hospitalization.status == status_filter)
+        if status_filter == "active":
+            # "active" es un concepto de UI: incluye todas las estancias en curso.
+            stmt = stmt.where(Hospitalization.status.in_(ACTIVE_STATUSES))
+        else:
+            stmt = stmt.where(Hospitalization.status == status_filter)
     if branch_id:
         stmt = stmt.where(Hospitalization.branch_id == branch_id)
     if search:
@@ -2292,3 +2296,39 @@ def discharge_hospitalization(
     db.commit()
     db.refresh(discharge)
     return discharge
+
+
+@router.get("/vitals/latest-all")
+def latest_all_vitals(
+    ctx: CurrentClinic = Depends(get_current_clinic),
+    db: Session = Depends(get_db),
+    branch_id: str | None = Query(default=None),
+) -> dict:
+    """Última medición por parámetro de cada estancia activa (para el 3D)."""
+    base = [
+        Hospitalization.clinic_id == ctx.clinic["id"],
+        Hospitalization.status.in_(ACTIVE_STATUSES),
+    ]
+    if branch_id:
+        base.append(Hospitalization.branch_id == branch_id)
+    hosp_ids = list(db.scalars(select(Hospitalization.id).where(*base)).all())
+    if not hosp_ids:
+        return {}
+    rows = db.execute(
+        text(
+            "SELECT DISTINCT ON (hospitalization_id, parameter) "
+            "  hospitalization_id, parameter, value, unit, observed_at "
+            "FROM hospitalization_vitals "
+            "WHERE clinic_id = :cid AND hospitalization_id = ANY(:ids) "
+            "ORDER BY hospitalization_id, parameter, observed_at DESC, id DESC"
+        ),
+        {"cid": ctx.clinic["id"], "ids": list(hosp_ids)},
+    ).mappings().all()
+    out: dict = {}
+    for r in rows:
+        out.setdefault(str(r["hospitalization_id"]), {})[r["parameter"]] = {
+            "value": float(r["value"]) if r["value"] is not None else None,
+            "unit": r["unit"],
+            "observed_at": r["observed_at"].isoformat(),
+        }
+    return out
