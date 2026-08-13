@@ -55,7 +55,7 @@ from app.services import hospitalization as hosp_service
 router = APIRouter(
     prefix="/hospitalization",
     tags=["hospitalization"],
-    dependencies=[Depends(require_component("hospitalization"))],
+    dependencies=[Depends(require_component("hospitalizacion"))],
 )
 
 MUTATORS = ("admin", "veterinario")
