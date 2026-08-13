@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 
 import { AppLayout } from '@/components/layout/AppLayout'
+import { CageVisualizer } from '@/components/hospitalizacion/CageVisualizer'
 import { HospConfigDialog } from '@/components/hospitalizacion/HospConfigDialog'
 import { ShiftDialog } from '@/components/hospitalizacion/ShiftDialog'
 import { Badge } from '@/components/ui/badge'
@@ -37,7 +38,6 @@ import { useToast } from '@/components/ui/toast'
 import { apiFetch } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
 import {
-  ACCOMMODATION_TYPE_LABELS,
   ISOLATION_META,
   MONITORING_LABELS,
   OPERATIONAL_META,
@@ -281,39 +281,15 @@ export function Hospitalizacion() {
           {overview && overview.accommodations.length > 0 && (
             <div className="mb-6">
               <div className="mb-2 flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-foreground">Ocupación de espacios</h2>
+                <h2 className="text-sm font-semibold text-foreground">Ocupación de espacios (3D)</h2>
                 <span className="text-xs text-muted-foreground">
                   {overview.accommodations.filter((a) => a.occupied).length}/{overview.accommodations.length} ocupados
                 </span>
               </div>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-                {overview.accommodations.map((a) => (
-                  <div
-                    key={a.id}
-                    className={`rounded-lg border px-3 py-2.5 ${
-                      a.occupied
-                        ? 'border-destructive/40 bg-destructive/5'
-                        : a.status === 'unavailable' || a.status === 'maintenance'
-                          ? 'border-border bg-muted/40 opacity-60'
-                          : 'border-border bg-card'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-semibold">{a.code}</p>
-                      <span
-                        className={`size-2.5 rounded-full ${
-                          a.occupied ? 'bg-destructive' : a.status === 'maintenance' ? 'bg-warning' : 'bg-success'
-                        }`}
-                        aria-hidden="true"
-                      />
-                    </div>
-                    <p className="truncate text-xs text-muted-foreground">{a.name}</p>
-                    <p className="mt-0.5 text-[11px] capitalize text-muted-foreground">
-                      {ACCOMMODATION_TYPE_LABELS[a.type] ?? a.type} · {a.active_count}/{a.capacity}
-                    </p>
-                  </div>
-                ))}
-              </div>
+              <CageVisualizer
+                accommodations={overview.accommodations}
+                hospitalizations={items}
+              />
             </div>
           )}
 
