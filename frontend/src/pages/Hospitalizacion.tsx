@@ -478,17 +478,26 @@ function CreateHospitalizationDialog({
       .catch(() => setAccommodations([]))
   }, [open, branchId])
 
-  const searchPet = async () => {
-    if (petQuery.trim().length < 2) return
-    try {
-      const res = await apiFetch<{ id: string; name: string; species: string }[]>(
-        `/pets?search=${encodeURIComponent(petQuery.trim())}`,
-      )
-      setPetResults(res)
-    } catch {
+  // Búsqueda de mascotas en tiempo real (con debounce).
+  useEffect(() => {
+    if (!open) return
+    const term = petQuery.trim()
+    if (term.length < 2) {
       setPetResults([])
+      return
     }
-  }
+    const handle = window.setTimeout(async () => {
+      try {
+        const res = await apiFetch<{ id: string; name: string; species: string }[]>(
+          `/pets?search=${encodeURIComponent(term)}`,
+        )
+        setPetResults(res)
+      } catch {
+        setPetResults([])
+      }
+    }, 300)
+    return () => window.clearTimeout(handle)
+  }, [petQuery, open])
 
   const submit = async () => {
     setError(null)
@@ -532,53 +541,62 @@ function CreateHospitalizationDialog({
         <div className="grid gap-4">
           <div className="space-y-2">
             <Label>Paciente *</Label>
-            <div className="flex gap-2">
-              <Input value={petQuery} onChange={(e) => setPetQuery(e.target.value)} placeholder="Escribe para buscar…" />
-              <Button type="button" variant="outline" onClick={searchPet}>
-                <Search /> Buscar
-              </Button>
+            <div className="relative">
+              <Input
+                value={petQuery}
+                onChange={(e) => setPetQuery(e.target.value)}
+                placeholder="Escribe el nombre para buscar…"
+                autoComplete="off"
+              />
+              {petResults.length > 0 && (
+                <div className="absolute z-20 mt-1 max-h-40 w-full overflow-y-auto rounded-md border border-border bg-card p-1 shadow-card">
+                  {petResults.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => {
+                        setPetId(p.id)
+                        setPetName(p.name)
+                        setPetResults([])
+                        setPetQuery(p.name)
+                      }}
+                      className="block w-full rounded px-2 py-1.5 text-left text-sm capitalize hover:bg-accent"
+                    >
+                      {p.name} · {p.species}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {petQuery.trim().length >= 2 && petResults.length === 0 && (
+                <p className="mt-1 text-xs text-muted-foreground">Sin resultados.</p>
+              )}
             </div>
-            {petResults.length > 0 && (
-              <div className="max-h-40 space-y-1 overflow-y-auto rounded-md border border-border p-1">
-                {petResults.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => {
-                      setPetId(p.id)
-                      setPetName(p.name)
-                      setPetResults([])
-                      setPetQuery(p.name)
-                    }}
-                    className="block w-full rounded px-2 py-1.5 text-left text-sm capitalize hover:bg-accent"
-                  >
-                    {p.name} · {p.species}
-                  </button>
-                ))}
-              </div>
-            )}
-            {petName && (
-              <p className="text-xs text-success">Paciente seleccionado: {petName}</p>
-            )}
+            {petName && <p className="text-xs text-success">Paciente seleccionado: {petName}</p>}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Sucursal *</Label>
-              <select
-                value={branchId}
-                onChange={(e) => {
-                  setBranchId(e.target.value)
-                  setAccommodationId('')
-                }}
-                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-              >
-                {branches.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name}
-                  </option>
-                ))}
-              </select>
+              {branches.length === 0 ? (
+                <p className="rounded-md border border-warning/30 bg-warning/5 px-3 py-2 text-xs text-warning">
+                  No hay sucursales registradas. Crea una desde Configuración para poder hospitalizar.
+                </p>
+              ) : (
+                <select
+                  value={branchId}
+                  onChange={(e) => {
+                    setBranchId(e.target.value)
+                    setAccommodationId('')
+                  }}
+                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                >
+                  {branches.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
             <div className="space-y-2">
               <Label>Espacio</Label>
