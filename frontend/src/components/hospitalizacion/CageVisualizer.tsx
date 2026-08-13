@@ -206,14 +206,30 @@ function buildInfoPanel(
 
   const header = document.createElement('div')
   header.className = 'flex items-center gap-2'
-  const img = document.createElement('img')
-  img.className = 'size-10 rounded-full border border-border object-cover'
-  img.src = occ.pet?.photo_url ?? ''
-  img.alt = ''
+  const photoUrl = occ.pet?.photo_url
+  const hasValidPhoto = Boolean(photoUrl && !photoUrl.startsWith('/media/'))
+  if (hasValidPhoto) {
+    const img = document.createElement('img')
+    img.className = 'size-10 rounded-full border border-border object-cover'
+    img.src = photoUrl as string
+    img.alt = ''
+    img.onerror = () => {
+      img.style.display = 'none'
+      const fb = document.createElement('div')
+      fb.className = 'flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary'
+      fb.textContent = (occ.pet?.name ?? '?').trim().charAt(0).toUpperCase()
+      header.insertBefore(fb, img.nextSibling)
+    }
+    header.appendChild(img)
+  } else {
+    const fb = document.createElement('div')
+    fb.className = 'flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary'
+    fb.textContent = (occ.pet?.name ?? '?').trim().charAt(0).toUpperCase()
+    header.appendChild(fb)
+  }
   const meta = document.createElement('div')
   meta.className = 'min-w-0'
   meta.innerHTML = `<p class="truncate text-xs font-semibold">${escapeHtml(occ.pet?.name ?? 'Paciente')}</p><p class="text-[10px] text-muted-foreground">${escapeHtml(acc.code)} · ${escapeHtml(acc.name)}</p>`
-  header.appendChild(img)
   header.appendChild(meta)
   wrap.appendChild(header)
 
