@@ -4,14 +4,17 @@ import {
   ArrowDownUp,
   BedDouble,
   CalendarClock,
+  Check,
   Loader2,
   PawPrint,
+  Pencil,
   Plus,
   Search,
   Settings2,
   Stethoscope,
   UserRound,
   Weight,
+  X,
 } from 'lucide-react'
 
 import { AppLayout } from '@/components/layout/AppLayout'
@@ -704,6 +707,52 @@ function SpacesDialog({
   const [capacity, setCapacity] = useState(1)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editCode, setEditCode] = useState('')
+  const [editName, setEditName] = useState('')
+  const [editType, setEditType] = useState('general')
+  const [editCapacity, setEditCapacity] = useState(1)
+  const [editStatus, setEditStatus] = useState('available')
+  const [editingBusy, setEditingBusy] = useState(false)
+
+  const startEdit = (a: Accommodation) => {
+    setEditingId(a.id)
+    setEditCode(a.code)
+    setEditName(a.name)
+    setEditType(a.type)
+    setEditCapacity(a.capacity)
+    setEditStatus(a.status)
+  }
+
+  const updateAccommodation = async () => {
+    if (!editingId) return
+    if (!editCode.trim() || !editName.trim()) {
+      setError('Código y nombre son obligatorios.')
+      return
+    }
+    setEditingBusy(true)
+    setError(null)
+    try {
+      await apiFetch(`/hospitalization/accommodations/${editingId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          code: editCode.trim(),
+          name: editName.trim(),
+          type: editType,
+          capacity: editCapacity,
+          status: editStatus,
+        }),
+      })
+      toast({ title: 'Espacio actualizado', description: `${editCode.trim()} guardado.`, variant: 'success' })
+      setEditingId(null)
+      await loadSpaces(selBranch)
+      onChanged()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo actualizar el espacio')
+    } finally {
+      setEditingBusy(false)
+    }
+  }
 
   const loadSpaces = async (b: string) => {
     try {
@@ -819,19 +868,71 @@ function SpacesDialog({
             {accommodations.length === 0 ? (
               <p className="text-sm text-muted-foreground">Sin espacios en esta sucursal.</p>
             ) : (
-              accommodations.map((a) => (
-                <div key={a.id} className="flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
-                  <div>
-                    <p className="text-sm font-medium">
-                      {a.code} · {a.name}
-                    </p>
-                    <p className="text-xs capitalize text-muted-foreground">
-                      {a.type} · capacidad {a.capacity} · {a.status}
-                    </p>
+              accommodations.map((a) =>
+                editingId === a.id ? (
+                  <div key={a.id} className="rounded-lg border border-primary/40 bg-primary/5 px-3 py-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Código *</Label>
+                        <Input value={editCode} onChange={(e) => setEditCode(e.target.value)} className="h-8" />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Nombre *</Label>
+                        <Input value={editName} onChange={(e) => setEditName(e.target.value)} className="h-8" />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Tipo</Label>
+                        <select value={editType} onChange={(e) => setEditType(e.target.value)} className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm">
+                          <option value="general">General</option>
+                          <option value="uci">UCI</option>
+                          <option value="isolation">Aislamiento</option>
+                          <option value="recovery">Recuperación</option>
+                          <option value="postop">Postoperatorio</option>
+                          <option value="other">Otro</option>
+                        </select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Estado</Label>
+                        <select value={editStatus} onChange={(e) => setEditStatus(e.target.value)} className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm">
+                          <option value="available">Disponible</option>
+                          <option value="maintenance">Mantenimiento</option>
+                          <option value="unavailable">No disponible</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="mt-2 flex items-center justify-end gap-2">
+                      <Button size="xs" variant="ghost" onClick={() => setEditingId(null)} disabled={editingBusy}>
+                        <X /> Cancelar
+                      </Button>
+                      <Button size="xs" variant="success" onClick={updateAccommodation} disabled={editingBusy}>
+                        {editingBusy ? <Loader2 className="animate-spin" /> : <Check />} Guardar
+                      </Button>
+                    </div>
                   </div>
-                  <Badge variant={a.active ? 'success' : 'secondary'}>{a.active ? 'Activo' : 'Inactivo'}</Badge>
-                </div>
-              ))
+                ) : (
+                  <div key={a.id} className="flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">
+                        {a.code} · {a.name}
+                      </p>
+                      <p className="truncate text-xs capitalize text-muted-foreground">
+                        {a.type} · capacidad {a.capacity} · {a.status}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      <Badge variant={a.active ? 'success' : 'secondary'}>{a.active ? 'Activo' : 'Inactivo'}</Badge>
+                      <button
+                        type="button"
+                        onClick={() => startEdit(a)}
+                        title="Editar / renombrar"
+                        className="flex size-7 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                      >
+                        <Pencil className="size-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ),
+              )
             )}
           </div>
         </div>

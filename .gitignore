@@ -31,9 +31,3 @@ logs/
 
 # Media local (fotos, PDFs, logos)
 backend/media/
-
-# Documentación/notas locales (solo README se versiona)
-/BITACORA.md
-/INSTRUCCIONES-PROYECTO.md
-/TODO.md
-/IDEAS.txt

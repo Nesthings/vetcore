@@ -170,9 +170,12 @@ export const MODULE_META: Record<string, ModuleMeta> = {
   hospitalizacion: {
     icon: BedDouble,
     desc: 'Pacientes hospitalizados',
-    text: 'text-emerald-700 dark:text-emerald-300',
-    iconBg: 'bg-emerald-500/15',
-    pageBg: 'from-emerald-100/80 dark:from-emerald-500/[0.12]',
+    text: 'text-orange-500 dark:text-orange-200',
+    iconBg: 'bg-orange-500/15',
+    img: '/module_pics/hospitalizacion.jpeg',
+    tint: 'bg-[#fff0e6] dark:bg-[#ffd9c4]/25',
+    glow: 'hover:shadow-[0_10px_30px_-6px_rgba(255,180,150,0.5)]',
+    pageBg: 'from-[#fff0e6]/80 dark:from-[#ffd9c4]/25',
   },
 }
 
