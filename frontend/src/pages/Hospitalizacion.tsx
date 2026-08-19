@@ -61,7 +61,7 @@ interface Branch {
   name: string
 }
 
-const ACTIVE_STATUSES: HospStatus[] = ['planned', 'admitted', 'active', 'discharge_pending']
+const ACTIVE_STATUSES: HospStatus[] = ['admitted', 'active', 'discharge_pending']
 
 const SEVERITY_ORDER: Record<OperationalStatus, number> = {
   critical: 0,
@@ -291,7 +291,7 @@ export function Hospitalizacion() {
           {overview && overview.accommodations.length > 0 && (
             <div className="mb-6">
               <div className="mb-2 flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-foreground">Ocupación de espacios (3D)</h2>
+                <h2 className="text-sm font-semibold text-foreground">Ocupación de espacios</h2>
                 <span className="text-xs text-muted-foreground">
                   {overview.accommodations.filter((a) => a.occupied).length}/{overview.accommodations.length} ocupados
                 </span>
@@ -713,6 +713,7 @@ function SpacesDialog({
   const [editType, setEditType] = useState('general')
   const [editCapacity, setEditCapacity] = useState(1)
   const [editStatus, setEditStatus] = useState('available')
+  const [editMaxIsolation, setEditMaxIsolation] = useState('normal')
   const [editingBusy, setEditingBusy] = useState(false)
 
   const startEdit = (a: Accommodation) => {
@@ -722,6 +723,7 @@ function SpacesDialog({
     setEditType(a.type)
     setEditCapacity(a.capacity)
     setEditStatus(a.status)
+    setEditMaxIsolation(a.max_isolation || 'normal')
   }
 
   const updateAccommodation = async () => {
@@ -741,6 +743,7 @@ function SpacesDialog({
           type: editType,
           capacity: editCapacity,
           status: editStatus,
+          max_isolation: editMaxIsolation,
         }),
       })
       toast({ title: 'Espacio actualizado', description: `${editCode.trim()} guardado.`, variant: 'success' })
@@ -899,6 +902,14 @@ function SpacesDialog({
                           <option value="unavailable">No disponible</option>
                         </select>
                       </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Aislamiento</Label>
+                        <select value={editMaxIsolation} onChange={(e) => setEditMaxIsolation(e.target.value)} className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm">
+                          <option value="normal">Normal</option>
+                          <option value="precaution">Precaución</option>
+                          <option value="isolation">Aislamiento</option>
+                        </select>
+                      </div>
                     </div>
                     <div className="mt-2 flex items-center justify-end gap-2">
                       <Button size="xs" variant="ghost" onClick={() => setEditingId(null)} disabled={editingBusy}>
@@ -917,6 +928,7 @@ function SpacesDialog({
                       </p>
                       <p className="truncate text-xs capitalize text-muted-foreground">
                         {a.type} · capacidad {a.capacity} · {a.status}
+                        {a.max_isolation !== 'normal' ? ` · ${a.max_isolation}` : ''}
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-1.5">

@@ -60,7 +60,7 @@ router = APIRouter(
 
 MUTATORS = ("admin", "veterinario")
 
-ACTIVE_STATUSES = ("planned", "admitted", "active", "discharge_pending")
+ACTIVE_STATUSES = ("admitted", "active", "discharge_pending")
 
 TRANSITIONS: dict[str, set[str]] = {
     "planned": {"admitted", "cancelled"},
@@ -522,6 +522,11 @@ def create_hospitalization(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="El estado inicial debe ser 'planned' o 'admitted'.",
         )
+    if body.status == "admitted" and not body.accommodation_id:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Un paciente admitido debe tener un espacio asignado.",
+        )
     _validate_branch(db, ctx.clinic["id"], str(body.branch_id))
     pet = db.scalar(select(Pet).where(Pet.id == body.pet_id, Pet.clinic_id == ctx.clinic["id"]))
     if pet is None:
@@ -632,8 +637,12 @@ def admit_hospitalization(
     db: Session = Depends(get_db),
 ) -> Hospitalization:
     row = _get_hospitalization_or_404(db, ctx.clinic["id"], hosp_id)
-    if row.accommodation_id:
-        _check_occupancy(db, ctx.clinic["id"], str(row.accommodation_id), exclude_hosp=str(row.id))
+    if not row.accommodation_id:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Asigna un espacio antes de admitir al paciente.",
+        )
+    _check_occupancy(db, ctx.clinic["id"], str(row.accommodation_id), exclude_hosp=str(row.id))
     return _transition(db, ctx, row, "admitted", "hospitalization_admitted")
 
 
@@ -664,6 +673,29 @@ def complete_discharge(
     db: Session = Depends(get_db),
 ) -> Hospitalization:
     row = _get_hospitalization_or_404(db, ctx.clinic["id"], hosp_id)
+    # Unifica el alta: si se completa por la transición simple y aún no existe
+    # un registro de alta, se crea con la checklist por defecto (para no perder
+    # la trazabilidad del alta).
+    from app.models import HospitalizationDischarge
+
+    existing = db.scalar(
+        select(HospitalizationDischarge).where(
+            HospitalizationDischarge.clinic_id == ctx.clinic["id"],
+            HospitalizationDischarge.hospitalization_id == row.id,
+        )
+    )
+    if existing is None:
+        default_items = hosp_service.get_config(
+            db, ctx.clinic["id"], "discharge_checklist", {}
+        ).get("items") or DEFAULT_DISCHARGE_CHECKLIST
+        db.add(
+            HospitalizationDischarge(
+                clinic_id=ctx.clinic["id"],
+                hospitalization_id=row.id,
+                user_id=ctx.user.sub,
+                checklist=[{"item": item, "done": False} for item in default_items],
+            )
+        )
     return _transition(db, ctx, row, "discharged", "hospitalization_discharged")
 
 
@@ -1054,10 +1086,16 @@ def create_medication_order(
     db.flush()
 
     # Genera las dosis programadas por intervalo (start_at → end_at | +48h).
+    # Se acota el horizonte y el número total de slots para evitar generar
+    # miles de filas con un end_at muy lejano / intervalo muy corto (DoS).
     if body.interval_hours:
+        max_horizon = body.start_at + timedelta(days=30)
         end = body.end_at or (body.start_at + timedelta(hours=48))
+        if end > max_horizon:
+            end = max_horizon
         slot = body.start_at
-        while slot <= end:
+        created_slots = 0
+        while slot <= end and created_slots < 240:
             db.add(
                 HospitalizationMedicationAdministration(
                     clinic_id=ctx.clinic["id"],
@@ -1066,6 +1104,7 @@ def create_medication_order(
                     status="pending",
                 )
             )
+            created_slots += 1
             slot += timedelta(hours=body.interval_hours)
 
     record_audit(
@@ -1134,7 +1173,12 @@ def _get_administration_or_404(
 def _consume_inventory(
     db: Session, clinic_id, order: HospitalizationMedicationOrder, hospitalization_id
 ) -> None:
-    """Consume stock del insumo vía movimientos de inventario (trazabilidad)."""
+    """Consume stock del insumo vía movimientos de inventario (trazabilidad).
+
+    Consume 1 unidad por administración (una dosis). Si se quiere que la
+    cantidad consumida dependa de la dosis, ajustar aquí (el `dose_actual`
+    de la administración está disponible en el caller).
+    """
     if not order.inventory_product_id:
         return
     consumed = Decimal("1")
@@ -1878,7 +1922,8 @@ def _shift_summary(db: Session, clinic_id, branch_id: str | None) -> dict:
             a.id: a
             for a in db.scalars(
                 select(HospitalizationAccommodation).where(
-                    HospitalizationAccommodation.id.in_(acc_ids)
+                    HospitalizationAccommodation.id.in_(acc_ids),
+                    HospitalizationAccommodation.clinic_id == clinic_id,
                 )
             ).all()
         }

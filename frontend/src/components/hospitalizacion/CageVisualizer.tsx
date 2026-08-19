@@ -123,6 +123,11 @@ function CageCard({
         <div className="flex min-w-0 items-center gap-1.5">
           <span className="text-sm font-bold tracking-tight">{acc.code}</span>
           <span className="truncate text-xs text-muted-foreground">{acc.name}</span>
+          {acc.max_isolation !== 'normal' && (
+            <Badge variant="warning" className="shrink-0 gap-1">
+              <ShieldAlert className="size-3" /> Aislamiento
+            </Badge>
+          )}
         </div>
         <span
           className={cn('size-2.5 shrink-0 rounded-full', occupied ? 'bg-destructive' : busy ? 'bg-warning' : 'bg-success')}
@@ -149,14 +154,6 @@ function CageCard({
                 </span>
               )}
             </div>
-            {acc.max_isolation !== 'normal' && (
-              <span
-                className="absolute -right-1 -top-1 flex size-6 items-center justify-center rounded-full bg-destructive text-card"
-                title={`Aislamiento: ${acc.max_isolation}`}
-              >
-                <ShieldAlert className="size-3.5" />
-              </span>
-            )}
           </div>
 
           {/* Nombre + estado */}

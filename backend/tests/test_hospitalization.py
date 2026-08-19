@@ -41,7 +41,16 @@ def _make_accommodation(client, clinic_id, branch_id, code="J1", capacity=1):
     return res.json()
 
 
+_ACCOMMODATION_SEQ = 0
+
+
 def _make_hospitalization(client, clinic_id, pet_id, branch_id, accommodation_id=None):
+    if accommodation_id is None:
+        global _ACCOMMODATION_SEQ
+        _ACCOMMODATION_SEQ += 1
+        accommodation_id = _make_accommodation(
+            client, clinic_id, branch_id, code=f"AUTO{_ACCOMMODATION_SEQ}"
+        )["id"]
     res = client.post(
         "/api/v1/hospitalization/hospitalizations",
         headers={"Authorization": f"Bearer {_admin_token(clinic_id)}"},
@@ -102,6 +111,8 @@ def test_transicion_invalida_rechazada(db_session, client, make_clinic, make_pet
 def test_ciclo_de_vida_completo(db_session, client, make_clinic, make_pet):
     clinic, branch = make_clinic()
     pet = make_pet(clinic, "Max")
+    user = _make_user(db_session, clinic, branch)
+    user_token = create_access_token(subject=str(user.id), role="admin", clinic_id=str(clinic.id))
     # planned → admitted → active → discharge_pending → discharged
     res = client.post(
         "/api/v1/hospitalization/hospitalizations",
@@ -113,16 +124,23 @@ def test_ciclo_de_vida_completo(db_session, client, make_clinic, make_pet):
     h = db_session.get(Hospitalization, hosp_id)
     assert h.status == "planned"
 
-    def act(path):
+    def act(path, token=None):
         return client.post(
             f"/api/v1/hospitalization/hospitalizations/{hosp_id}/{path}",
-            headers={"Authorization": f"Bearer {_admin_token(clinic.id)}"},
+            headers={"Authorization": f"Bearer {token or _admin_token(clinic.id)}"},
         )
 
+    acc = _make_accommodation(client, clinic.id, branch.id)
+    assigned = client.patch(
+        f"/api/v1/hospitalization/hospitalizations/{hosp_id}",
+        headers={"Authorization": f"Bearer {_admin_token(clinic.id)}"},
+        json={"accommodation_id": str(acc["id"])},
+    )
+    assert assigned.status_code == 200, assigned.text
     assert act("admit").status_code == 200
     assert act("activate").status_code == 200
     assert act("request-discharge").status_code == 200
-    assert act("complete-discharge").status_code == 200
+    assert act("complete-discharge", token=user_token).status_code == 200
     db_session.refresh(h)
     assert h.status == "discharged"
     assert h.actual_discharge_at is not None
@@ -166,11 +184,23 @@ def test_multi_tenant_aislamiento(db_session, client, make_clinic, make_pet):
     assert all(h["pet"]["name"] == "MaxA" for h in items)
 
 
-def test_recepcion_sin_permiso_recibe_403(db_session, client, make_clinic):
-    clinic, _ = make_clinic()
+def test_recepcion_puede_ver_pero_no_mutar(db_session, client, make_clinic, make_pet):
+    clinic, branch = make_clinic()
+    pet = make_pet(clinic, "Max")
     res = client.get(
         "/api/v1/hospitalization/hospitalizations",
         headers={"Authorization": f"Bearer {_recepcion_token(clinic.id)}"},
+    )
+    assert res.status_code == 200
+
+    res = client.post(
+        "/api/v1/hospitalization/hospitalizations",
+        headers={"Authorization": f"Bearer {_recepcion_token(clinic.id)}"},
+        json={
+            "pet_id": str(pet.id),
+            "branch_id": str(branch.id),
+            "status": "planned",
+        },
     )
     assert res.status_code == 403
 
@@ -202,7 +232,8 @@ def test_monitorizacion_genera_tareas_y_no_duplica(db_session, client, make_clin
             "pet_id": str(pet.id),
             "branch_id": str(branch.id),
             "status": "admitted",
-            "monitoring_level": "intensive",
+            "monitoring_level": "basic",
+            "accommodation_id": str(_make_accommodation(client, clinic.id, branch.id)["id"]),
         },
     )
     assert res.status_code == 201, res.text
@@ -233,7 +264,12 @@ def test_completar_tarea_registra_usuario(db_session, client, make_clinic, make_
     res = client.post(
         "/api/v1/hospitalization/hospitalizations",
         headers={"Authorization": f"Bearer {_admin_token(clinic.id)}"},
-        json={"pet_id": str(pet.id), "branch_id": str(branch.id), "status": "admitted"},
+        json={
+            "pet_id": str(pet.id),
+            "branch_id": str(branch.id),
+            "status": "admitted",
+            "accommodation_id": str(_make_accommodation(client, clinic.id, branch.id)["id"]),
+        },
     )
     hosp_id = res.json()["id"]
 
@@ -271,6 +307,7 @@ def test_tarea_atrasada_en_overview(db_session, client, make_clinic, make_pet):
             "branch_id": str(branch.id),
             "status": "admitted",
             "monitoring_level": "basic",
+            "accommodation_id": str(_make_accommodation(client, clinic.id, branch.id)["id"]),
         },
     )
     hosp_id = res.json()["id"]
@@ -342,6 +379,7 @@ def test_vitales_completan_tarea_de_monitorizacion(db_session, client, make_clin
             "branch_id": str(branch.id),
             "status": "admitted",
             "monitoring_level": "basic",
+            "accommodation_id": str(_make_accommodation(client, clinic.id, branch.id)["id"]),
         },
     )
     hosp_id = res.json()["id"]

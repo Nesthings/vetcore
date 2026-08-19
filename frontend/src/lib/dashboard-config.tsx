@@ -1,8 +1,11 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 
 import { useAuth } from '@/lib/auth'
+import { DASHBOARD_CATALOG } from '@/lib/dashboards'
 
-const DEFAULT_ACTIVE = ['species', 'new_pets', 'appt_heatmap', 'vet_load', 'appt_funnel']
+const DEFAULT_ACTIVE = ['species', 'new_pets', 'appt_heatmap', 'vet_load']
+
+const CATALOG_SLUGS = new Set(DASHBOARD_CATALOG.map((d) => d.slug))
 
 interface DashboardConfigValue {
   active: string[]
@@ -21,7 +24,12 @@ function loadActive(key: string): string[] {
     const raw = localStorage.getItem(key)
     if (raw) {
       const parsed = JSON.parse(raw)
-      if (Array.isArray(parsed)) return parsed.filter((s) => typeof s === 'string')
+      if (Array.isArray(parsed)) {
+        // Filtra slugs que ya no existen en el catálogo (p. ej. 'appt_funnel'),
+        // evitando tiles fantasma imposibles de quitar.
+        const valid = parsed.filter((s) => typeof s === 'string' && CATALOG_SLUGS.has(s))
+        return valid.length ? valid : DEFAULT_ACTIVE
+      }
     }
   } catch {
     // sin almacenamiento

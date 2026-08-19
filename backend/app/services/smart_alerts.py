@@ -791,9 +791,15 @@ def get_alerts_summary(db: Session, clinic_id, branch_id=None, limit: int = 12) 
                 "title": rule.name if rule else a.rule_key,
                 "description": a.message or "",
                 "pet_name": (a.metadata_json or {}).get("pet_name"),
-                "pet_id": str(a.entity_id),
+                "entity_type": a.entity_type,
+                "entity_id": str(a.entity_id),
                 "triggered_at": a.triggered_at.isoformat(),
-                "link": a.link or f"/pets/{a.entity_id}",
+                "link": a.link
+                or (
+                    f"/hospitalizacion/{a.entity_id}"
+                    if a.entity_type == ENTITY_HOSPITALIZATION
+                    else f"/pets/{a.entity_id}"
+                ),
                 "metadata": a.metadata_json or {},
             }
         )

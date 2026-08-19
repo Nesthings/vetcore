@@ -7,10 +7,14 @@ de estado) por POST. El endpoint es público (no requiere auth de la app).
 El verify token se configura en `settings.whatsapp_webhook_verify_token`.
 """
 
+import logging
+
 from fastapi import APIRouter, Request
 from fastapi.responses import PlainTextResponse
 
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/whatsapp", tags=["whatsapp-webhook"])
 
@@ -37,14 +41,18 @@ async def webhook_receive(request: Request) -> dict:
                 value = change.get("value") or {}
                 phone_number_id = value.get("metadata", {}).get("phone_number_id")
                 for msg in value.get("messages") or []:
-                    print(
-                        f"[whatsapp-webhook] entrada phone={phone_number_id} "
-                        f"from={msg.get('from')} type={msg.get('type')}"
+                    logger.info(
+                        "entrada phone=%s from=%s type=%s",
+                        phone_number_id,
+                        msg.get("from"),
+                        msg.get("type"),
                     )
                 for st in value.get("statuses") or []:
-                    print(
-                        f"[whatsapp-webhook] estado id={st.get('id')} "
-                        f"status={st.get('status')} msg_id={st.get('message_id')}"
+                    logger.info(
+                        "estado id=%s status=%s msg_id=%s",
+                        st.get("id"),
+                        st.get("status"),
+                        st.get("message_id"),
                     )
     except Exception:  # noqa: BLE001 - nunca fallar el ack a Meta
         pass

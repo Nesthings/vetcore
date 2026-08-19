@@ -33,37 +33,52 @@ def _reminder_template(appointment_id: str, stage: str) -> str:
     return f"rem:{appointment_id}:{stage}"
 
 
-def _get_consent(db: Session, clinic_id: str, pet_id: str) -> tuple[str | None, bool]:
-    owner_id = db.execute(
-        text(
-            "SELECT owner_id FROM owner_pet_links "
-            "WHERE pet_id = :p AND clinic_id = :c AND is_active = true LIMIT 1"
-        ),
-        {"p": pet_id, "c": clinic_id},
-    ).scalar()
-    if owner_id is None:
-        return None, False
-    accepts = db.execute(
-        text("SELECT accepts_reminders FROM owner_preferences WHERE owner_id = :o"),
-        {"o": owner_id},
-    ).scalar()
-    return str(owner_id), bool(accepts)
-
-
-def _stage_status(
-    db: Session, appointment_id: str, stage: str, window_time: datetime, consent: bool
-) -> str:
-    sent = db.scalar(
-        select(OutboundNotification.id).where(
-            OutboundNotification.template == _reminder_template(str(appointment_id), stage),
-            OutboundNotification.status == "sent",
+def _consents_batch(
+    db: Session, clinic_id: str, pet_ids: list[str]
+) -> dict[str, tuple[str | None, bool]]:
+    """Consentimiento (owner_id, accepts) en batch por pet_id."""
+    if not pet_ids:
+        return {}
+    rows = (
+        db.execute(
+            text(
+                "SELECT l.pet_id AS pet_id, l.owner_id AS owner_id, "
+                "       COALESCE(op.accepts_reminders, false) AS accepts "
+                "FROM owner_pet_links l "
+                "LEFT JOIN owner_preferences op ON op.owner_id = l.owner_id "
+                "WHERE l.pet_id = ANY(:pids) AND l.clinic_id = :c AND l.is_active = true"
+            ),
+            {"pids": pet_ids, "c": clinic_id},
         )
+        .mappings()
+        .all()
     )
-    if sent:
-        return "sent"
-    if not consent:
-        return "not_consented"
-    return "pending_due" if window_time <= datetime.now(UTC) else "pending"
+    out: dict[str, tuple[str | None, bool]] = {}
+    for r in rows:
+        out.setdefault(str(r["pet_id"]), (str(r["owner_id"]), bool(r["accepts"])))
+    return out
+
+
+def _sent_templates_batch(db: Session, templates: list[str]) -> set[str]:
+    if not templates:
+        return set()
+    return set(
+        db.scalars(
+            select(OutboundNotification.template).where(
+                OutboundNotification.template.in_(templates),
+                OutboundNotification.status == "sent",
+            )
+        ).all()
+    )
+
+
+def _owner_phones_batch(db: Session, owner_ids: list[str]) -> dict[str, str | None]:
+    if not owner_ids:
+        return {}
+    rows = db.execute(
+        text("SELECT id, phone FROM owners WHERE id = ANY(:ids)"), {"ids": owner_ids}
+    ).all()
+    return {str(r[0]): r[1] for r in rows}
 
 
 @router.get(
@@ -87,19 +102,31 @@ def reminder_schedule(
     pet = db.get(Pet, appointment.pet_id) if appointment.pet_id else None
     vet = db.get(User, appointment.vet_user_id) if appointment.vet_user_id else None
     _, consent = (
-        _get_consent(db, ctx.clinic["id"], str(appointment.pet_id))
+        _consents_batch(db, ctx.clinic["id"], [str(appointment.pet_id)]).get(
+            str(appointment.pet_id), (None, False)
+        )
         if appointment.pet_id
         else (None, False)
     )
 
+    templates = [_reminder_template(appointment_id, stage) for stage, _ in REMINDER_STAGES]
+    sent = _sent_templates_batch(db, templates)
+
     stages = []
     for stage, hours in REMINDER_STAGES:
         window_time = appointment.start_time - timedelta(hours=hours)
+        status_value: str
+        if _reminder_template(appointment_id, stage) in sent:
+            status_value = "sent"
+        elif not consent:
+            status_value = "not_consented"
+        else:
+            status_value = "pending_due" if window_time <= datetime.now(UTC) else "pending"
         stages.append(
             ReminderStage(
                 stage=stage,
                 window_time=window_time,
-                status=_stage_status(db, appointment_id, stage, window_time, consent),
+                status=status_value,
                 owner_consented=consent,
             )
         )
@@ -134,31 +161,36 @@ def run_reminders(
         )
     )
 
+    # Datos en batch: consentimientos, teléfonos, mascotas y estados ya enviados.
+    pet_ids = [str(a.pet_id) for a in appointments if a.pet_id]
+    consents = _consents_batch(db, ctx.clinic["id"], pet_ids)
+    owner_ids = [c[0] for c in consents.values() if c[0]]
+    phones = _owner_phones_batch(db, owner_ids)
+    pets = {
+        str(p.id): p for p in db.scalars(select(Pet).where(Pet.clinic_id == ctx.clinic["id"])).all()
+    }
+    all_templates = [
+        _reminder_template(str(a.id), stage) for a in appointments for stage, _ in REMINDER_STAGES
+    ]
+    sent_templates = _sent_templates_batch(db, all_templates)
+
     processed = 0
     skipped_no_consent = 0
     not_configured = 0
     failed = 0
     clinic_name = ctx.clinic["name"]
     for appt in appointments:
-        owner_id, consent = _get_consent(db, ctx.clinic["id"], str(appt.pet_id))
+        owner_id, consent = consents.get(str(appt.pet_id), (None, False))
         if owner_id is None:
             continue
-        owner_phone = db.scalar(
-            text("SELECT phone FROM owners WHERE id = :o"), {"o": owner_id}
-        )
-        pet = db.get(Pet, appt.pet_id) if appt.pet_id else None
+        owner_phone = phones.get(owner_id)
+        pet = pets.get(str(appt.pet_id)) if appt.pet_id else None
         pet_name = pet.name if pet else (appt.walk_in_name or "tu mascota")
         for stage, hours in REMINDER_STAGES:
             if now < appt.start_time - timedelta(hours=hours):
                 continue  # la etapa aún no toca
             template = _reminder_template(str(appt.id), stage)
-            sent = db.scalar(
-                select(OutboundNotification.id).where(
-                    OutboundNotification.template == template,
-                    OutboundNotification.status == "sent",
-                )
-            )
-            if sent:
+            if template in sent_templates:
                 continue
             if not consent:
                 skipped_no_consent += 1
@@ -220,25 +252,28 @@ def pending_reminders(
         )
     )
 
-    pets = {p.id: p for p in db.scalars(select(Pet).where(Pet.clinic_id == ctx.clinic["id"])).all()}
+    pet_ids = [str(a.pet_id) for a in appointments if a.pet_id]
+    consents = _consents_batch(db, ctx.clinic["id"], pet_ids)
+    pets = {
+        str(p.id): p for p in db.scalars(select(Pet).where(Pet.clinic_id == ctx.clinic["id"])).all()
+    }
+    all_templates = [
+        _reminder_template(str(a.id), stage) for a in appointments for stage, _ in REMINDER_STAGES
+    ]
+    sent_templates = _sent_templates_batch(db, all_templates)
+
     out = []
     for appt in appointments:
-        _, consent = _get_consent(db, ctx.clinic["id"], str(appt.pet_id))
+        _, consent = consents.get(str(appt.pet_id), (None, False))
         next_stage = None
         for stage, hours in REMINDER_STAGES:
             if now < appt.start_time - timedelta(hours=hours):
                 continue
             template = _reminder_template(str(appt.id), stage)
-            exists = db.scalar(
-                select(OutboundNotification.id).where(
-                    OutboundNotification.template == template,
-                    OutboundNotification.status == "sent",
-                )
-            )
-            if not exists:
+            if template not in sent_templates:
                 next_stage = stage if consent else None
                 break
-        pet = pets.get(appt.pet_id)
+        pet = pets.get(str(appt.pet_id))
         out.append(
             PendingReminder(
                 appointment_id=appt.id,

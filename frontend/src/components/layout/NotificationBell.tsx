@@ -36,7 +36,10 @@ export function NotificationBell() {
 
   useEffect(() => {
     load()
-    const t = setInterval(load, 30000)
+    // Solo sondea mientras la pestaña está visible (ahorra requests en segundo plano).
+    const t = setInterval(() => {
+      if (document.visibilityState === 'visible') load()
+    }, 30000)
     return () => clearInterval(t)
   }, [])
 

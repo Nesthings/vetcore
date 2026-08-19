@@ -58,10 +58,9 @@ async def lifespan(app: FastAPI):
             while True:
                 await asyncio.sleep(sweep_seconds)
                 try:
-                    # El contenedor corre UNA instancia (desired_count=1): el
-                    # barrido no se duplica. Best-effort: si falla una clínica,
-                    # se registra y continúa en el siguiente ciclo.
-                    smart_alerts_service.sweep_all_clinics()
+                    # El barrido es trabajo síncrono de BD; se ejecuta en un
+                    # hilo para NO bloquear el event loop del servidor.
+                    await asyncio.to_thread(smart_alerts_service.sweep_all_clinics)
                 except Exception:  # noqa: BLE001
                     logger.exception("Barrido periódico de alertas falló")
 

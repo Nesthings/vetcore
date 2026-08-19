@@ -32,18 +32,10 @@ import {
   X,
   XCircle,
 } from 'lucide-react'
-import {
-  CartesianGrid,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts'
 
 import { AppLayout } from '@/components/layout/AppLayout'
 import { ConsentDialog } from '@/components/pets/ConsentDialog'
+import { WeightChart } from '@/components/pets/WeightChart'
 import { InviteOwnerDialog } from '@/components/pets/InviteOwnerDialog'
 import { PetQrCard } from '@/components/pets/PetQrCard'
 import { DoseStamps } from '@/components/pets/DoseStamps'
@@ -73,6 +65,7 @@ import {
 } from '@/components/ui/table'
 import type { Pet } from '@/pages/Pets'
 import { apiFetch } from '@/lib/api'
+import { ALERT_STYLES, ALERT_TYPES } from '@/lib/clinical-alerts'
 import { SPECIES_ICONS, speciesLabel } from '@/lib/species'
 import { cn } from '@/lib/utils'
 import type { PetVaccinationPlan } from '@/lib/vaccination'
@@ -160,22 +153,6 @@ interface FamilyMember {
   sex?: string | null
   relation: string
   photo_url?: string | null
-}
-
-const ALERT_TYPES = [
-  'Alergia',
-  'Enfermedad crónica',
-  'Comportamiento',
-  'Medidas especiales',
-  'Otra',
-]
-
-const ALERT_STYLES: Record<string, string> = {
-  Alergia: 'border-destructive/40 bg-destructive/10 text-destructive',
-  'Enfermedad crónica': 'border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300',
-  Comportamiento: 'border-violet-500/40 bg-violet-500/10 text-violet-700 dark:text-violet-300',
-  'Medidas especiales': 'border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-300',
-  Otra: 'border-slate-500/40 bg-slate-500/10 text-slate-700 dark:text-slate-300',
 }
 
 const CITA_STATUS: Record<
@@ -1280,39 +1257,7 @@ export function PetDetail() {
                           icon={Weight}
                         />
                       ) : (
-                        <ResponsiveContainer width="100%" height="100%">
-                          <LineChart
-                            data={weightChart}
-                            margin={{ top: 8, right: 8, left: -20, bottom: 0 }}
-                          >
-                            <CartesianGrid
-                              strokeDasharray="3 3"
-                              stroke="var(--border)"
-                              vertical={false}
-                            />
-                            <XAxis
-                              dataKey="fecha"
-                              tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }}
-                              tickLine={false}
-                              axisLine={false}
-                            />
-                            <YAxis
-                              domain={['auto', 'auto']}
-                              tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }}
-                              tickLine={false}
-                              axisLine={false}
-                            />
-                            <Tooltip formatter={(v) => [`${v} kg`, 'Peso']} />
-                            <Line
-                              type="monotone"
-                              dataKey="peso"
-                              stroke="var(--chart-1)"
-                              strokeWidth={2.5}
-                              dot={{ r: 4, fill: 'var(--chart-1)' }}
-                              activeDot={{ r: 6 }}
-                            />
-                          </LineChart>
-                        </ResponsiveContainer>
+                        <WeightChart data={weightChart} height="100%" />
                       )}
                     </CardContent>
                   </Card>

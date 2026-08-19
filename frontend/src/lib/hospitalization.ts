@@ -1,5 +1,3 @@
-import { CheckCircle2, CircleAlert, Clock3, Info, TriangleAlert } from 'lucide-react'
-
 export type HospStatus =
   | 'planned'
   | 'admitted'
@@ -116,7 +114,6 @@ export const ACCOMMODATION_TYPE_LABELS: Record<string, string> = {
   postop: 'Postoperatorio',
   other: 'Otro',
 }
-
 export interface HospTask {
   id: string
   clinic_id: string
@@ -459,8 +456,3 @@ export function elapsedLabel(minutes: number): string {
   return `${d} d ${h % 24} h`
 }
 
-export const DISCHARGE_ICON = CheckCircle2
-export const CRITICAL_ICON = CircleAlert
-export const WARNING_ICON = TriangleAlert
-export const INFO_ICON = Info
-export const CLOCK_ICON = Clock3
