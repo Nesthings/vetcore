@@ -1,0 +1,35 @@
+# Secrets y configuración local
+.env
+.env.*
+!.env.example
+
+# Dependencias
+node_modules/
+**/node_modules/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.venv-*/
+*.egg-info/
+
+# Media / uploads (generados en runtime)
+media/
+**/media/
+
+# Logs
+*.log
+
+# Build
+dist/
+build/
+
+# Sesiones locales / documentos sensibles
+vetcore-session.json
+
+# Sistema / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

@@ -1,0 +1,380 @@
+import { useCallback, useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { Icon as MDIIcon } from '@mdi/react'
+import {
+  mdiBird,
+  mdiCat,
+  mdiDog,
+  mdiFish,
+  mdiHorse,
+  mdiPaw,
+  mdiRabbit,
+  mdiRodent,
+  mdiSnake,
+  mdiTurtle,
+} from '@mdi/js'
+import { ArrowUpRight, Pencil, Plus, Users } from 'lucide-react'
+
+import { AppLayout } from '@/components/layout/AppLayout'
+import { PetFormDialog } from '@/components/pets/PetFormDialog'
+import { Avatar } from '@/components/ui/avatar'
+import { Button } from '@/components/ui/button'
+import { EmptyState } from '@/components/ui/empty-state'
+import { ErrorState } from '@/components/ui/error-state'
+import { LoadingState } from '@/components/ui/loading-state'
+import { SearchInput } from '@/components/ui/search-input'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { apiFetch } from '@/lib/api'
+import { cn } from '@/lib/utils'
+
+export interface PetOwner {
+  owner_id: string
+  full_name?: string | null
+  phone?: string | null
+  email?: string | null
+  profile_photo_url?: string | null
+  alt_contact_name?: string | null
+  alt_phone?: string | null
+  linked_at: string
+  is_active: boolean
+}
+
+export interface Pet {
+  id: string
+  clinic_id: string
+  name: string
+  species: string
+  breed?: string | null
+  color_primary?: string | null
+  color_secondary?: string | null
+  markings?: string | null
+  sex?: string | null
+  birth_date?: string | null
+  allergies?: string | null
+  clinical_alert_text?: string | null
+  clinical_photo_url?: string | null
+  is_active: boolean
+  created_at: string
+  latest_weight_kg?: number | null
+  owners?: PetOwner[] | null
+}
+
+interface PetWithAlerts extends Pet {
+  alert_count?: number
+}
+
+const SPECIES_ICONS: Record<string, string> = {
+  perro: mdiDog,
+  gato: mdiCat,
+  ave: mdiBird,
+  conejo: mdiRabbit,
+  reptil: mdiSnake,
+  roedor: mdiRodent,
+  hurones: mdiPaw,
+  peces: mdiFish,
+  anfibio: mdiTurtle,
+  equino: mdiHorse,
+  otro: mdiPaw,
+}
+
+interface SpeciesOption {
+  species: string
+  count: number
+}
+
+export function Pets() {
+  const [pets, setPets] = useState<PetWithAlerts[]>([])
+  const [search, setSearch] = useState('')
+  const [speciesFilter, setSpeciesFilter] = useState<string | null>(null)
+  const [speciesOptions, setSpeciesOptions] = useState<SpeciesOption[]>([])
+  const [loaded, setLoaded] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [formOpen, setFormOpen] = useState(false)
+  const [editing, setEditing] = useState<PetWithAlerts | null>(null)
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  useEffect(() => {
+    let cancelled = false
+    apiFetch<SpeciesOption[]>('/pets/species')
+      .then((res) => {
+        if (!cancelled) setSpeciesOptions(res)
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [refreshKey])
+
+  useEffect(() => {
+    let cancelled = false
+    const t = setTimeout(
+      () => {
+        ;(async () => {
+          try {
+            const params = new URLSearchParams()
+            if (search.trim()) params.set('search', search.trim())
+            if (speciesFilter) params.set('species', speciesFilter)
+            params.set('limit', '100')
+            const res = await apiFetch<PetWithAlerts[]>(`/pets?${params}`)
+            if (!cancelled) {
+              setPets(res)
+              setLoaded(true)
+            }
+          } catch (err) {
+            if (!cancelled) {
+              setError(err instanceof Error ? err.message : 'No se pudieron cargar los pacientes')
+            }
+          }
+        })()
+      },
+      search.trim() || speciesFilter ? 120 : 0,
+    )
+    return () => {
+      cancelled = true
+      clearTimeout(t)
+    }
+  }, [search, speciesFilter, refreshKey])
+
+  const refresh = useCallback(() => setRefreshKey((k) => k + 1), [])
+
+  const term = search.trim().toLowerCase()
+  const visible = term ? pets.filter((p) => p.name.toLowerCase().includes(term)) : pets
+
+  return (
+    <AppLayout>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Pacientes</h1>
+          <p className="text-sm text-muted-foreground">Expediente de las mascotas de la clínica</p>
+        </div>
+        <Button
+          size="sm"
+          onClick={() => {
+            setEditing(null)
+            setFormOpen(true)
+          }}
+        >
+          <Plus /> Nueva mascota
+        </Button>
+      </div>
+
+      <div className="mb-4 flex flex-col gap-3">
+        <SearchInput
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          onClear={() => setSearch('')}
+          placeholder="Buscar por nombre…"
+          className="max-w-md"
+        />
+        {speciesOptions.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Especie
+            </span>
+            <button
+              type="button"
+              onClick={() => setSpeciesFilter(null)}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors',
+                !speciesFilter
+                  ? 'border-primary bg-primary text-primary-foreground shadow-glow'
+                  : 'border-border bg-card text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+              )}
+            >
+              Todas
+            </button>
+            {speciesOptions.map((s) => {
+              const active = speciesFilter === s.species
+              return (
+                <button
+                  key={s.species}
+                  type="button"
+                  onClick={() => setSpeciesFilter(active ? null : s.species)}
+                  title={s.species}
+                  className={cn(
+                    'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium capitalize transition-colors',
+                    active
+                      ? 'border-primary bg-primary text-primary-foreground shadow-glow'
+                      : 'border-border bg-card text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                  )}
+                >
+                  <MDIIcon
+                    path={SPECIES_ICONS[s.species] ?? mdiPaw}
+                    size={0.85}
+                    className="shrink-0"
+                    aria-hidden="true"
+                  />
+                  {s.species}
+                  <span
+                    className={cn(
+                      'text-xs',
+                      active ? 'text-primary-foreground/70' : 'text-muted-foreground',
+                    )}
+                  >
+                    {s.count}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {error && <ErrorState description={error} onRetry={refresh} className="mb-6" />}
+      {!loaded && !error && <LoadingState label="Cargando pacientes…" />}
+
+      {loaded && !error && pets.length > 0 && visible.length === 0 && (
+        <EmptyState
+          title="Sin resultados"
+          description={`Ningún paciente coincide con «${search.trim()}».`}
+          icon={Users}
+        />
+      )}
+
+      {loaded && !error && pets.length === 0 && search.trim() && (
+        <EmptyState
+          title="Sin resultados"
+          description={`Ningún paciente coincide con «${search.trim()}».`}
+          icon={Users}
+        />
+      )}
+
+      {loaded && !error && pets.length === 0 && !search.trim() && (
+        <EmptyState
+          title="Sin pacientes"
+          description="Registra tu primera mascota para empezar su expediente."
+          icon={Users}
+          action={
+            <Button
+              size="sm"
+              onClick={() => {
+                setEditing(null)
+                setFormOpen(true)
+              }}
+            >
+              <Plus /> Registrar mascota
+            </Button>
+          }
+        />
+      )}
+
+      {loaded && !error && visible.length > 0 && (
+        <div className="overflow-hidden rounded-lg border border-border bg-card shadow-card">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Paciente</TableHead>
+                <TableHead>Dueño</TableHead>
+                <TableHead>Especie / Raza</TableHead>
+                <TableHead>Color</TableHead>
+                <TableHead className="hidden lg:table-cell">Sexo</TableHead>
+                <TableHead>Último peso</TableHead>
+                <TableHead className="text-right">Acciones</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {visible.map((p) => (
+                <TableRow key={p.id}>
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <Avatar
+                        src={p.clinical_photo_url}
+                        name={p.name}
+                        alt={`Foto de ${p.name}`}
+                        className="size-10 shrink-0"
+                      />
+                      <Link
+                        to={`/pets/${p.id}`}
+                        title="Abrir cartilla de la mascota"
+                        className="inline-flex max-w-40 items-center gap-1.5 rounded-full border border-primary/30 bg-primary/5 px-2.5 py-1 text-sm font-medium text-primary transition-colors hover:border-primary/60 hover:bg-primary/10 hover:underline hover:underline-offset-2"
+                      >
+                        <span className="truncate">{p.name}</span>
+                        <ArrowUpRight className="size-3.5 shrink-0" aria-hidden="true" />
+                      </Link>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    {(() => {
+                      const owner = p.owners?.find((o) => o.is_active)
+                      return owner?.full_name ? (
+                        <span className="inline-flex min-w-0 items-center gap-2">
+                          <Avatar
+                            src={owner.profile_photo_url}
+                            name={owner.full_name}
+                            className="size-6 shrink-0"
+                          />
+                          <span className="max-w-40 truncate text-sm">{owner.full_name}</span>
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )
+                    })()}
+                  </TableCell>
+                  <TableCell>
+                    <span className="block max-w-44 truncate text-sm capitalize">
+                      {p.species}
+                      {p.breed ? ` · ${p.breed}` : ''}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    {p.color_primary ? (
+                      <div className="min-w-0">
+                        <span className="inline-flex min-w-0 items-center gap-1.5">
+                          <span
+                            className="inline-block size-2.5 shrink-0 rounded-full border border-border"
+                            aria-hidden="true"
+                          />
+                          <span className="truncate">{p.color_primary}</span>
+                        </span>
+                        {p.color_secondary ? (
+                          <span className="block truncate pl-4 text-xs text-muted-foreground">
+                            {p.color_secondary}
+                          </span>
+                        ) : null}
+                      </div>
+                    ) : (
+                      '—'
+                    )}
+                  </TableCell>
+                  <TableCell className="hidden lg:table-cell">{p.sex ?? '—'}</TableCell>
+                  <TableCell>{p.latest_weight_kg ? `${p.latest_weight_kg} kg` : '—'}</TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={`Editar ${p.name}`}
+                      onClick={() => {
+                        setEditing(p)
+                        setFormOpen(true)
+                      }}
+                    >
+                      <Pencil />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      <PetFormDialog
+        open={formOpen}
+        pet={editing}
+        onOpenChange={setFormOpen}
+        onSaved={() => {
+          setFormOpen(false)
+          setEditing(null)
+          refresh()
+        }}
+      />
+    </AppLayout>
+  )
+}

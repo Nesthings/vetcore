@@ -1,0 +1,811 @@
+"""Cartilla compartida del dueño (acceso por token, sin login).
+
+El staff genera un enlace (`POST /pets/{id}/share-link`) con un token JWT
+(scoped a la cartilla). Este router valida el token y expone una vista del
+expediente adaptada al dueño:
+
+- Lectura: datos de la mascota, dueños, alertas, carnet, línea de tiempo,
+  pesos, fotos, consentimientos, vacunación y familia.
+- Acciones puntuales del dueño: subir foto de perfil de la mascota (se ve en
+  el sistema general), agregar/resolver alertas (máx. 20) y firmar
+  consentimientos pendientes a distancia.
+
+El resto del apartado (dueño, carnet, línea de tiempo, fotos, vacunación,
+familia) es de solo lectura desde aquí.
+"""
+
+import base64
+import uuid
+from datetime import UTC, datetime, timedelta
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+from sqlalchemy import func, select, text
+from sqlalchemy.orm import Session
+
+from app.api.pets import ensure_qr_token
+from app.core.events import notify_roles, record_audit
+from app.core.images import process_cartilla_photo
+from app.core.security import InvalidTokenError, decode_share_token
+from app.core.storage import (
+    ALLOWED_IMAGE_EXTENSIONS,
+    public_url,
+    save_media,
+    validate_extension,
+)
+from app.db.session import get_db
+from app.models import (
+    Appointment,
+    AppointmentWaitlist,
+    Clinic,
+    ClinicalAlert,
+    ClinicBranch,
+    Consultation,
+    ConsultationAttachment,
+    DigitalConsent,
+    Pet,
+    PetPhoto,
+    PetWeightRecord,
+    User,
+)
+from app.services.carnet import build_carnet, build_vaccination
+
+router = APIRouter(prefix="/share", tags=["share"])
+
+MAX_IMAGE_BYTES = 5 * 1024 * 1024
+ALERT_LIMIT = 20
+
+
+def _pet_from_token(token: str, db: Session) -> Pet:
+    pet = None
+    try:
+        pet_id = decode_share_token(token)
+        pet = db.get(Pet, pet_id)
+    except InvalidTokenError:
+        pet = db.scalar(select(Pet).where(Pet.qr_token == token))
+    if pet is None or not pet.is_active:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Paciente no encontrado")
+    return pet
+
+
+def _with_owners(db: Session, pet: Pet) -> list[dict]:
+    rows = (
+        db.execute(
+            text(
+                "SELECT o.id AS owner_id, o.full_name, o.phone, o.email, "
+                "o.profile_photo_url, o.signature_url, o.alt_contact_name, o.alt_phone, "
+                "l.linked_at, l.is_active "
+                "FROM owner_pet_links l JOIN owners o ON o.id = l.owner_id "
+                "WHERE l.pet_id = :pid AND l.clinic_id = :cid "
+                "ORDER BY l.linked_at DESC"
+            ),
+            {"pid": pet.id, "cid": pet.clinic_id},
+        )
+        .mappings()
+        .all()
+    )
+    return [dict(r) for r in rows]
+
+
+def _pet_dict(db: Session, pet: Pet) -> dict:
+    latest = db.scalar(
+        select(PetWeightRecord.weight_kg)
+        .where(PetWeightRecord.pet_id == pet.id)
+        .order_by(PetWeightRecord.recorded_at.desc(), PetWeightRecord.id.desc())
+        .limit(1)
+    )
+    data = {
+        "id": str(pet.id),
+        "name": pet.name,
+        "species": pet.species,
+        "breed": pet.breed,
+        "color_primary": pet.color_primary,
+        "color_secondary": pet.color_secondary,
+        "markings": pet.markings,
+        "sex": pet.sex,
+        "birth_date": pet.birth_date.isoformat() if pet.birth_date else None,
+        "allergies": pet.allergies,
+        "clinical_photo_url": pet.clinical_photo_url,
+        "is_active": pet.is_active,
+        "latest_weight_kg": float(latest) if latest is not None else None,
+    }
+    data["owners"] = _with_owners(db, pet)
+    return data
+
+
+@router.get("/cartilla", summary="Datos de la cartilla del dueño (por token)")
+def share_cartilla(
+    token: str = Query(...),
+    db: Session = Depends(get_db),
+) -> dict:
+    pet = _pet_from_token(token, db)
+    clinic_id = pet.clinic_id
+
+    alerts = db.scalars(
+        select(ClinicalAlert)
+        .where(ClinicalAlert.pet_id == pet.id)
+        .order_by(ClinicalAlert.created_at.desc())
+    ).all()
+
+    carnet = build_carnet(db, pet)
+
+    consents = list(
+        db.scalars(
+            select(DigitalConsent)
+            .where(DigitalConsent.pet_id == pet.id, DigitalConsent.clinic_id == clinic_id)
+            .order_by(DigitalConsent.signed_at.desc())
+        )
+    )
+    consents_payload = [
+        {
+            "id": str(c.id),
+            "title": c.title,
+            "body": c.body,
+            "status": c.status,
+            "signature_url": c.signature_url,
+            "pdf_url": c.pdf_url,
+            "attachment_url": c.attachment_url,
+            "attachment_name": c.attachment_name,
+            "signed_at": c.signed_at.isoformat(),
+        }
+        for c in consents
+    ]
+
+    weights = db.scalars(
+        select(PetWeightRecord)
+        .where(PetWeightRecord.pet_id == pet.id, PetWeightRecord.clinic_id == clinic_id)
+        .order_by(PetWeightRecord.recorded_at.desc())
+    ).all()
+
+    consultations = list(
+        db.scalars(
+            select(Consultation)
+            .where(Consultation.pet_id == pet.id, Consultation.clinic_id == clinic_id)
+            .order_by(Consultation.created_at.desc())
+        )
+    )
+    appointments = list(
+        db.scalars(
+            select(Appointment)
+            .where(Appointment.pet_id == pet.id, Appointment.clinic_id == clinic_id)
+            .order_by(Appointment.start_time.desc())
+        )
+    )
+    vet_ids = {c.vet_user_id for c in consultations}
+    vets = (
+        dict(db.execute(select(User.id, User.full_name).where(User.id.in_(vet_ids))).all())
+        if vet_ids
+        else {}
+    )
+    timeline: list[dict] = []
+    for c in consultations:
+        timeline.append(
+            {
+                "type": "consulta",
+                "id": str(c.id),
+                "title": c.reason or "Consulta",
+                "subtitle": f"Diagnóstico: {c.diagnosis}" if c.diagnosis else "",
+                "author": vets.get(c.vet_user_id),
+                "date": c.created_at.isoformat(),
+                "status": None,
+            }
+        )
+    for a in appointments:
+        timeline.append(
+            {
+                "type": "cita",
+                "id": str(a.id),
+                "title": a.procedure_type,
+                "subtitle": "",
+                "author": None,
+                "date": a.start_time.isoformat(),
+                "status": a.status,
+            }
+        )
+    photo_rows = db.execute(
+        text(
+            "SELECT p.id, p.label, p.url, p.taken_at FROM pet_photos p "
+            "WHERE p.pet_id = :pid AND p.clinic_id = :cid"
+        ),
+        {"pid": pet.id, "cid": clinic_id},
+    ).mappings().all()
+    for p in photo_rows:
+        timeline.append(
+            {
+                "type": "foto",
+                "id": str(p["id"]),
+                "title": p["label"] or "Foto de la consulta",
+                "subtitle": "",
+                "author": None,
+                "date": p["taken_at"].isoformat(),
+                "status": None,
+                "url": p["url"],
+            }
+        )
+    timeline.sort(key=lambda e: e["date"], reverse=True)
+
+    # Fotos de evolución (adjuntos de consulta + pet_photos)
+    consult_ids = [c.id for c in consultations]
+    attachments = (
+        db.scalars(
+            select(ConsultationAttachment)
+            .where(
+                ConsultationAttachment.consultation_id.in_(consult_ids),
+                ConsultationAttachment.type == "photo",
+            )
+            .order_by(ConsultationAttachment.created_at.asc())
+        ).all()
+        if consult_ids
+        else []
+    )
+    consult_by_id = {c.id: c for c in consultations}
+    photos: list[dict] = []
+    for att in attachments:
+        c = consult_by_id.get(att.consultation_id)
+        if c is None:
+            continue
+        photos.append(
+            {
+                "url": att.url,
+                "consultation_date": c.created_at.isoformat(),
+                "reason": c.reason,
+            }
+        )
+    pet_photos = list(
+        db.scalars(
+            select(PetPhoto)
+            .where(PetPhoto.clinic_id == clinic_id, PetPhoto.pet_id == pet.id)
+            .order_by(PetPhoto.taken_at.asc())
+        )
+    )
+    for p in pet_photos:
+        photos.append(
+            {
+                "url": p.url,
+                "consultation_date": p.taken_at.isoformat(),
+                "reason": p.label or "Sesión del veterinario",
+            }
+        )
+
+    # Familia: mismo nombre de dueño
+    owner_names = list(
+        db.execute(
+            text(
+                "SELECT DISTINCT trim(o.full_name) AS full_name "
+                "FROM owner_pet_links l JOIN owners o ON o.id = l.owner_id "
+                "WHERE l.pet_id = :pid AND l.clinic_id = :cid AND l.is_active = true "
+                "AND o.full_name IS NOT NULL AND trim(o.full_name) <> ''"
+            ),
+            {"pid": pet.id, "cid": clinic_id},
+        ).scalars()
+    )
+    family: list[dict] = []
+    if owner_names:
+        placeholders = ",".join(f":nm{i}" for i in range(len(owner_names)))
+        params: dict = {"cid": clinic_id, "pid": pet.id}
+        params.update({f"nm{i}": n for i, n in enumerate(owner_names)})
+        rows = db.execute(
+            text(
+                "SELECT DISTINCT p.id, p.name, p.species, p.breed, p.sex, "
+                "p.clinical_photo_url AS photo_url "
+                "FROM owner_pet_links l "
+                "JOIN owners o ON o.id = l.owner_id "
+                "JOIN pets p ON p.id = l.pet_id "
+                "WHERE l.clinic_id = :cid AND l.is_active = true "
+                "AND p.id <> :pid AND p.is_active = true "
+                f"AND trim(coalesce(o.full_name, '')) IN ({placeholders})"
+            ),
+            params,
+        ).mappings().all()
+        for r in rows:
+            sex = r["sex"]
+            relation = (
+                "hermano"
+                if sex in ("M", "macho", "Macho")
+                else "hermana" if sex in ("H", "hembra", "Hembra") else "hermano(a)"
+            )
+            family.append(
+                {
+                    "id": str(r["id"]),
+                    "name": r["name"],
+                    "species": r["species"],
+                    "breed": r["breed"],
+                    "sex": sex,
+                    "relation": relation,
+                    "photo_url": r["photo_url"],
+                }
+            )
+
+    clinic = db.get(Clinic, pet.clinic_id)
+
+    return {
+        "pet": _pet_dict(db, pet),
+        "clinic": {"name": clinic.name, "logo_url": clinic.logo_url},
+        "branches": [
+            {"id": str(b.id), "name": b.name}
+            for b in db.scalars(
+                select(ClinicBranch).where(ClinicBranch.clinic_id == pet.clinic_id)
+            )
+        ],
+        "qr_url": f"/cartilla?token={ensure_qr_token(db, pet)}",
+        "alerts": [
+            {
+                "id": str(a.id),
+                "type": a.type,
+                "description": a.description,
+                "created_at": a.created_at.isoformat(),
+            }
+            for a in alerts
+        ],
+        "carnet": carnet,
+        "vaccination": build_vaccination(db, pet),
+        "consents": consents_payload,
+        "weights": [
+            {
+                "id": str(w.id),
+                "weight_kg": float(w.weight_kg),
+                "recorded_at": w.recorded_at.isoformat(),
+            }
+            for w in weights
+        ],
+        "timeline": timeline,
+        "photos": photos,
+        "family": family,
+    }
+
+
+def _waitlist_payload(db: Session, row: AppointmentWaitlist) -> dict:
+    pet_name = db.scalar(select(Pet.name).where(Pet.id == row.pet_id))
+    branch_name = db.scalar(select(ClinicBranch.name).where(ClinicBranch.id == row.branch_id))
+    return {
+        "id": str(row.id),
+        "pet_id": str(row.pet_id),
+        "pet_name": pet_name,
+        "branch_id": str(row.branch_id),
+        "branch_name": branch_name,
+        "desired_from": row.desired_from.isoformat(),
+        "desired_to": row.desired_to.isoformat(),
+        "status": row.status,
+        "created_at": row.created_at.isoformat(),
+    }
+
+
+@router.post(
+    "/cartilla/waitlist",
+    status_code=status.HTTP_201_CREATED,
+    summary="El dueño solicita una cita (entra a la lista de espera)",
+)
+def share_request_waitlist(
+    token: str = Form(...),
+    branch_id: str = Form(...),
+    desired_from: datetime = Form(...),
+    desired_to: datetime = Form(...),
+    db: Session = Depends(get_db),
+) -> dict:
+    pet = _pet_from_token(token, db)
+    if desired_to <= desired_from:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="desired_to debe ser posterior a desired_from",
+        )
+    branch = db.scalar(
+        select(ClinicBranch).where(
+            ClinicBranch.id == branch_id, ClinicBranch.clinic_id == pet.clinic_id
+        )
+    )
+    if branch is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Sucursal no encontrada"
+        )
+    # Tope anti-spam: máximo 5 solicitudes por mascota en las últimas 24 h.
+    # Se permiten varias solicitudes activas a la vez (no se bloquea por una
+    # sola "en espera", como antes).
+    cutoff = datetime.now(UTC) - timedelta(hours=24)
+    recent = (
+        db.scalar(
+            select(func.count())
+            .select_from(AppointmentWaitlist)
+            .where(
+                AppointmentWaitlist.pet_id == pet.id,
+                AppointmentWaitlist.clinic_id == pet.clinic_id,
+                AppointmentWaitlist.created_at >= cutoff,
+            )
+        )
+        or 0
+    )
+    if recent >= 5:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Llegaste al límite de 5 solicitudes de cita por mascota en 24 horas. "
+            "Puedes cancelar las anteriores o esperar a que pase el día.",
+        )
+
+    row = AppointmentWaitlist(
+        clinic_id=pet.clinic_id,
+        branch_id=branch.id,
+        pet_id=pet.id,
+        desired_from=desired_from,
+        desired_to=desired_to,
+        status="waiting",
+    )
+    db.add(row)
+    db.flush()
+    notify_roles(
+        db,
+        pet.clinic_id,
+        ["admin", "veterinario", "recepcion"],
+        "waitlist_owner_request",
+        f"El dueño de {pet.name} solicitó una cita para "
+        f"{desired_from.strftime('%d/%m %H:%M')}–{desired_to.strftime('%H:%M')}. "
+        "Revisa la lista de espera.",
+        link="/waitlist",
+    )
+    record_audit(
+        db,
+        clinic_id=pet.clinic_id,
+        actor_type="owner",
+        actor_id=pet.id,
+        action="waitlist_owner_requested",
+        entity_type="waitlist",
+        entity_id=row.id,
+        metadata={"pet_id": str(pet.id)},
+    )
+    db.commit()
+    db.refresh(row)
+    return _waitlist_payload(db, row)
+
+
+@router.get(
+    "/cartilla/waitlist",
+    summary="Solicitudes de cita de la mascota (dueño)",
+)
+def share_waitlist(
+    token: str = Query(...),
+    db: Session = Depends(get_db),
+) -> list[dict]:
+    pet = _pet_from_token(token, db)
+    rows = list(
+        db.scalars(
+            select(AppointmentWaitlist)
+            .where(AppointmentWaitlist.pet_id == pet.id)
+            .order_by(AppointmentWaitlist.created_at.desc())
+        )
+    )
+    return [_waitlist_payload(db, r) for r in rows]
+
+
+@router.delete(
+    "/cartilla/waitlist/{waitlist_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="El dueño cancela su solicitud de cita",
+)
+def share_cancel_waitlist(
+    waitlist_id: str,
+    token: str = Form(...),
+    db: Session = Depends(get_db),
+) -> None:
+    pet = _pet_from_token(token, db)
+    row = db.scalar(
+        select(AppointmentWaitlist).where(
+            AppointmentWaitlist.id == waitlist_id,
+            AppointmentWaitlist.pet_id == pet.id,
+        )
+    )
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Solicitud no encontrada"
+        )
+    if row.status not in ("waiting", "offered"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La solicitud ya no se puede cancelar",
+        )
+    record_audit(
+        db,
+        clinic_id=pet.clinic_id,
+        actor_type="owner",
+        actor_id=pet.id,
+        action="waitlist_owner_cancelled",
+        entity_type="waitlist",
+        entity_id=row.id,
+        metadata={"pet_id": str(pet.id)},
+    )
+    db.delete(row)
+    db.commit()
+
+
+@router.post("/cartilla/photo", summary="Sube la foto de perfil de la mascota")
+def share_upload_photo(
+    token: str = Form(...),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+) -> dict:
+    pet = _pet_from_token(token, db)
+    validate_extension(file.filename or "", ALLOWED_IMAGE_EXTENSIONS)
+    content = file.file.read()
+    if len(content) > MAX_IMAGE_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="La imagen supera el límite de 5 MB",
+        )
+    try:
+        processed = process_cartilla_photo(content)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    rel = save_media(f"pets/{pet.id}", f"perfil_{uuid.uuid4().hex[:8]}.jpg", processed)
+    pet.clinical_photo_url = public_url(rel)
+    record_audit(
+        db,
+        clinic_id=pet.clinic_id,
+        actor_type="owner",
+        actor_id=pet.id,
+        action="pet_photo_updated_owner",
+        entity_type="pet",
+        entity_id=pet.id,
+    )
+    db.commit()
+    return {"clinical_photo_url": pet.clinical_photo_url}
+
+
+@router.post("/cartilla/owner-photo", summary="El dueño sube/actualiza su propia foto de perfil")
+def share_upload_owner_photo(
+    token: str = Form(...),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+) -> dict:
+    pet = _pet_from_token(token, db)
+    row = db.execute(
+        text(
+            "SELECT o.id, o.profile_photo_url FROM owner_pet_links l "
+            "JOIN owners o ON o.id = l.owner_id "
+            "WHERE l.pet_id = :pid AND l.clinic_id = :cid AND l.is_active = true "
+            "ORDER BY l.linked_at DESC LIMIT 1"
+        ),
+        {"pid": pet.id, "cid": pet.clinic_id},
+    ).mappings().first()
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="La mascota no tiene un dueño activo"
+        )
+    validate_extension(file.filename or "", ALLOWED_IMAGE_EXTENSIONS)
+    content = file.file.read()
+    if len(content) > MAX_IMAGE_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="La imagen supera el límite de 5 MB",
+        )
+    try:
+        processed = process_cartilla_photo(content)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    rel = save_media(f"owners/{row.id}", f"profile_{uuid.uuid4().hex[:8]}.jpg", processed)
+    db.execute(
+        text(
+            "UPDATE owners SET profile_photo_prev_url = profile_photo_url, "
+            "profile_photo_url = :url WHERE id = :oid"
+        ),
+        {"url": public_url(rel), "oid": row.id},
+    )
+    record_audit(
+        db,
+        clinic_id=pet.clinic_id,
+        actor_type="owner",
+        actor_id=pet.id,
+        action="owner_photo_updated_owner",
+        entity_type="owner",
+        entity_id=row.id,
+        metadata={"pet_id": str(pet.id)},
+    )
+    db.commit()
+    return {"profile_photo_url": public_url(rel), "revertible": bool(row.profile_photo_url)}
+
+
+def _active_owner_row(db: Session, pet: Pet) -> dict:
+    row = db.execute(
+        text(
+            "SELECT o.id, o.full_name, o.signature_url FROM owner_pet_links l "
+            "JOIN owners o ON o.id = l.owner_id "
+            "WHERE l.pet_id = :pid AND l.clinic_id = :cid AND l.is_active = true "
+            "ORDER BY l.linked_at DESC LIMIT 1"
+        ),
+        {"pid": pet.id, "cid": pet.clinic_id},
+    ).mappings().first()
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="La mascota no tiene un dueño activo"
+        )
+    return dict(row)
+
+
+@router.post(
+    "/cartilla/signature",
+    summary="El dueño guarda su firma (por si también es médico y firma documentos)",
+)
+def share_upload_owner_signature(
+    token: str = Form(...),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+) -> dict:
+    pet = _pet_from_token(token, db)
+    row = _active_owner_row(db, pet)
+    validate_extension(file.filename or "", ALLOWED_IMAGE_EXTENSIONS)
+    content = file.file.read()
+    if len(content) > MAX_IMAGE_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="La imagen supera el límite de 5 MB",
+        )
+    import io
+
+    from PIL import Image
+
+    try:
+        with Image.open(io.BytesIO(content)) as img:
+            img.verify()
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="El archivo no es una imagen válida"
+        ) from exc
+
+    rel = save_media(f"owners/{row['id']}", "firma.png", content)
+    db.execute(
+        text("UPDATE owners SET signature_url = :url WHERE id = :oid"),
+        {"url": public_url(rel), "oid": row["id"]},
+    )
+    record_audit(
+        db,
+        clinic_id=pet.clinic_id,
+        actor_type="owner",
+        actor_id=pet.id,
+        action="owner_signature_updated_owner",
+        entity_type="owner",
+        entity_id=row["id"],
+        metadata={"pet_id": str(pet.id)},
+    )
+    db.commit()
+    return {"signature_url": public_url(rel)}
+
+
+@router.delete(
+    "/cartilla/signature",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="El dueño elimina su firma guardada",
+)
+def share_delete_owner_signature(
+    token: str = Form(...),
+    db: Session = Depends(get_db),
+) -> None:
+    pet = _pet_from_token(token, db)
+    row = _active_owner_row(db, pet)
+    db.execute(
+        text("UPDATE owners SET signature_url = NULL WHERE id = :oid"),
+        {"oid": row["id"]},
+    )
+    record_audit(
+        db,
+        clinic_id=pet.clinic_id,
+        actor_type="owner",
+        actor_id=pet.id,
+        action="owner_signature_deleted_owner",
+        entity_type="owner",
+        entity_id=row["id"],
+        metadata={"pet_id": str(pet.id)},
+    )
+    db.commit()
+
+
+@router.post(
+    "/cartilla/alerts",
+    status_code=status.HTTP_201_CREATED,
+    summary="El dueño agrega una alerta clínica (máx. 20)",
+)
+def share_create_alert(
+    token: str = Form(...),
+    type_: str = Form(..., alias="type"),
+    description: str = Form(..., min_length=1, max_length=1000),
+    db: Session = Depends(get_db),
+) -> dict:
+    pet = _pet_from_token(token, db)
+    count = db.scalar(
+        select(func.count())
+        .select_from(ClinicalAlert)
+        .where(ClinicalAlert.pet_id == pet.id)
+    ) or 0
+    if count >= ALERT_LIMIT:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Límite de {ALERT_LIMIT} alertas alcanzado",
+        )
+    alert = ClinicalAlert(pet_id=pet.id, type=type_, description=description)
+    db.add(alert)
+    db.flush()
+    record_audit(
+        db,
+        clinic_id=pet.clinic_id,
+        actor_type="owner",
+        actor_id=pet.id,
+        action="alert_created_owner",
+        entity_type="alert",
+        entity_id=alert.id,
+        metadata={"pet_id": str(pet.id), "type": type_},
+    )
+    db.commit()
+    return {"id": str(alert.id), "type": alert.type, "description": alert.description}
+
+
+@router.delete("/cartilla/alerts/{alert_id}", status_code=status.HTTP_204_NO_CONTENT)
+def share_delete_alert(
+    alert_id: str,
+    token: str = Query(...),
+    db: Session = Depends(get_db),
+) -> None:
+    pet = _pet_from_token(token, db)
+    alert = db.scalar(
+        select(ClinicalAlert).where(ClinicalAlert.id == alert_id, ClinicalAlert.pet_id == pet.id)
+    )
+    if alert is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alerta no encontrada")
+    db.delete(alert)
+    db.commit()
+
+
+@router.post(
+    "/cartilla/consents/{consent_id}/sign",
+    summary="El dueño firma un consentimiento pendiente a distancia",
+)
+def share_sign_consent(
+    consent_id: str,
+    token: str = Form(...),
+    signature_base64: str = Form(...),
+    db: Session = Depends(get_db),
+) -> dict:
+    pet = _pet_from_token(token, db)
+    consent = db.scalar(
+        select(DigitalConsent).where(
+            DigitalConsent.id == consent_id, DigitalConsent.pet_id == pet.id
+        )
+    )
+    if consent is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Consentimiento no encontrado"
+        )
+    if consent.status in ("signed", "owner_signed"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Ya está firmado")
+
+    raw = signature_base64
+    if raw.startswith("data:"):
+        parts = raw.split(",", 1)
+        if len(parts) > 1:
+            raw = parts[1]
+    try:
+        signature_bytes = base64.b64decode(raw)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Firma inválida"
+        ) from exc
+
+    sig_rel = save_media(f"consents/{pet.id}", f"firma_remota_{consent.id}.png", signature_bytes)
+    signature_url = public_url(sig_rel)
+
+    consent.status = "owner_signed"
+    consent.signature_url = signature_url
+    consent.signed_at = datetime.now(UTC)
+    notify_roles(
+        db,
+        pet.clinic_id,
+        ["admin", "veterinario", "recepcion"],
+        "consent_owner_signed",
+        f'El dueño firmó el consentimiento "{consent.title}" de {pet.name}. Confírmalo.',
+        link=f"/pets/{pet.id}?tab=consents",
+    )
+    record_audit(
+        db,
+        clinic_id=pet.clinic_id,
+        actor_type="owner",
+        actor_id=pet.id,
+        action="consent_signed_owner",
+        entity_type="consent",
+        entity_id=consent.id,
+        metadata={"pet_id": str(pet.id), "title": consent.title},
+    )
+    db.commit()
+    return {"id": str(consent.id), "status": "owner_signed", "pdf_url": consent.pdf_url}

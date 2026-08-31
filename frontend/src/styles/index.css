@@ -1,0 +1,244 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * ============================================================================
+ * DESIGN SYSTEM — VetCore
+ * Dirección visual: "papel clínico cálido" + verde clínico profundo.
+ *
+ * - Neutrales cálidos (nada de gris frío de template) para dar calidez.
+ * - Primario verde clínico (confianza + salud) como identidad.
+ * - Acentos pastel por módulo (rojo, naranja, azul, morado, verde, rosa,
+ *   ámbar, peach) que aportan los módulos; el "cromo" es cálido y neutro.
+ * - Tipografía: Plus Jakarta Sans (display) + Geist (UI) + Geist Mono (código).
+ * - Sombras difusas y moderadas (soft structuralism).
+ * Consistente en día y noche.
+ * ============================================================================
+ */
+
+:root {
+  --radius: 0.75rem;
+
+  /* Neutrales cálidos "papel" */
+  --background: #faf9f6;
+  --foreground: #212725;
+  --card: #ffffff;
+  --card-foreground: #212725;
+  --popover: #ffffff;
+  --popover-foreground: #212725;
+
+  /* Primario: verde clínico profundo */
+  --primary: #1e6f5e;
+  --primary-hover: #175447;
+  --primary-foreground: #ffffff;
+
+  /* Superficies secundarias y acentos (cálidos) */
+  --secondary: #f2f0e9;
+  --secondary-foreground: #2e3632;
+  --muted: #f4f2ec;
+  --muted-foreground: #5c6763;
+  --accent: #eeece4;
+  --accent-foreground: #1e2623;
+
+  /* Estados semánticos */
+  --destructive: #b4453a;
+  --destructive-foreground: #ffffff;
+  --success: #2e7d5b;
+  --success-foreground: #ffffff;
+  --warning: #c26e16;
+  --warning-foreground: #ffffff;
+  --info: #3a6ea5;
+  --info-foreground: #ffffff;
+
+  /* Bordes y anillos */
+  --border: #e7e3da;
+  --input: #ddd9ce;
+  --ring: #1e6f5e;
+
+  /* Colores de gráficas — familia pastel (mismo lenguaje que los módulos) */
+  --chart-1: #ef4444;
+  --chart-2: #f97316;
+  --chart-3: #0ea5e9;
+  --chart-4: #a855f7;
+  --chart-5: #10b981;
+}
+
+.dark {
+  --background: #121816;
+  --foreground: #e8ece9;
+  --card: #1a211e;
+  --card-foreground: #e8ece9;
+  --popover: #1a211e;
+  --popover-foreground: #e8ece9;
+  --primary: #34a88c;
+  --primary-hover: #45b89c;
+  --primary-foreground: #06231b;
+  --secondary: #232b27;
+  --secondary-foreground: #cdd6d1;
+  --muted: #1e2622;
+  --muted-foreground: #9aa6a0;
+  --accent: #262f2b;
+  --accent-foreground: #e8ece9;
+  --destructive: #e0706a;
+  --destructive-foreground: #3a0c0a;
+  --success: #5bc49b;
+  --success-foreground: #06231b;
+  --warning: #e5a05a;
+  --warning-foreground: #3a2406;
+  --info: #6fa6d9;
+  --info-foreground: #0a1e33;
+  --border: #2b342f;
+  --input: #37413b;
+  --ring: #34a88c;
+  --chart-1: #f87171;
+  --chart-2: #fb923c;
+  --chart-3: #38bdf8;
+  --chart-4: #c084fc;
+  --chart-5: #4ade80;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  /* Tipografía del sistema */
+  --font-sans:
+    'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    sans-serif;
+  --font-display:
+    'Plus Jakarta Sans', 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial,
+    sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* Radios coherentes sobre la base de 0.75rem */
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  /* Sombras difusas y moderadas (soft structuralism) */
+  --shadow-card: 0 1px 2px 0 rgb(24 34 30 / 0.05), 0 8px 24px -16px rgb(24 34 30 / 0.1);
+  --shadow-elevated: 0 12px 32px -16px rgb(24 34 30 / 0.16);
+  --shadow-dialog: 0 24px 64px -24px rgb(24 34 30 / 0.24);
+
+  /* Resplandores al hover ("iluminan" el elemento) */
+  --shadow-glow: 0 10px 34px -8px rgb(30 111 94 / 0.45), 0 2px 10px -4px rgb(30 111 94 / 0.22);
+  --shadow-glow-success:
+    0 10px 34px -8px rgb(46 125 91 / 0.45), 0 2px 10px -4px rgb(46 125 91 / 0.22);
+  --shadow-glow-destructive:
+    0 10px 34px -8px rgb(180 69 58 / 0.42), 0 2px 10px -4px rgb(180 69 58 / 0.22);
+
+  /* Gradiente de marca (verde) para acentos */
+  --gradient-brand: linear-gradient(135deg, var(--primary) 0%, #2e8b72 100%);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply font-sans text-foreground antialiased;
+    background-color: var(--background);
+    font-feature-settings: 'cv11', 'ss01';
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Evitar scroll horizontal accidental del documento en cualquier página
+     (elementos que ocasionalmente se ensanchan más que el viewport). 'clip'
+     recorta sin crear contenedor de scroll, así el header sticky y las tablas
+     internas con su propio scroll siguen funcionando. */
+  html,
+  body {
+    overflow-x: hidden;
+    overflow-x: clip;
+  }
+
+  /* Jerarquía tipográfica base (display cálida) */
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+  }
+  h1 {
+    @apply text-3xl font-bold tracking-tight;
+  }
+  h2 {
+    @apply text-2xl font-bold tracking-tight;
+  }
+  h3 {
+    @apply text-xl font-semibold;
+  }
+  h4 {
+    @apply text-base font-semibold;
+  }
+
+  ::selection {
+    @apply bg-primary/20 text-primary;
+  }
+
+  /* iOS Safari hace zoom automático al enfocar inputs con font-size < 16px,
+     lo que "acerca" la pantalla y habilita scroll horizontal. En pantallas
+     pequeñas forzamos 16px en los campos de formulario para evitarlo. */
+  @media (max-width: 640px) {
+    input,
+    select,
+    textarea {
+      font-size: 16px;
+    }
+  }
+}
+
+@layer utilities {
+  /* Fondo "vidrio": translúcido + desenfoque */
+  .glass {
+    background-color: color-mix(in srgb, var(--card) 82%, transparent);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+  }
+
+  /* Texto con degradado de marca */
+  .text-gradient {
+    background-image: var(--gradient-brand);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Gradiente de marca para fondos */
+  .bg-brand-gradient {
+    background-image: var(--gradient-brand);
+  }
+}

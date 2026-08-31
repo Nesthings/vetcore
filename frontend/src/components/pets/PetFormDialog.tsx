@@ -1,0 +1,925 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Check, Loader2, Plus, Syringe, Trash2, UserRound } from 'lucide-react'
+
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { useToast } from '@/components/ui/toast'
+import { ClinicalAlertSelector, type PendingAlert } from '@/components/pets/ClinicalAlertSelector'
+import { apiFetch } from '@/lib/api'
+import { speciesLabel } from '@/lib/species'
+
+interface BreedsCatalog {
+  species: { key: string; label: string }[]
+  breeds: Record<string, string[]>
+  colors: Record<string, string[]>
+  markings: Record<string, string[]>
+}
+
+function toDateInput(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+function dateFromAge(years: number, months: number): Date {
+  const d = new Date()
+  d.setFullYear(d.getFullYear() - years)
+  d.setMonth(d.getMonth() - months)
+  return d
+}
+
+function ageFromDate(birth: string): { years: number; months: number } {
+  const b = new Date(birth)
+  const now = new Date()
+  let months = (now.getFullYear() - b.getFullYear()) * 12 + (now.getMonth() - b.getMonth())
+  if (now.getDate() < b.getDate()) months -= 1
+  if (months < 0) months = 0
+  return { years: Math.floor(months / 12), months: months % 12 }
+}
+
+export interface PetFormValue {
+  id: string
+  name: string
+  species: string
+  breed?: string | null
+  color_primary?: string | null
+  color_secondary?: string | null
+  markings?: string | null
+  sex?: string | null
+  birth_date?: string | null
+  allergies?: string | null
+  clinical_alert_text?: string | null
+}
+
+export function PetFormDialog({
+  open,
+  pet,
+  onOpenChange,
+  onSaved,
+}: {
+  open: boolean
+  pet?: PetFormValue | null
+  onOpenChange: (open: boolean) => void
+  onSaved: (pet?: { id: string }) => void
+}) {
+  const [catalog, setCatalog] = useState<BreedsCatalog | null>(null)
+  const [name, setName] = useState('')
+  const [species, setSpecies] = useState('perro')
+  const [breed, setBreed] = useState('')
+  const [breedQuery, setBreedQuery] = useState('')
+  const [breedOpen, setBreedOpen] = useState(false)
+  const breedRef = useRef<HTMLDivElement>(null)
+  const [addingBreed, setAddingBreed] = useState(false)
+  const [colorPrimary, setColorPrimary] = useState('')
+  const [colorSecondary, setColorSecondary] = useState('')
+  const [markings, setMarkings] = useState('')
+  const [sex, setSex] = useState('')
+  const [birthDate, setBirthDate] = useState('')
+  const [ageYears, setAgeYears] = useState('')
+  const [ageMonths, setAgeMonths] = useState('')
+  const [pendingAlerts, setPendingAlerts] = useState<PendingAlert[]>([])
+
+  const [ownerName, setOwnerName] = useState('')
+  const [ownerPhone, setOwnerPhone] = useState('')
+  const [ownerEmail, setOwnerEmail] = useState('')
+  const [altContactName, setAltContactName] = useState('')
+  const [altPhone, setAltPhone] = useState('')
+  const [ownerAcceptsReminders, setOwnerAcceptsReminders] = useState(false)
+  const [ownerResults, setOwnerResults] = useState<
+    { id: string; full_name: string | null; phone: string | null; email: string | null }[]
+  >([])
+  const [ownerDropdownOpen, setOwnerDropdownOpen] = useState(false)
+  const ownerResultsRef = useRef<HTMLDivElement>(null)
+
+  const [submitting, setSubmitting] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const [assignPlan, setAssignPlan] = useState(false)
+  const [selectedPlans, setSelectedPlans] = useState<string[]>([])
+  const [planBranchId, setPlanBranchId] = useState('')
+  const [planVetId, setPlanVetId] = useState('')
+  const [planStartDate, setPlanStartDate] = useState('')
+  const [planStartTime, setPlanStartTime] = useState('10:00')
+  const [plans, setPlans] = useState<
+    { id: string; name: string; species: string | null }[]
+  >([])
+  const [branches, setBranches] = useState<{ id: string; name: string }[]>([])
+  const [vets, setVets] = useState<{ id: string; full_name: string }[]>([])
+
+  const { toast } = useToast()
+
+  const loadCatalog = useCallback(async () => {
+    try {
+      const res = await apiFetch<BreedsCatalog>('/pets/breeds-catalog')
+      setCatalog(res)
+    } catch {
+      setCatalog(null)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (open) loadCatalog()
+  }, [open, loadCatalog])
+
+  useEffect(() => {
+    if (!open) return
+    Promise.all([
+      apiFetch<{ id: string; name: string; species: string | null }[]>(
+        '/vaccination-plans?active_only=true',
+      ),
+      apiFetch<{ id: string; name: string }[]>('/branches'),
+      apiFetch<{ id: string; full_name: string; role: string }[]>('/users'),
+    ])
+      .then(([p, b, u]) => {
+        setPlans(p)
+        setBranches(b)
+        setVets(u.filter((x) => x.role === 'admin' || x.role === 'veterinario'))
+        setPlanBranchId((cur) => cur || (b[0]?.id ?? ''))
+      })
+      .catch(() => undefined)
+  }, [open])
+
+  useEffect(() => {
+    if (!open || pet) return
+    const term = ownerName.trim()
+    if (term.length < 2) {
+      setOwnerResults([])
+      return
+    }
+    const handle = window.setTimeout(async () => {
+      try {
+        const res = await apiFetch<
+          { id: string; full_name: string | null; phone: string | null; email: string | null }[]
+        >(`/owners?search=${encodeURIComponent(term)}`)
+        setOwnerResults(res)
+        setOwnerDropdownOpen(true)
+      } catch {
+        setOwnerResults([])
+      }
+    }, 300)
+    return () => window.clearTimeout(handle)
+  }, [ownerName, open, pet])
+
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (ownerResultsRef.current && !ownerResultsRef.current.contains(e.target as Node)) {
+        setOwnerDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onClick)
+    return () => document.removeEventListener('mousedown', onClick)
+  }, [])
+
+  const pickOwner = (o: { full_name: string | null; phone: string | null; email: string | null }) => {
+    setOwnerName(o.full_name ?? '')
+    setOwnerPhone(o.phone ?? '')
+    setOwnerEmail(o.email ?? '')
+    setOwnerDropdownOpen(false)
+  }
+
+  useEffect(() => {
+    if (!open) return
+    if (pet) {
+      setName(pet.name)
+      setSpecies(pet.species)
+      setBreed(pet.breed ?? '')
+      setBreedQuery(pet.breed ?? '')
+      setColorPrimary(pet.color_primary ?? '')
+      setColorSecondary(pet.color_secondary ?? '')
+      setMarkings(pet.markings ?? '')
+      setSex(pet.sex ?? '')
+      setBirthDate(pet.birth_date ?? '')
+      if (pet.birth_date) {
+        const { years, months } = ageFromDate(pet.birth_date)
+        setAgeYears(String(years))
+        setAgeMonths(String(months))
+      } else {
+        setAgeYears('')
+        setAgeMonths('')
+      }
+    } else {
+      setName('')
+      setSpecies('perro')
+      setBreed('')
+      setBreedQuery('')
+      setColorPrimary('')
+      setColorSecondary('')
+      setMarkings('')
+      setSex('')
+      setBirthDate('')
+      setAgeYears('')
+      setAgeMonths('')
+    }
+    setPendingAlerts([])
+    setOwnerName('')
+    setOwnerPhone('')
+    setOwnerEmail('')
+    setOwnerResults([])
+    setOwnerDropdownOpen(false)
+    setAltContactName('')
+    setAltPhone('')
+    setConfirmDelete(false)
+    setDeleting(false)
+    setSubmitting(false)
+    setAssignPlan(false)
+    setSelectedPlans([])
+    setPlanVetId('')
+    setPlanStartDate(new Date().toISOString().slice(0, 10))
+    setPlanStartTime('10:00')
+    setError(null)
+  }, [open, pet])
+
+  const allBreeds = catalog?.breeds[species] ?? ['Mestizo']
+  const allColors = catalog?.colors[species] ?? []
+  const allMarkings = catalog?.markings[species] ?? []
+
+  const speciesPlans = useMemo(
+    () => plans.filter((p) => species == null || p.species == null || p.species === species),
+    [plans, species],
+  )
+
+  const onAgeChange = (years: string, months: string) => {
+    const y = Number(years) || 0
+    const m = Number(months) || 0
+    setBirthDate(y || m ? toDateInput(dateFromAge(y, m)) : '')
+  }
+
+  const onBirthDateChange = (value: string) => {
+    setBirthDate(value)
+    if (value) {
+      const { years, months } = ageFromDate(value)
+      setAgeYears(String(years))
+      setAgeMonths(String(months))
+    } else {
+      setAgeYears('')
+      setAgeMonths('')
+    }
+  }
+
+  const filteredBreeds = useMemo(() => {
+    const q = breedQuery.trim().toLowerCase()
+    if (!q) return allBreeds
+    return allBreeds.filter((b) => b.toLowerCase().includes(q))
+  }, [allBreeds, breedQuery])
+
+  const exactMatch = allBreeds.some((b) => b.toLowerCase() === breedQuery.trim().toLowerCase())
+  const canAdd = breedQuery.trim().length > 0 && !exactMatch
+
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (breedRef.current && !breedRef.current.contains(e.target as Node)) {
+        setBreedOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onClick)
+    return () => document.removeEventListener('mousedown', onClick)
+  }, [])
+
+  const pickBreed = (value: string) => {
+    setBreed(value)
+    setBreedQuery(value)
+    setBreedOpen(false)
+  }
+
+  const addCustomBreed = async () => {
+    const value = breedQuery.trim()
+    if (!value || addingBreed) return
+    setAddingBreed(true)
+    setError(null)
+    try {
+      await apiFetch('/pets/breeds', {
+        method: 'POST',
+        body: JSON.stringify({ species, breed: value }),
+      })
+      await loadCatalog()
+      pickBreed(value)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo agregar la raza')
+    } finally {
+      setAddingBreed(false)
+    }
+  }
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(null)
+    setSubmitting(true)
+    try {
+      const payload = {
+        name,
+        species,
+        breed: breed || breedQuery.trim() || null,
+        color_primary: colorPrimary || null,
+        color_secondary: colorSecondary || null,
+        markings: markings || null,
+        sex: sex || null,
+        birth_date: birthDate || null,
+      }
+      let savedId: string | undefined
+      if (pet) {
+        await apiFetch(`/pets/${pet.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify(payload),
+        })
+        savedId = pet.id
+      } else {
+        if (assignPlan && selectedPlans.length === 0) {
+          setError('Selecciona al menos un plan de vacunación y la sucursal.')
+          return
+        }
+        const owner =
+          ownerName || ownerPhone || ownerEmail
+            ? {
+                full_name: ownerName || null,
+                phone: ownerPhone || null,
+                email: ownerEmail || null,
+                alt_contact_name: altContactName || null,
+                alt_phone: altPhone || null,
+                accepts_reminders: ownerAcceptsReminders,
+              }
+            : null
+        const created = await apiFetch<{ id: string }>('/pets', {
+          method: 'POST',
+          body: JSON.stringify({ ...payload, owner }),
+        })
+        savedId = created.id
+        for (const alert of pendingAlerts) {
+          await apiFetch(`/pets/${created.id}/alerts`, {
+            method: 'POST',
+            body: JSON.stringify({ type: alert.type, description: alert.description }),
+          })
+        }
+        if (assignPlan) {
+          for (const pid of selectedPlans) {
+            await apiFetch('/vaccination-plans/assign', {
+              method: 'POST',
+              body: JSON.stringify({
+                pet_id: created.id,
+                plan_id: pid,
+                branch_id: planBranchId,
+                vet_user_id: planVetId || null,
+                start_date: planStartDate,
+                start_time: planStartTime ? `${planStartTime}:00` : '10:00:00',
+                duration_minutes: 30,
+              }),
+            })
+          }
+        }
+        toast({
+          title: 'Mascota registrada',
+          description:
+            selectedPlans.length > 0
+              ? `Se asignaron ${selectedPlans.length} plan(es) de vacunación.`
+              : pendingAlerts.length > 0
+                ? `Se guardaron ${pendingAlerts.length} alerta(s) clínica(s).`
+                : 'El expediente se creó correctamente.',
+          variant: 'success',
+        })
+      }
+      onSaved(savedId ? { id: savedId } : undefined)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo guardar la mascota')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const remove = async () => {
+    if (!pet) return
+    setError(null)
+    setDeleting(true)
+    try {
+      await apiFetch(`/pets/${pet.id}`, { method: 'DELETE' })
+      onSaved()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo eliminar la mascota')
+      setConfirmDelete(false)
+      setDeleting(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{pet ? 'Editar mascota' : 'Nueva mascota'}</DialogTitle>
+          <DialogDescription>
+            {pet
+              ? 'Actualiza los datos del expediente del paciente.'
+              : 'Da de alta a un paciente, su expediente clínico y a su dueño.'}
+          </DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={submit} className="grid gap-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Nombre *</Label>
+              <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="species">Especie *</Label>
+              <select
+                id="species"
+                value={species}
+                onChange={(e) => {
+                  setSpecies(e.target.value)
+                  setBreed('')
+                  setBreedQuery('')
+                  setBreedOpen(false)
+                  setColorPrimary('')
+                  setColorSecondary('')
+                  setMarkings('')
+                }}
+                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+              >
+                {(
+                  catalog?.species ?? [
+                    { key: 'perro', label: 'Perro' },
+                    { key: 'gato', label: 'Gato' },
+                    { key: 'otro', label: 'Otro' },
+                  ]
+                ).map((s) => (
+                  <option key={s.key} value={s.key}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="breed">Raza</Label>
+              <div className="relative" ref={breedRef}>
+                <Input
+                  id="breed"
+                  value={breedQuery}
+                  onChange={(e) => {
+                    setBreedQuery(e.target.value)
+                    setBreedOpen(true)
+                  }}
+                  onFocus={() => setBreedOpen(true)}
+                  placeholder="Escribe para buscar…"
+                  autoComplete="off"
+                />
+                {breedOpen && (
+                  <div className="absolute z-20 mt-1 max-h-52 w-full overflow-y-auto rounded-md border border-border bg-card p-1 shadow-card">
+                    {filteredBreeds.map((b) => (
+                      <button
+                        key={b}
+                        type="button"
+                        onClick={() => pickBreed(b)}
+                        className="block w-full rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
+                      >
+                        {b}
+                      </button>
+                    ))}
+                    {filteredBreeds.length === 0 && !canAdd && (
+                      <p className="px-2 py-1.5 text-sm text-muted-foreground">Sin resultados.</p>
+                    )}
+                    {canAdd && (
+                      <button
+                        type="button"
+                        onClick={addCustomBreed}
+                        disabled={addingBreed}
+                        className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm font-medium text-primary hover:bg-accent"
+                      >
+                        {addingBreed ? (
+                          <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+                        ) : (
+                          <Plus className="size-3.5" aria-hidden="true" />
+                        )}
+                        Agregar «{breedQuery.trim()}» a la lista
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {exactMatch || breedQuery.trim() === ''
+                  ? `${allBreeds.length} razas disponibles`
+                  : 'Si no encuentras la raza, agrégala a la lista.'}
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="sex">Sexo</Label>
+              <select
+                id="sex"
+                value={sex}
+                onChange={(e) => setSex(e.target.value)}
+                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+              >
+                <option value="">—</option>
+                <option value="M">Macho</option>
+                <option value="H">Hembra</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="birth">Nacimiento</Label>
+              <Input
+                id="birth"
+                type="date"
+                value={birthDate}
+                onChange={(e) => onBirthDateChange(e.target.value)}
+              />
+            </div>
+            <div className="col-span-2 space-y-2">
+              <Label htmlFor="age-years">Edad</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="age-years"
+                  type="number"
+                  min={0}
+                  max={60}
+                  value={ageYears}
+                  onChange={(e) => {
+                    setAgeYears(e.target.value)
+                    onAgeChange(e.target.value, ageMonths)
+                  }}
+                  className="w-24"
+                />
+                <span className="text-sm text-muted-foreground">años</span>
+                <Input
+                  id="age-months"
+                  type="number"
+                  min={0}
+                  max={11}
+                  value={ageMonths}
+                  onChange={(e) => {
+                    setAgeMonths(e.target.value)
+                    onAgeChange(ageYears, e.target.value)
+                  }}
+                  className="w-24"
+                />
+                <span className="text-sm text-muted-foreground">meses</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="color-primary">Color 1</Label>
+              <select
+                id="color-primary"
+                value={colorPrimary}
+                onChange={(e) => setColorPrimary(e.target.value)}
+                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+              >
+                <option value="">—</option>
+                {allColors.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="color-secondary">Color 2 (opcional)</Label>
+              <select
+                id="color-secondary"
+                value={colorSecondary}
+                onChange={(e) => setColorSecondary(e.target.value)}
+                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+              >
+                <option value="">— Sin segundo color —</option>
+                {allColors
+                  .filter((c) => c !== colorPrimary)
+                  .map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="markings">Características especiales</Label>
+            <select
+              id="markings"
+              value={markings}
+              onChange={(e) => setMarkings(e.target.value)}
+              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+            >
+              <option value="">—</option>
+              {allMarkings.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-muted-foreground">
+              Ej. manchado, atigrado, pío, con guantes…
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Alertas clínicas</Label>
+            <p className="text-xs text-muted-foreground">
+              Alergias, comportamiento y medidas especiales — el mismo selector de la cartilla.
+            </p>
+            {pet ? (
+              <ClinicalAlertSelector petId={pet.id} />
+            ) : (
+              <ClinicalAlertSelector pending={pendingAlerts} onPendingChange={setPendingAlerts} />
+            )}
+          </div>
+
+          {!pet && (
+            <div className="rounded-md border border-border p-4">
+              <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
+                <input
+                  type="checkbox"
+                  checked={assignPlan}
+                  onChange={(e) => setAssignPlan(e.target.checked)}
+                  className="size-4 rounded border-border"
+                />
+                <Syringe className="size-4 text-primary" aria-hidden="true" />
+                Agregar plan de vacunación
+              </label>
+              {assignPlan && (
+                <div className="mt-3 grid gap-3">
+                  <div className="space-y-2">
+                    <Label>Planes de vacunación * (puedes elegir varios)</Label>
+                    <div className="max-h-44 space-y-1.5 overflow-y-auto rounded-md border border-border p-2">
+                      {speciesPlans.length === 0 && (
+                        <p className="px-2 py-1.5 text-sm text-muted-foreground">
+                          No hay planes disponibles para esta especie.
+                        </p>
+                      )}
+                      {speciesPlans.map((p) => {
+                        const checked = selectedPlans.includes(p.id)
+                        return (
+                          <label
+                            key={p.id}
+                            className={`flex cursor-pointer items-center gap-2 rounded-md border px-2.5 py-2 text-sm transition-colors ${
+                              checked
+                                ? 'border-primary/50 bg-primary/5'
+                                : 'border-border hover:bg-accent'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() =>
+                                setSelectedPlans((prev) =>
+                                  checked ? prev.filter((x) => x !== p.id) : [...prev, p.id],
+                                )
+                              }
+                              className="size-4 rounded border-border"
+                            />
+                            <span className="min-w-0 flex-1 truncate">{p.name}</span>
+                            {checked && <Check className="size-4 shrink-0 text-primary" />}
+                          </label>
+                        )
+                      })}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Se muestran solo los planes de la especie {speciesLabel(species)}. Cada plan
+                      se agendará por separado.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="vp-branch">Sucursal *</Label>
+                      <select
+                        id="vp-branch"
+                        value={planBranchId}
+                        onChange={(e) => setPlanBranchId(e.target.value)}
+                        className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                        required
+                      >
+                        {branches.map((b) => (
+                          <option key={b.id} value={b.id}>
+                            {b.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="vp-vet">Veterinario</Label>
+                      <select
+                        id="vp-vet"
+                        value={planVetId}
+                        onChange={(e) => setPlanVetId(e.target.value)}
+                        className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                      >
+                        <option value="">— Sin asignar —</option>
+                        {vets.map((v) => (
+                          <option key={v.id} value={v.id}>
+                            {v.full_name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="vp-date">Fecha de inicio *</Label>
+                      <Input
+                        id="vp-date"
+                        type="date"
+                        value={planStartDate}
+                        onChange={(e) => setPlanStartDate(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="vp-time">Hora *</Label>
+                      <Input
+                        id="vp-time"
+                        type="time"
+                        value={planStartTime}
+                        onChange={(e) => setPlanStartTime(e.target.value)}
+                        required
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Se agendarán automáticamente todas las dosis del plan como citas en la agenda, a
+                    partir de esta fecha y hora.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {!pet && (
+            <div className="rounded-md border border-border p-4">
+              <div className="mb-3 flex items-center gap-2">
+                <UserRound className="size-4 text-primary" aria-hidden="true" />
+                <p className="text-sm font-medium">Dueño de la mascota</p>
+              </div>
+              <div className="grid gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="owner-name">Nombre</Label>
+                  <div className="relative" ref={ownerResultsRef}>
+                    <Input
+                      id="owner-name"
+                      value={ownerName}
+                      onChange={(e) => {
+                        setOwnerName(e.target.value)
+                        setOwnerDropdownOpen(true)
+                      }}
+                      onFocus={() => {
+                        if (ownerResults.length > 0) setOwnerDropdownOpen(true)
+                      }}
+                      placeholder="Nombre del dueño — busca si ya existe"
+                      autoComplete="off"
+                    />
+                    {ownerDropdownOpen && ownerResults.length > 0 && (
+                      <div className="absolute z-20 mt-1 max-h-52 w-full overflow-y-auto rounded-md border border-border bg-card p-1 shadow-card">
+                        {ownerResults.map((o) => (
+                          <button
+                            key={o.id}
+                            type="button"
+                            onClick={() => pickOwner(o)}
+                            className="block w-full rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
+                          >
+                            <span className="block font-medium">{o.full_name ?? 'Dueño'}</span>
+                            <span className="block text-xs text-muted-foreground">
+                              {[o.phone, o.email].filter(Boolean).join(' · ') || 'Sin contacto'}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Si el dueño ya tiene otra mascota, selecciónalo para vincularlas (aparecerán en
+                    familia) y evitar duplicados.
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="owner-phone">Número de contacto</Label>
+                    <Input
+                      id="owner-phone"
+                      value={ownerPhone}
+                      onChange={(e) => setOwnerPhone(e.target.value)}
+                      placeholder="55 1234 5678"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="owner-email">Correo</Label>
+                    <Input
+                      id="owner-email"
+                      type="email"
+                      value={ownerEmail}
+                      onChange={(e) => setOwnerEmail(e.target.value)}
+                      placeholder="correo@ejemplo.com"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 pt-1">
+                  <div className="h-px flex-1 bg-border" aria-hidden="true" />
+                  <span className="text-xs font-medium text-muted-foreground">
+                    Contacto alternativo
+                  </span>
+                  <div className="h-px flex-1 bg-border" aria-hidden="true" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="alt-name">Nombre alternativo</Label>
+                    <Input
+                      id="alt-name"
+                      value={altContactName}
+                      onChange={(e) => setAltContactName(e.target.value)}
+                      placeholder="Nombre de respaldo"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="alt-phone">Número alternativo</Label>
+                    <Input
+                      id="alt-phone"
+                      value={altPhone}
+                      onChange={(e) => setAltPhone(e.target.value)}
+                      placeholder="55 9876 5432"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {(ownerName || ownerPhone || ownerEmail) && (
+                <label className="flex cursor-pointer items-start gap-2 rounded-md bg-secondary/40 px-3 py-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={ownerAcceptsReminders}
+                    onChange={(e) => setOwnerAcceptsReminders(e.target.checked)}
+                    className="mt-0.5 size-4 rounded border-border"
+                  />
+                  <span>El dueño acepta recibir recordatorios por WhatsApp de sus citas.</span>
+                </label>
+              )}
+            </div>
+          )}
+
+          {error && <p className="text-sm text-destructive">{error}</p>}
+
+          {confirmDelete && pet && (
+            <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3">
+              <p className="text-sm font-medium text-destructive">¿Eliminar a {pet.name}?</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                La mascota dejará de aparecer en el expediente. Esta acción no se puede deshacer.
+              </p>
+            </div>
+          )}
+
+          <DialogFooter>
+            {confirmDelete ? (
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setConfirmDelete(false)}
+                  disabled={deleting}
+                >
+                  Cancelar
+                </Button>
+                <Button type="button" variant="destructive" onClick={remove} disabled={deleting}>
+                  {deleting ? <Loader2 className="animate-spin" /> : 'Sí, eliminar'}
+                </Button>
+              </>
+            ) : (
+              <>
+                {pet && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="mr-auto text-destructive hover:text-destructive"
+                    onClick={() => setConfirmDelete(true)}
+                  >
+                    <Trash2 /> Eliminar mascota
+                  </Button>
+                )}
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={submitting}>
+                  {submitting ? (
+                    <Loader2 className="animate-spin" />
+                  ) : pet ? (
+                    'Guardar cambios'
+                  ) : (
+                    'Guardar mascota'
+                  )}
+                </Button>
+              </>
+            )}
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
