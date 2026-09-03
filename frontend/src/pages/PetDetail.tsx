@@ -1387,7 +1387,7 @@ export function PetDetail() {
                         <select
                           value={compareIdx}
                           onChange={(e) => setCompareIdx(Number(e.target.value))}
-                          className="h-9 flex-1 rounded-md border border-input bg-background px-2 text-sm"
+                          className="h-9 min-w-0 flex-1 truncate rounded-md border border-input bg-background px-2 text-sm"
                         >
                           {photos.map((p, i) => (
                             <option key={p.consultation_id} value={i}>
