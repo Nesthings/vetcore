@@ -75,7 +75,20 @@ def create_sale(
                 detail=f"Stock insuficiente para «{product.name}» "
                 f"(disponible: {int(product.stock_quantity)})",
             )
-        product.stock_quantity -= int(qty)
+        # Descuento atómico: evita sobreventa con requests concurrentes.
+        updated = db.execute(
+            text(
+                "UPDATE sale_products SET stock_quantity = stock_quantity - :q "
+                "WHERE id = :id AND clinic_id = :cid AND stock_quantity >= :q"
+            ),
+            {"q": int(qty), "id": product.id, "cid": clinic_id},
+        )
+        if updated.rowcount == 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Stock insuficiente para «{product.name}» "
+                f"(disponible: {int(product.stock_quantity)})",
+            )
         total += qty * Decimal(str(product.price))
         invoice_items.append(
             InvoiceItem(

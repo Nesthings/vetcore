@@ -8,6 +8,8 @@ completa la consulta como una caja: consulta + factura + recibo PDF.
 from datetime import UTC, datetime
 from decimal import Decimal
 
+import logging
+
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session, selectinload
@@ -15,6 +17,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.api.deps import CurrentClinic, get_current_clinic, require_clinic_roles, require_component
 from app.core.events import record_audit
 from app.core.storage import (
+    read_upload_limited,
     ALLOWED_IMAGE_EXTENSIONS,
     public_url,
     save_media,
@@ -56,6 +59,8 @@ router = APIRouter(
 CONSULTATION_MUTATORS = ("admin", "veterinario")
 
 MAX_IMAGE_BYTES = 5 * 1024 * 1024  # 5 MB
+
+logger = logging.getLogger(__name__)
 
 
 @router.get("", response_model=list[ConsultationRead])
@@ -234,7 +239,20 @@ def checkout_consultation(
                 detail=f"Stock insuficiente para «{product.name}» "
                 f"(disponible: {int(product.stock_quantity)})",
             )
-        product.stock_quantity -= int(qty)
+        # Descuento atómico: evita sobreventa con requests concurrentes.
+        updated = db.execute(
+            text(
+                "UPDATE sale_products SET stock_quantity = stock_quantity - :q "
+                "WHERE id = :id AND clinic_id = :cid AND stock_quantity >= :q"
+            ),
+            {"q": int(qty), "id": product.id, "cid": clinic_id},
+        )
+        if updated.rowcount == 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Stock insuficiente para «{product.name}» "
+                f"(disponible: {int(product.stock_quantity)})",
+            )
         line_total = qty * Decimal(str(product.price))
         total += line_total
         invoice_items.append(
@@ -322,7 +340,9 @@ def checkout_consultation(
         entity_id=invoice.id,
         metadata={"total": float(invoice.total)},
     )
-    db.commit()
+    # La transacción NO se commitea todavía: la consulta, la factura y el
+    # descuento de stock se persisten en un solo commit DESPUÉS de generar los
+    # PDFs. Si la generación falla, todo se revierte (sin cobro fantasma).
 
     clinic = db.get(Clinic, clinic_id)
     date_str = performed_at.astimezone().strftime("%d/%m/%Y %H:%M")
@@ -379,18 +399,25 @@ def checkout_consultation(
     db.commit()
 
     if body.send_receipt_whatsapp:
-        send_receipt_summary(
-            db,
-            clinic_id,
-            owner_id,
-            summary_data["pet_name"],
-            float(invoice.total),
-            clinic.name,
-            str(invoice.id)[:8].upper(),
-            invoice.id,
-            receipt_pdf_url=receipt_url,
-        )
-        db.commit()
+        try:
+            send_receipt_summary(
+                db,
+                clinic_id,
+                owner_id,
+                summary_data["pet_name"],
+                float(invoice.total),
+                clinic.name,
+                str(invoice.id)[:8].upper(),
+                invoice.id,
+                receipt_pdf_url=receipt_url,
+            )
+            db.commit()
+        except Exception:  # noqa: BLE001 - el envío es best-effort
+            db.rollback()
+            logger.warning(
+                "No se pudo enviar el recibo por WhatsApp de la factura %s", invoice.id,
+                exc_info=True,
+            )
 
     return CheckoutResult(
         consultation_id=consultation.id,
@@ -507,11 +534,12 @@ def upload_attachment(
     _get_consultation_or_404(db, ctx.clinic["id"], consultation_id)
 
     validate_extension(file.filename or "", ALLOWED_IMAGE_EXTENSIONS)
-    content = file.file.read()
-    if len(content) > MAX_IMAGE_BYTES:
+    try:
+        content = read_upload_limited(file, MAX_IMAGE_BYTES)
+    except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail="La imagen supera el límite de 5 MB",
+            detail=str(exc),
         )
 
     rel = save_media(f"consultations/{consultation_id}", file.filename or "attach.jpg", content)

@@ -13,6 +13,7 @@ from app.api.deps import CurrentClinic, get_current_clinic, require_clinic_roles
 from app.core.events import record_audit
 from app.core.images import process_product_photo
 from app.core.storage import (
+    read_upload_limited,
     ALLOWED_IMAGE_EXTENSIONS,
     public_url,
     save_media,
@@ -175,11 +176,12 @@ def upload_product_photo(
     product = _get_product_or_404(db, ctx.clinic["id"], product_id)
 
     validate_extension(file.filename or "", ALLOWED_IMAGE_EXTENSIONS)
-    content = file.file.read()
-    if len(content) > MAX_IMAGE_BYTES:
+    try:
+        content = read_upload_limited(file, MAX_IMAGE_BYTES)
+    except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail="La imagen supera el límite de 5 MB",
+            detail=str(exc),
         )
     try:
         processed = process_product_photo(content)

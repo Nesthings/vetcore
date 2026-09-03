@@ -6,9 +6,11 @@ con foto (idea 1): candidatos visibles + login por id de usuario.
 """
 
 import secrets
+import time
+from collections import defaultdict
 from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -26,6 +28,32 @@ from app.schemas.auth import (
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+# --- Rate limiting de login (anti fuerza bruta, en memoria) ---
+LOGIN_MAX_ATTEMPTS = 6
+LOGIN_WINDOW_SECONDS = 60
+_login_attempts: dict[str, list[float]] = defaultdict(list)
+
+
+def _login_key(request: Request, identifier: str) -> str:
+    ip = request.client.host if request.client else "anon"
+    return f"{ip}:{identifier.strip().lower()}"
+
+
+def _enforce_login_rate(key: str) -> None:
+    now = time.time()
+    recent = [t for t in _login_attempts[key] if now - t < LOGIN_WINDOW_SECONDS]
+    _login_attempts[key] = recent
+    if len(recent) >= LOGIN_MAX_ATTEMPTS:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Demasiados intentos. Espera un momento y vuelve a intentarlo.",
+        )
+    _login_attempts[key].append(now)
+
+
+def _clear_login_rate(key: str) -> None:
+    _login_attempts.pop(key, None)
 
 
 def _staff_login(db: Session, identifier: str, password: str) -> LoginResponse:
@@ -104,13 +132,17 @@ def _super_admin_login(db: Session, identifier: str, password: str) -> LoginResp
     response_model=LoginResponse,
     summary="Login por correo y contraseña (identifica clínica y rol automáticamente)",
 )
-def login(body: LoginRequest, db: Session = Depends(get_db)) -> LoginResponse:
+def login(body: LoginRequest, request: Request, db: Session = Depends(get_db)) -> LoginResponse:
     """Autentica con correo + contraseña y detecta la identidad:
     staff de clínica (identifica `clinic_id`, `branch_id` y rol), dueño u
     super-admin. No expone la lista de usuarios de las clínicas."""
+    key = _login_key(request, body.identifier)
+    _enforce_login_rate(key)
     for fn in (_staff_login, _super_admin_login):
         try:
-            return fn(db, body.identifier, body.password)
+            resp = fn(db, body.identifier, body.password)
+            _clear_login_rate(key)
+            return resp
         except HTTPException:
             continue
     raise HTTPException(
@@ -123,8 +155,14 @@ def login(body: LoginRequest, db: Session = Depends(get_db)) -> LoginResponse:
     response_model=LoginResponse,
     summary="Login de super-admin (dueño del producto)",
 )
-def login_super_admin(body: LoginRequest, db: Session = Depends(get_db)) -> LoginResponse:
-    return _super_admin_login(db, body.identifier, body.password)
+def login_super_admin(
+    body: LoginRequest, request: Request, db: Session = Depends(get_db)
+) -> LoginResponse:
+    key = _login_key(request, body.identifier)
+    _enforce_login_rate(key)
+    resp = _super_admin_login(db, body.identifier, body.password)
+    _clear_login_rate(key)
+    return resp
 
 
 @router.get("/me", response_model=MeResponse, summary="Identidad del token actual")

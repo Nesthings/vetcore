@@ -1,5 +1,6 @@
 """Utilidades de seguridad: hashing de contraseñas y tokens JWT."""
 
+import hashlib
 from datetime import UTC, datetime, timedelta
 
 from jose import JWTError, jwt
@@ -56,11 +57,21 @@ def get_token_payload(token: str) -> dict:
 SHARE_TOKEN_EXPIRE_DAYS = 30
 
 
-def create_share_token(pet_id: str) -> tuple[str, datetime]:
+def share_token_version(qr_token: str | None) -> str:
+    """Versión corta del token QR: cambia al regenerar el QR y permite revocar
+    los enlaces de cartilla emitidos con anterioridad."""
+    return hashlib.sha256((qr_token or "").encode()).hexdigest()[:16]
+
+
+def create_share_token(
+    pet_id: str, version: str | None = None
+) -> tuple[str, datetime]:
     """Token de acceso a la cartilla para el dueño (sin login).
 
     Expira en `SHARE_TOKEN_EXPIRE_DAYS` y solo da acceso de solo lectura +
     acciones puntuales (foto, alertas, firmar consentimientos) de esa mascota.
+    `version` vincula el token al QR actual: al regenerar el QR, los enlaces
+    antiguos dejan de ser válidos.
     """
     expire = datetime.now(UTC) + timedelta(days=SHARE_TOKEN_EXPIRE_DAYS)
     payload = {
@@ -69,6 +80,8 @@ def create_share_token(pet_id: str) -> tuple[str, datetime]:
         "exp": expire,
         "iat": datetime.now(UTC),
     }
+    if version:
+        payload["ver"] = version
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm), expire
 
 
@@ -81,3 +94,14 @@ def decode_share_token(token: str) -> str:
     if not pet_id:
         raise InvalidTokenError("Token inválido")
     return str(pet_id)
+
+
+def get_share_token_version(token: str) -> str | None:
+    """Versión del QR embebida en el token de cartilla, o None si no la trae."""
+    try:
+        payload = get_token_payload(token)
+        if payload.get("scope") != "cartilla":
+            return None
+        return payload.get("ver")
+    except InvalidTokenError:
+        return None

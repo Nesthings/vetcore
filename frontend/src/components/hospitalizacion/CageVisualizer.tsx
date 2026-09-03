@@ -91,7 +91,7 @@ function CageCard({
   onOpen: () => void
 }) {
   const occ = occupants[0]
-  const photoUrl = occ?.pet?.photo_url && !occ.pet.photo_url.startsWith('/media/') ? occ.pet.photo_url : null
+  const photoUrl = occ?.pet?.photo_url || null
 
   return (
     <button

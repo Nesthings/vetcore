@@ -1235,7 +1235,13 @@ export function NewConsultation() {
           )}
 
           {!(step === 0 && mode === 'choose') && (
-          <div className="flex items-center justify-between gap-3 pt-2">
+          <div className="space-y-2 pt-2">
+            {step === 0 && !(pet && vetUserId) && (
+              <p className="text-xs text-muted-foreground">
+                Selecciona el veterinario que atendió y un paciente para poder continuar.
+              </p>
+            )}
+          <div className="flex items-center justify-between gap-3">
             {step > 0 ? (
               <Button type="button" variant="outline" onClick={() => setStep((s) => s - 1)}>
                 <ArrowLeft /> Anterior
@@ -1267,6 +1273,7 @@ export function NewConsultation() {
                 )}
               </Button>
             )}
+          </div>
           </div>
           )}
         </form>

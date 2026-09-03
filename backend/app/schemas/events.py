@@ -22,6 +22,7 @@ class AuditLogRead(BaseModel):
     id: uuid.UUID
     clinic_id: uuid.UUID | None
     actor_type: str
+    actor_name: str | None = None
     action: str
     entity_type: str
     entity_id: uuid.UUID

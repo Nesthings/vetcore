@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import CurrentClinic, get_current_clinic, require_clinic_roles
 from app.core.events import record_audit
 from app.core.storage import (
+    read_upload_limited,
     ALLOWED_IMAGE_EXTENSIONS,
     ALLOWED_PDF_EXTENSIONS,
     public_url,
@@ -95,11 +96,12 @@ def create_pending_consent(
         validate_extension(
             attachment.filename, ALLOWED_IMAGE_EXTENSIONS | ALLOWED_PDF_EXTENSIONS
         )
-        content = attachment.file.read()
-        if len(content) > MAX_ATTACHMENT_BYTES:
+        try:
+            content = read_upload_limited(attachment, MAX_ATTACHMENT_BYTES)
+        except ValueError as exc:
             raise HTTPException(
                 status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                detail="El documento supera el límite de 10 MB",
+                detail=str(exc),
             )
         rel = save_media(f"consents/{pet.id}", attachment.filename, content)
         attachment_url = public_url(rel)

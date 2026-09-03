@@ -52,21 +52,24 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     sweep_seconds = getattr(settings, "smart_alerts_sweep_seconds", 900)
+    sweep_enabled = getattr(settings, "smart_alerts_sweep_enabled", True)
     task = None
-    if sweep_seconds and sweep_seconds > 0:
+    if sweep_seconds and sweep_seconds > 0 and sweep_enabled:
         async def _sweep() -> None:
             while True:
                 await asyncio.sleep(sweep_seconds)
                 try:
-                    # El contenedor corre UNA instancia (desired_count=1): el
-                    # barrido no se duplica. Best-effort: si falla una clínica,
-                    # se registra y continúa en el siguiente ciclo.
+                    # Barrido best-effort: si falla una clínica, se registra y
+                    # continúa en el siguiente ciclo. Con N réplicas, activar
+                    # SMART_ALERTS_SWEEP_ENABLED solo en un worker.
                     smart_alerts_service.sweep_all_clinics()
                 except Exception:  # noqa: BLE001
                     logger.exception("Barrido periódico de alertas falló")
 
         task = asyncio.create_task(_sweep())
         logger.info("Barrido periódico de alertas activado cada %ss", sweep_seconds)
+    else:
+        logger.info("Barrido periódico de alertas desactivado")
     try:
         yield
     finally:
@@ -84,7 +87,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
