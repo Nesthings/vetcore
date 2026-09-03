@@ -36,13 +36,11 @@ class Settings(BaseSettings):
     super_admin_password: str = _DEFAULT_SUPER_ADMIN_PASSWORD
     super_admin_name: str = "Super Admin"
 
-    # CORS: orígenes explícitos (lista separada por comas en CORS_ORIGINS)
-    cors_origins: list[str] = [
-        "http://localhost:5173",
-        "http://localhost:5179",
-        "http://127.0.0.1:5173",
-        "http://127.0.0.1:5179",
-    ]
+    # CORS: orígenes explícitos separados por coma (env CORS_ORIGINS)
+    cors_origins: str = (
+        "http://localhost:5173,http://localhost:5179,"
+        "http://127.0.0.1:5173,http://127.0.0.1:5179"
+    )
 
     # Barrido de alertas inteligentes (0 = desactivado; env para un solo worker)
     smart_alerts_sweep_seconds: int = 900
@@ -101,6 +99,10 @@ class Settings(BaseSettings):
             f"postgresql+psycopg://{self.postgres_user}:{self.postgres_password}"
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
         )
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
 
 settings = Settings()

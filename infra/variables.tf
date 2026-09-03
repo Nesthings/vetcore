@@ -28,6 +28,34 @@ variable "jwt_secret" {
   sensitive   = true
 }
 
+variable "super_admin_email" {
+  description = "Correo del super-admin de la plataforma"
+  type        = string
+  default     = "admin@vetcore.app"
+}
+
+variable "super_admin_password" {
+  description = "Contraseña del super-admin (obligatoria en producción; el backend rechaza el default)"
+  type        = string
+  sensitive   = true
+}
+
+variable "cors_origins" {
+  description = "Orígenes CORS permitidos separados por coma (vacío = solo mismo origen)"
+  type        = string
+  default     = ""
+}
+
+variable "db_pool_size" {
+  type    = number
+  default = 5
+}
+
+variable "db_max_overflow" {
+  type    = number
+  default = 10
+}
+
 # VPC opcional: si la BD está dentro de una VPC, indica subnets y security group.
 variable "lambda_vpc_subnet_ids" {
   description = "Subnets privadas para la Lambda (vacío si la BD es pública)"
