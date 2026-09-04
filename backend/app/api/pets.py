@@ -269,6 +269,7 @@ def create_walkin_photo(
     file: UploadFile = File(...),
     name: str = Form(..., min_length=1, max_length=150),
     label: str = Form(default="", max_length=200),
+    note: str = Form(default="", max_length=2000),
     ctx: CurrentClinic = Depends(require_clinic_roles(*PET_MUTATORS)),
     db: Session = Depends(get_db),
 ) -> dict:
@@ -288,6 +289,7 @@ def create_walkin_photo(
         vet_user_id=ctx.user.sub,
         url=public_url(rel),
         label=label.strip() or None,
+        annotation_json={"note": note.strip()} if note.strip() else None,
         taken_at=datetime.now(UTC),
     )
     db.add(photo)
@@ -307,6 +309,7 @@ def create_walkin_photo(
         "id": str(photo.id),
         "url": photo.url,
         "label": photo.label,
+        "note": (photo.annotation_json or {}).get("note"),
         "walk_in_name": photo.walk_in_name,
         "taken_at": photo.taken_at.isoformat(),
     }
@@ -331,6 +334,7 @@ def list_walkin_photos(
             "id": str(p.id),
             "url": p.url,
             "label": p.label,
+            "note": (p.annotation_json or {}).get("note"),
             "walk_in_name": p.walk_in_name,
             "taken_at": p.taken_at.isoformat(),
         }
@@ -681,6 +685,7 @@ def pet_photos_list(
             "id": str(p.id),
             "url": p.url,
             "label": p.label,
+            "note": (p.annotation_json or {}).get("note"),
             "taken_at": p.taken_at.isoformat(),
         }
         for p in photos
@@ -696,6 +701,7 @@ def create_pet_photo(
     pet_id: str,
     file: UploadFile = File(...),
     label: str = Form(default="", max_length=200),
+    note: str = Form(default="", max_length=2000),
     ctx: CurrentClinic = Depends(require_clinic_roles(*PET_MUTATORS)),
     db: Session = Depends(get_db),
 ) -> dict:
@@ -716,6 +722,7 @@ def create_pet_photo(
         vet_user_id=ctx.user.sub,
         url=public_url(rel),
         label=label.strip() or None,
+        annotation_json={"note": note.strip()} if note.strip() else None,
         taken_at=datetime.now(UTC),
     )
     db.add(photo)
@@ -735,6 +742,7 @@ def create_pet_photo(
         "id": str(photo.id),
         "url": photo.url,
         "label": photo.label,
+        "note": (photo.annotation_json or {}).get("note"),
         "taken_at": photo.taken_at.isoformat(),
     }
 
