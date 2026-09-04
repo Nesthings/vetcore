@@ -28,6 +28,9 @@ export interface OwnerPet {
     species: string
     breed?: string | null
     sex?: string | null
+    color_primary?: string | null
+    color_secondary?: string | null
+    markings?: string | null
     birth_date?: string | null
     cartilla_photo_url?: string | null
     latest_weight_kg?: number | null

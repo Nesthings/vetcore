@@ -23,6 +23,7 @@ import {
   Plus,
   RotateCcw,
   Send,
+  SquarePen,
   Stethoscope,
   Syringe,
   TriangleAlert,
@@ -52,6 +53,7 @@ import { AssignPlanDialog } from '@/components/pets/AssignPlanDialog'
 import { BrandCombobox } from '@/components/pets/BrandCombobox'
 import { PhotoComparison } from '@/components/pets/PhotoComparison'
 import { TransferOwnerDialog } from '@/components/pets/TransferOwnerDialog'
+import { PetFormDialog } from '@/components/pets/PetFormDialog'
 import {
   HospitalizacionGameCard,
   type HospitalizationShare,
@@ -77,6 +79,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import type { Pet } from '@/pages/Pets'
+import { petColorHex } from '@/lib/pet-colors'
 import { apiFetch } from '@/lib/api'
 import { SPECIES_ICONS, speciesLabel } from '@/lib/species'
 import { cn } from '@/lib/utils'
@@ -429,6 +432,7 @@ export function PetDetail() {
   const [inviteOpen, setInviteOpen] = useState(false)
   const [transferOpen, setTransferOpen] = useState(false)
   const [consentOpen, setConsentOpen] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
   const [qrUrl, setQrUrl] = useState<string | null>(null)
   const [confirmConsent, setConfirmConsent] = useState<Consent | null>(null)
   const [assignOpen, setAssignOpen] = useState(false)
@@ -766,6 +770,17 @@ export function PetDetail() {
                       {sexLabel(pet.sex) && (
                         <Badge className={accent.chip}>{sexLabel(pet.sex)}</Badge>
                       )}
+                      {pet.color_primary && (
+                        <Badge variant="outline" className="gap-1.5 text-muted-foreground">
+                          <span
+                            className="inline-block size-2.5 shrink-0 rounded-full border border-black/10"
+                            style={{ backgroundColor: petColorHex(pet.color_primary) }}
+                            aria-hidden="true"
+                          />
+                          {pet.color_primary}
+                          {pet.color_secondary ? ` / ${pet.color_secondary}` : ''}
+                        </Badge>
+                      )}
                       {pet.markings && (
                         <Badge variant="outline" className="text-muted-foreground">
                           {pet.markings}
@@ -818,6 +833,9 @@ export function PetDetail() {
                       </Button>
                       <Button variant="outline" size="sm" onClick={() => setTransferOpen(true)}>
                         <UserRoundCog /> Transferir dueño
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+                        <SquarePen /> Editar
                       </Button>
                     </div>
                   </div>
@@ -1856,6 +1874,18 @@ export function PetDetail() {
         confirmLabel="Confirmar"
         onConfirm={runDoseAction}
       />
+
+      {pet && (
+        <PetFormDialog
+          open={editOpen}
+          pet={pet}
+          onOpenChange={setEditOpen}
+          onSaved={() => {
+            setEditOpen(false)
+            load()
+          }}
+        />
+      )}
     </AppLayout>
   )
 }

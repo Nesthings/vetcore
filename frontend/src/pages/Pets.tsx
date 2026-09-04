@@ -33,6 +33,7 @@ import {
 } from '@/components/ui/table'
 import { apiFetch } from '@/lib/api'
 import { cn } from '@/lib/utils'
+import { petColorHex } from '@/lib/pet-colors'
 
 export interface PetOwner {
   owner_id: string
@@ -328,7 +329,8 @@ export function Pets() {
                       <div className="min-w-0">
                         <span className="inline-flex min-w-0 items-center gap-1.5">
                           <span
-                            className="inline-block size-2.5 shrink-0 rounded-full border border-border"
+                            className="inline-block size-2.5 shrink-0 rounded-full border border-black/10"
+                            style={{ backgroundColor: petColorHex(p.color_primary) }}
                             aria-hidden="true"
                           />
                           <span className="truncate">{p.color_primary}</span>
