@@ -9,6 +9,11 @@ engine = create_engine(
     # Pool parametrizable por entorno (DB_POOL_SIZE / DB_MAX_OVERFLOW).
     pool_size=settings.db_pool_size,
     max_overflow=settings.db_max_overflow,
+    connect_args={
+        # psycopg 3 + pooler (Supabase): desactiva prepared statements para
+        # evitar "prepared statement already exists" al reutilizar conexiones.
+        "prepare_threshold": None,
+    },
 )
 
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
