@@ -9,7 +9,6 @@ import {
   Loader2,
   MapPin,
   Network,
-  PawPrint,
   ShieldCheck,
   Sparkles,
   UserPlus,
@@ -434,17 +433,6 @@ const saveStep = async () => {
               alt="VetCore"
               className="size-12 shrink-0 rounded-2xl object-contain"
             />
-            <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-gradient-brand text-white shadow-elevated">
-              {logoFile || logoUrl ? (
-                <img
-                  src={logoFile ? URL.createObjectURL(logoFile) : logoUrl ?? ''}
-                  alt="Logo de la clínica"
-                  className="size-full object-cover"
-                />
-              ) : (
-                <PawPrint className="size-6" aria-hidden="true" />
-              )}
-            </div>
             <div>
               <h1 className="font-display text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
                 Configura tu clínica
