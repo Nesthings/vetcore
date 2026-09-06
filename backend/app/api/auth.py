@@ -149,7 +149,6 @@ def _super_admin_login(
 
 @router.post(
     "/login",
-    response_model=LoginResponse,
     summary="Login por correo y contraseña (identifica clínica y rol automáticamente)",
 )
 def login(
@@ -174,7 +173,6 @@ def login(
 
 @router.post(
     "/login/super-admin",
-    response_model=LoginResponse,
     summary="Login de super-admin (dueño del producto)",
 )
 def login_super_admin(
