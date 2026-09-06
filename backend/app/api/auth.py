@@ -16,7 +16,14 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import CurrentClinic, CurrentUser, get_current_clinic, get_current_user
 from app.core.config import settings
-from app.core.security import create_access_token, hash_password, verify_password
+from app.core.security import (
+    create_access_token,
+    create_twofa_challenge_token,
+    get_token_payload,
+    hash_password,
+    verify_password,
+)
+from app.core.totp import build_otpauth_uri, generate_secret, qr_data_uri, verify_code
 from app.db.session import get_db
 from app.schemas.auth import (
     ForgotPasswordRequest,
@@ -25,6 +32,11 @@ from app.schemas.auth import (
     LoginResponse,
     MeResponse,
     ResetPasswordRequest,
+    TwoFactorConfirmRequest,
+    TwoFactorRequiredResponse,
+    TwoFactorSetupResponse,
+    TwoFactorStatusResponse,
+    TwoFactorVerifyRequest,
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -97,11 +109,13 @@ def _staff_login(db: Session, identifier: str, password: str) -> LoginResponse:
     )
 
 
-def _super_admin_login(db: Session, identifier: str, password: str) -> LoginResponse:
+def _super_admin_login(
+    db: Session, identifier: str, password: str
+) -> LoginResponse | TwoFactorRequiredResponse:
     row = (
         db.execute(
             text(
-                "SELECT id, password_hash, is_active FROM super_admins "
+                "SELECT id, password_hash, is_active, totp_enabled FROM super_admins "
                 "WHERE LOWER(email) = LOWER(:email)"
             ),
             {"email": identifier},
@@ -119,6 +133,12 @@ def _super_admin_login(db: Session, identifier: str, password: str) -> LoginResp
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Credenciales inválidas",
         )
+    if row["totp_enabled"]:
+        # Paso 1 OK: password válido. Se entrega un challenge de corta duración
+        # que debe completarse con el código TOTP.
+        return TwoFactorRequiredResponse(
+            challenge_token=create_twofa_challenge_token(str(row["id"])),
+        )
     db.execute(
         text("UPDATE super_admins SET last_login_at = now() WHERE id = :uid"), {"uid": row["id"]}
     )
@@ -132,7 +152,9 @@ def _super_admin_login(db: Session, identifier: str, password: str) -> LoginResp
     response_model=LoginResponse,
     summary="Login por correo y contraseña (identifica clínica y rol automáticamente)",
 )
-def login(body: LoginRequest, request: Request, db: Session = Depends(get_db)) -> LoginResponse:
+def login(
+    body: LoginRequest, request: Request, db: Session = Depends(get_db)
+) -> LoginResponse | TwoFactorRequiredResponse:
     """Autentica con correo + contraseña y detecta la identidad:
     staff de clínica (identifica `clinic_id`, `branch_id` y rol), dueño u
     super-admin. No expone la lista de usuarios de las clínicas."""
@@ -157,7 +179,7 @@ def login(body: LoginRequest, request: Request, db: Session = Depends(get_db)) -
 )
 def login_super_admin(
     body: LoginRequest, request: Request, db: Session = Depends(get_db)
-) -> LoginResponse:
+) -> LoginResponse | TwoFactorRequiredResponse:
     key = _login_key(request, body.identifier)
     _enforce_login_rate(key)
     resp = _super_admin_login(db, body.identifier, body.password)
@@ -287,4 +309,182 @@ def reset_password(
         {"rid": reset["id"]},
     )
     db.commit()
+
+
+# ---------------------------------------------------------------------------
+# 2FA del super-admin (TOTP, compatible con Microsoft Authenticator)
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/super-admin/2fa/verify",
+    response_model=LoginResponse,
+    summary="Paso 2 del login del super-admin: valida el código TOTP",
+)
+def super_admin_verify_2fa(
+    body: TwoFactorVerifyRequest,
+    db: Session = Depends(get_db),
+) -> LoginResponse:
+    try:
+        payload = get_token_payload(body.challenge_token)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="El challenge de 2FA es inválido o expiró. Vuelve a iniciar sesión.",
+        )
+    if payload.get("purpose") != "2fa":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="El challenge de 2FA es inválido o expiró. Vuelve a iniciar sesión.",
+        )
+    row = (
+        db.execute(
+            text(
+                "SELECT id, totp_secret, totp_enabled FROM super_admins "
+                "WHERE id = :uid AND is_active = true"
+            ),
+            {"uid": payload.get("sub")},
+        )
+        .mappings()
+        .first()
+    )
+    if row is None or not row["totp_enabled"]:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="El 2FA no está habilitado para esta cuenta",
+        )
+    if not verify_code(row["totp_secret"] or "", body.code):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="El código de verificación es incorrecto",
+        )
+    db.execute(
+        text("UPDATE super_admins SET last_login_at = now() WHERE id = :uid"),
+        {"uid": row["id"]},
+    )
+    db.commit()
+    return LoginResponse(
+        access_token=create_access_token(subject=str(row["id"]), role="super-admin"),
+        role="super-admin",
+        sub=str(row["id"]),
+    )
+
+
+@router.get(
+    "/super-admin/2fa/status",
+    response_model=TwoFactorStatusResponse,
+    summary="Estado del 2FA del super-admin",
+)
+def super_admin_2fa_status(
+    user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> TwoFactorStatusResponse:
+    if user.role != "super-admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acceso denegado")
+    enabled = db.execute(
+        text("SELECT totp_enabled FROM super_admins WHERE id = :uid"),
+        {"uid": user.sub},
+    ).scalar()
+    return TwoFactorStatusResponse(totp_enabled=bool(enabled))
+
+
+@router.post(
+    "/super-admin/2fa/setup",
+    response_model=TwoFactorSetupResponse,
+    summary="Inicia la configuración del 2FA (genera secreto + QR)",
+)
+def super_admin_2fa_setup(
+    user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> TwoFactorSetupResponse:
+    if user.role != "super-admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acceso denegado")
+    email = db.execute(
+        text("SELECT email FROM super_admins WHERE id = :uid"),
+        {"uid": user.sub},
+    ).scalar()
+    if not email:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cuenta no encontrada")
+    secret = generate_secret()
+    uri = build_otpauth_uri(email, secret)
+    # Se guarda el secreto ANTES de confirmar para validarlo al escanear el QR.
+    db.execute(
+        text("UPDATE super_admins SET totp_secret = :s WHERE id = :uid"),
+        {"s": secret, "uid": user.sub},
+    )
+    db.commit()
+    return TwoFactorSetupResponse(secret=secret, otpauth_uri=uri, qr_data=qr_data_uri(uri))
+
+
+@router.post(
+    "/super-admin/2fa/confirm",
+    response_model=TwoFactorStatusResponse,
+    summary="Confirma el 2FA validando un primer código TOTP",
+)
+def super_admin_2fa_confirm(
+    body: TwoFactorConfirmRequest,
+    user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> TwoFactorStatusResponse:
+    if user.role != "super-admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acceso denegado")
+    row = (
+        db.execute(
+            text("SELECT totp_secret FROM super_admins WHERE id = :uid"),
+            {"uid": user.sub},
+        )
+        .mappings()
+        .first()
+    )
+    if row is None or not row["totp_secret"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Primero inicia la configuración del 2FA",
+        )
+    if not verify_code(row["totp_secret"], body.code):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El código de verificación es incorrecto",
+        )
+    db.execute(
+        text("UPDATE super_admins SET totp_enabled = true WHERE id = :uid"),
+        {"uid": user.sub},
+    )
+    db.commit()
+    return TwoFactorStatusResponse(totp_enabled=True)
+
+
+@router.post(
+    "/super-admin/2fa/disable",
+    response_model=TwoFactorStatusResponse,
+    summary="Desactiva el 2FA (requiere código TOTP actual)",
+)
+def super_admin_2fa_disable(
+    body: TwoFactorConfirmRequest,
+    user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> TwoFactorStatusResponse:
+    if user.role != "super-admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acceso denegado")
+    row = (
+        db.execute(
+            text("SELECT totp_secret, totp_enabled FROM super_admins WHERE id = :uid"),
+            {"uid": user.sub},
+        )
+        .mappings()
+        .first()
+    )
+    if row is None or not row["totp_enabled"]:
+        return TwoFactorStatusResponse(totp_enabled=False)
+    if not verify_code(row["totp_secret"] or "", body.code):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El código de verificación es incorrecto",
+        )
+    db.execute(
+        text("UPDATE super_admins SET totp_enabled = false WHERE id = :uid"),
+        {"uid": user.sub},
+    )
+    db.commit()
+    return TwoFactorStatusResponse(totp_enabled=False)
 

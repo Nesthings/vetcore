@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
-import { AlertCircle, Lock, LogIn, Mail, UserRound } from 'lucide-react'
+import { AlertCircle, Lock, LogIn, Mail, ShieldCheck, UserRound } from 'lucide-react'
 
 import { AuthLayout } from '@/components/auth/AuthLayout'
 import { Button } from '@/components/ui/button'
@@ -13,6 +13,11 @@ interface LoginResponse {
   access_token: string
 }
 
+interface TwoFactorRequiredResponse {
+  requires_2fa: boolean
+  challenge_token: string
+}
+
 export function Login() {
   const { login, isAuthenticated } = useAuth()
   const navigate = useNavigate()
@@ -23,16 +28,27 @@ export function Login() {
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
+  // Estado 2FA
+  const [challenge, setChallenge] = useState<string | null>(null)
+  const [code, setCode] = useState('')
+  const [codeError, setCodeError] = useState<string | null>(null)
+  const [codeSubmitting, setCodeSubmitting] = useState(false)
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
     setSubmitting(true)
     try {
-      const res = await apiFetch<LoginResponse>('/auth/login', {
+      const res = await apiFetch<LoginResponse | TwoFactorRequiredResponse>('/auth/login', {
         method: 'POST',
         body: JSON.stringify({ identifier: email.trim(), password }),
       })
-      login(res.access_token)
+      if ('requires_2fa' in res && res.requires_2fa) {
+        setChallenge(res.challenge_token)
+        setCode('')
+        return
+      }
+      login((res as LoginResponse).access_token)
       const from = (location.state as { from?: { pathname: string } } | null)?.from
       navigate(from?.pathname ?? '/', { replace: true })
     } catch (err) {
@@ -40,6 +56,94 @@ export function Login() {
     } finally {
       setSubmitting(false)
     }
+  }
+
+  const handleCodeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!challenge) return
+    setCodeError(null)
+    setCodeSubmitting(true)
+    try {
+      const res = await apiFetch<LoginResponse>('/auth/super-admin/2fa/verify', {
+        method: 'POST',
+        body: JSON.stringify({ challenge_token: challenge, code: code.trim() }),
+      })
+      login(res.access_token)
+      navigate('/platform', { replace: true })
+    } catch (err) {
+      setCodeError(err instanceof Error ? err.message : 'El código de verificación es incorrecto')
+    } finally {
+      setCodeSubmitting(false)
+    }
+  }
+
+  if (isAuthenticated) {
+    return <Navigate to="/" replace />
+  }
+
+  if (challenge) {
+    return (
+      <AuthLayout
+        title="Verificación en dos pasos"
+        subtitle="Ingresa el código de 6 dígitos de tu aplicación de autenticación."
+      >
+        <form onSubmit={handleCodeSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="login-2fa-code">Código de verificación</Label>
+            <div className="relative">
+              <ShieldCheck className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                id="login-2fa-code"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={6}
+                className="pl-9 text-center font-mono text-lg tracking-[0.3em]"
+                value={code}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="••••••"
+                required
+                autoFocus
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Usa Microsoft Authenticator u otra app de autenticación para obtener el código.
+            </p>
+          </div>
+
+          {codeError && (
+            <div className="flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+              <AlertCircle className="size-4 shrink-0" aria-hidden="true" />
+              <span>{codeError}</span>
+            </div>
+          )}
+
+          <Button type="submit" className="w-full" disabled={codeSubmitting}>
+            {codeSubmitting ? (
+              <span className="flex items-center gap-2">
+                <span className="size-4 animate-spin rounded-full border-2 border-background border-t-transparent" />
+                Verificando…
+              </span>
+            ) : (
+              <>
+                <LogIn /> Verificar
+              </>
+            )}
+          </Button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setChallenge(null)
+              setCode('')
+              setCodeError(null)
+            }}
+            className="w-full text-center text-xs text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Volver al inicio de sesión
+          </button>
+        </form>
+      </AuthLayout>
+    )
   }
 
   return (
@@ -52,7 +156,6 @@ export function Login() {
         </Link>
       }
     >
-      {isAuthenticated && <Navigate to="/" replace />}
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="login-email">Correo electrónico</Label>

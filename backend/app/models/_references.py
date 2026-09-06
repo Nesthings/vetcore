@@ -6,7 +6,7 @@ foreign keys de los modelos actuales. La tabla `owners` se modela en la
 Subfase 1.7 como parte de la identidad global del dueño.
 """
 
-from sqlalchemy import Boolean, Column, DateTime, String, Table, Text, func
+from sqlalchemy import Boolean, Column, DateTime, String, Table, Text, false, func
 from sqlalchemy.dialects.postgresql import UUID
 
 from app.db.session import Base
@@ -32,5 +32,7 @@ super_admins = Table(
     Column("password_hash", Text, nullable=False),
     Column("full_name", String(200), nullable=False),
     Column("is_active", Boolean, nullable=False, server_default="true"),
+    Column("totp_secret", Text),
+    Column("totp_enabled", Boolean, nullable=False, server_default=false()),
     Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
 )

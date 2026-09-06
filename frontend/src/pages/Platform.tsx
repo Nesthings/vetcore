@@ -8,6 +8,7 @@ import {
   KeyRound,
   Link2,
   Plus,
+  QrCode,
   RefreshCw,
   ShieldCheck,
 } from 'lucide-react'
@@ -101,6 +102,15 @@ export function Platform() {
   const [events, setEvents] = useState<ClinicEvent[]>([])
   const [loadingClinics, setLoadingClinics] = useState(true)
   const [tab, setTab] = useState('links')
+
+  // Estado 2FA del super-admin
+  const [totpEnabled, setTotpEnabled] = useState(false)
+  const [totpStatusLoading, setTotpStatusLoading] = useState(true)
+  const [totpSetup, setTotpSetup] = useState<{ secret: string; qr_data: string } | null>(null)
+  const [totpSetupLoading, setTotpSetupLoading] = useState(false)
+  const [totpCode, setTotpCode] = useState('')
+  const [totpCodeError, setTotpCodeError] = useState<string | null>(null)
+  const [totpCodeLoading, setTotpCodeLoading] = useState(false)
 
   const loadInvites = useCallback(async () => {
     try {
@@ -241,6 +251,82 @@ export function Platform() {
     }
   }
 
+  const loadTotpStatus = useCallback(async () => {
+    setTotpStatusLoading(true)
+    try {
+      const res = await apiFetch<{ totp_enabled: boolean }>('/auth/super-admin/2fa/status')
+      setTotpEnabled(res.totp_enabled)
+    } catch {
+      // sin acceso / error → se ignora
+    } finally {
+      setTotpStatusLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadTotpStatus()
+  }, [loadTotpStatus])
+
+  const startTotpSetup = async () => {
+    setTotpSetupLoading(true)
+    setTotpCodeError(null)
+    try {
+      const res = await apiFetch<{ secret: string; qr_data: string }>(
+        '/auth/super-admin/2fa/setup',
+        { method: 'POST' },
+      )
+      setTotpSetup(res)
+    } catch (err) {
+      setTotpCodeError(err instanceof Error ? err.message : 'No se pudo iniciar la configuración')
+    } finally {
+      setTotpSetupLoading(false)
+    }
+  }
+
+  const confirmTotp = async () => {
+    if (totpCode.trim().length !== 6) {
+      setTotpCodeError('Ingresa el código de 6 dígitos de tu aplicación.')
+      return
+    }
+    setTotpCodeLoading(true)
+    setTotpCodeError(null)
+    try {
+      await apiFetch('/auth/super-admin/2fa/confirm', {
+        method: 'POST',
+        body: JSON.stringify({ code: totpCode.trim() }),
+      })
+      setTotpEnabled(true)
+      setTotpSetup(null)
+      setTotpCode('')
+    } catch (err) {
+      setTotpCodeError(err instanceof Error ? err.message : 'El código es incorrecto')
+    } finally {
+      setTotpCodeLoading(false)
+    }
+  }
+
+  const disableTotp = async () => {
+    if (totpCode.trim().length !== 6) {
+      setTotpCodeError('Ingresa tu código actual para desactivar el 2FA.')
+      return
+    }
+    setTotpCodeLoading(true)
+    setTotpCodeError(null)
+    try {
+      await apiFetch('/auth/super-admin/2fa/disable', {
+        method: 'POST',
+        body: JSON.stringify({ code: totpCode.trim() }),
+      })
+      setTotpEnabled(false)
+      setTotpSetup(null)
+      setTotpCode('')
+    } catch (err) {
+      setTotpCodeError(err instanceof Error ? err.message : 'El código es incorrecto')
+    } finally {
+      setTotpCodeLoading(false)
+    }
+  }
+
   return (
     <div className="mx-auto max-w-3xl p-4 sm:p-6">
       <div className="mb-6 flex items-center gap-3">
@@ -262,6 +348,7 @@ export function Platform() {
           <TabsTrigger value="links">Links de invitación</TabsTrigger>
           <TabsTrigger value="clinics">Clínicas</TabsTrigger>
           <TabsTrigger value="recover">Recuperar acceso</TabsTrigger>
+          <TabsTrigger value="security">Seguridad</TabsTrigger>
         </TabsList>
 
         <TabsContent value="links" className="space-y-4">
@@ -629,6 +716,155 @@ export function Platform() {
                   <Button type="button" size="sm" onClick={resetPassword}>
                     Restablecer contraseña
                   </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="security" className="space-y-4">
+          <Card className="shadow-card">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ShieldCheck className="size-5 text-primary" /> Autenticación en dos pasos
+              </CardTitle>
+              <CardDescription>
+                Protege el acceso a la plataforma con un segundo factor usando Microsoft
+                Authenticator u otra app TOTP.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {totpStatusLoading ? (
+                <p className="text-sm text-muted-foreground">Cargando estado…</p>
+              ) : totpEnabled && !totpSetup ? (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between gap-3 rounded-lg border border-success/30 bg-success/5 px-4 py-3">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">2FA activado</p>
+                      <p className="text-xs text-muted-foreground">
+                        El acceso a la plataforma requiere tu código de verificación.
+                      </p>
+                    </div>
+                    <Badge variant="soft-success">Activo</Badge>
+                  </div>
+                  <div className="flex flex-wrap items-end gap-2">
+                    <div className="w-full max-w-xs space-y-1.5">
+                      <Label htmlFor="platform-totp-disable-code">Código actual</Label>
+                      <Input
+                        id="platform-totp-disable-code"
+                        inputMode="numeric"
+                        maxLength={6}
+                        className="text-center font-mono text-lg tracking-[0.3em]"
+                        value={totpCode}
+                        onChange={(e) =>
+                          setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))
+                        }
+                        placeholder="••••••"
+                      />
+                      {totpCodeError && (
+                        <p className="text-xs text-destructive">{totpCodeError}</p>
+                      )}
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={disableTotp}
+                      disabled={totpCodeLoading}
+                    >
+                      {totpCodeLoading ? 'Desactivando…' : 'Desactivar 2FA'}
+                    </Button>
+                  </div>
+                </div>
+              ) : totpSetup ? (
+                <div className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Escanea el código QR con tu aplicación de autenticación (Microsoft
+                    Authenticator, Google Authenticator, etc.) y luego ingresa el código de 6
+                    dígitos para activar.
+                  </p>
+                  <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
+                    <div className="shrink-0 overflow-hidden rounded-xl border border-border bg-white p-2">
+                      <img
+                        src={totpSetup.qr_data}
+                        alt="Código QR para configurar la autenticación"
+                        className="size-48 object-contain"
+                      />
+                    </div>
+                    <div className="w-full max-w-xs space-y-2">
+                      <Label htmlFor="platform-totp-code">Código de 6 dígitos</Label>
+                      <Input
+                        id="platform-totp-code"
+                        inputMode="numeric"
+                        maxLength={6}
+                        className="text-center font-mono text-lg tracking-[0.3em]"
+                        value={totpCode}
+                        onChange={(e) =>
+                          setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))
+                        }
+                        placeholder="••••••"
+                      />
+                      {totpCodeError && (
+                        <p className="text-xs text-destructive">{totpCodeError}</p>
+                      )}
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={confirmTotp}
+                          disabled={totpCodeLoading}
+                        >
+                          {totpCodeLoading ? 'Activando…' : 'Activar 2FA'}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setTotpSetup(null)}
+                        >
+                          Cancelar
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="rounded-lg border border-border/60 bg-muted/30 px-4 py-3">
+                    <p className="text-sm text-muted-foreground">
+                      El 2FA está desactivado. Actívalo para exigir un código de verificación
+                      además de tu contraseña al entrar a la plataforma.
+                    </p>
+                  </div>
+                  <div className="flex items-end gap-2">
+                    <div className="w-full max-w-xs space-y-1.5">
+                      <Label htmlFor="platform-totp-disable-code">
+                        Código actual (si desactivás)
+                      </Label>
+                      <Input
+                        id="platform-totp-disable-code"
+                        inputMode="numeric"
+                        maxLength={6}
+                        className="text-center font-mono text-lg tracking-[0.3em]"
+                        value={totpCode}
+                        onChange={(e) =>
+                          setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))
+                        }
+                        placeholder="••••••"
+                      />
+                      {totpCodeError && (
+                        <p className="text-xs text-destructive">{totpCodeError}</p>
+                      )}
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={startTotpSetup}
+                      disabled={totpSetupLoading}
+                    >
+                      <QrCode className="size-4" aria-hidden="true" />
+                      {totpSetupLoading ? 'Generando…' : 'Configurar 2FA'}
+                    </Button>
+                  </div>
                 </div>
               )}
             </CardContent>
