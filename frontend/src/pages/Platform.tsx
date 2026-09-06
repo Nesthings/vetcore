@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Building2,
   ChevronDown,
@@ -7,6 +8,7 @@ import {
   Copy,
   KeyRound,
   Link2,
+  LogOut,
   Plus,
   QrCode,
   RefreshCw,
@@ -20,6 +22,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { apiFetch } from '@/lib/api'
+import { useAuth } from '@/lib/auth'
 
 interface Invite {
   id: string
@@ -81,6 +84,8 @@ const SUBSCRIPTION_LABEL: Record<
 }
 
 export function Platform() {
+  const { logout } = useAuth()
+  const navigate = useNavigate()
   const [invites, setInvites] = useState<Invite[]>([])
   const [invName, setInvName] = useState('')
   const [invEmail, setInvEmail] = useState('')
@@ -329,14 +334,27 @@ export function Platform() {
 
   return (
     <div className="mx-auto max-w-3xl p-4 sm:p-6">
-      <div className="mb-6 flex items-center gap-3">
-        <div className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
-          <ShieldCheck className="size-6" aria-hidden="true" />
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <ShieldCheck className="size-6" aria-hidden="true" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Plataforma</h1>
+            <p className="text-sm text-muted-foreground">Dueño del producto · admin@vetcore.app</p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Plataforma</h1>
-          <p className="text-sm text-muted-foreground">Dueño del producto · admin@vetcore.app</p>
-        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            logout()
+            navigate('/login', { replace: true })
+          }}
+        >
+          <LogOut className="size-4" aria-hidden="true" />
+          Cerrar sesión
+        </Button>
       </div>
 
       <div className="mb-4 min-h-[20px]">
