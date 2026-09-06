@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
-import { AlertCircle, Lock, LogIn, Mail, ShieldCheck, UserRound } from 'lucide-react'
+import { AlertCircle, Lock, LogIn, Mail, UserRound } from 'lucide-react'
 
 import { AuthLayout } from '@/components/auth/AuthLayout'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { apiFetch } from '@/lib/api'
+import { OtpInput } from '@/components/ui/otp-input'
+import { apiFetch, decodeJwtPayload } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
 
 interface LoginResponse {
@@ -64,12 +65,13 @@ export function Login() {
     setCodeError(null)
     setCodeSubmitting(true)
     try {
-      const res = await apiFetch<LoginResponse>('/auth/super-admin/2fa/verify', {
+      const res = await apiFetch<LoginResponse>('/auth/2fa/verify', {
         method: 'POST',
         body: JSON.stringify({ challenge_token: challenge, code: code.trim() }),
       })
       login(res.access_token)
-      navigate('/platform', { replace: true })
+      const payload = decodeJwtPayload(res.access_token)
+      navigate(payload?.role === 'super-admin' ? '/platform' : '/', { replace: true })
     } catch (err) {
       setCodeError(err instanceof Error ? err.message : 'El código de verificación es incorrecto')
     } finally {
@@ -90,21 +92,12 @@ export function Login() {
         <form onSubmit={handleCodeSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="login-2fa-code">Código de verificación</Label>
-            <div className="relative">
-              <ShieldCheck className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                id="login-2fa-code"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                maxLength={6}
-                className="pl-9 text-center font-mono text-lg tracking-[0.3em]"
-                value={code}
-                onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                placeholder="••••••"
-                required
-                autoFocus
-              />
-            </div>
+            <OtpInput
+              value={code}
+              onChange={(v) => setCode(v)}
+              autoFocus
+              disabled={codeSubmitting}
+            />
             <p className="text-xs text-muted-foreground">
               Usa Microsoft Authenticator u otra app de autenticación para obtener el código.
             </p>

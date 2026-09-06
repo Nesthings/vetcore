@@ -18,6 +18,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { OtpInput } from '@/components/ui/otp-input'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -766,18 +767,12 @@ export function Platform() {
                     <Badge variant="soft-success">Activo</Badge>
                   </div>
                   <div className="flex flex-wrap items-end gap-2">
-                    <div className="w-full max-w-xs space-y-1.5">
+                    <div className="w-full space-y-1.5">
                       <Label htmlFor="platform-totp-disable-code">Código actual</Label>
-                      <Input
-                        id="platform-totp-disable-code"
-                        inputMode="numeric"
-                        maxLength={6}
-                        className="text-center font-mono text-lg tracking-[0.3em]"
+                      <OtpInput
                         value={totpCode}
-                        onChange={(e) =>
-                          setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))
-                        }
-                        placeholder="••••••"
+                        onChange={setTotpCode}
+                        disabled={totpCodeLoading}
                       />
                       {totpCodeError && (
                         <p className="text-xs text-destructive">{totpCodeError}</p>
@@ -810,16 +805,10 @@ export function Platform() {
                     </div>
                     <div className="w-full max-w-xs space-y-2">
                       <Label htmlFor="platform-totp-code">Código de 6 dígitos</Label>
-                      <Input
-                        id="platform-totp-code"
-                        inputMode="numeric"
-                        maxLength={6}
-                        className="text-center font-mono text-lg tracking-[0.3em]"
+                      <OtpInput
                         value={totpCode}
-                        onChange={(e) =>
-                          setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))
-                        }
-                        placeholder="••••••"
+                        onChange={setTotpCode}
+                        disabled={totpCodeLoading}
                       />
                       {totpCodeError && (
                         <p className="text-xs text-destructive">{totpCodeError}</p>
@@ -858,16 +847,10 @@ export function Platform() {
                       <Label htmlFor="platform-totp-disable-code">
                         Código actual (si desactivás)
                       </Label>
-                      <Input
-                        id="platform-totp-disable-code"
-                        inputMode="numeric"
-                        maxLength={6}
-                        className="text-center font-mono text-lg tracking-[0.3em]"
+                      <OtpInput
                         value={totpCode}
-                        onChange={(e) =>
-                          setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))
-                        }
-                        placeholder="••••••"
+                        onChange={setTotpCode}
+                        disabled={totpCodeLoading}
                       />
                       {totpCodeError && (
                         <p className="text-xs text-destructive">{totpCodeError}</p>
