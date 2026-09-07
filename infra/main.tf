@@ -16,6 +16,15 @@ terraform {
 # 1. Configuración del Proveedor y Región (Punto 4)
 provider "aws" {
   region = var.region
+  default_tags {
+    tags = {
+      Project     = var.name_prefix
+      Environment = "production"
+      ManagedBy   = "terraform"
+      CostCenter  = "vetcore-saas"
+      Owner       = "platform"
+    }
+  }
 }
 
 # 2. Dead Letter Queue (DLQ) (Punto 2)
@@ -139,6 +148,11 @@ resource "aws_lambda_function" "vetcore_worker" {
       security_group_ids = var.lambda_vpc_security_group_ids
     }
   }
+}
+
+resource "aws_cloudwatch_log_group" "worker" {
+  name              = "/aws/lambda/vetcore-whatsapp-worker"
+  retention_in_days = 14
 }
 
 resource "aws_lambda_event_source_mapping" "vetcore_worker" {

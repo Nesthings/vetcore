@@ -27,6 +27,22 @@ resource "aws_ecr_repository" "backend" {
   }
 }
 
+resource "aws_ecr_lifecycle_policy" "backend" {
+  repository = aws_ecr_repository.backend.name
+  policy = jsonencode({
+    rules = [{
+      rulePriority = 1
+      description  = "Mantener ultimas 5 imagenes"
+      selection = {
+        tagStatus   = "any"
+        countType   = "imageCountMoreThan"
+        countNumber = 5
+      }
+      action = { type = "expire" }
+    }]
+  })
+}
+
 # 2. Security groups
 resource "aws_security_group" "alb" {
   name        = "vetcore-alb"
@@ -79,6 +95,10 @@ resource "aws_lb" "backend" {
   load_balancer_type = "application"
   security_groups    = [aws_security_group.alb.id]
   subnets            = data.aws_subnets.public.ids
+  tags = {
+    Component = "ingress-api"
+    Tier      = "edge"
+  }
 }
 
 resource "aws_lb_target_group" "backend" {
@@ -167,6 +187,38 @@ resource "aws_cloudwatch_log_group" "backend" {
   retention_in_days = 7
 }
 
+locals {
+  app_env = {
+    APP_NAME                        = "VetCore API"
+    ENV                             = "production"
+    DEBUG                           = "false"
+    DATABASE_URL                    = var.database_url
+    JWT_SECRET                      = var.jwt_secret
+    JWT_ALGORITHM                   = "HS256"
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES = "480"
+    SUPER_ADMIN_EMAIL               = var.super_admin_email
+    SUPER_ADMIN_PASSWORD            = var.super_admin_password
+    SMART_ALERTS_SWEEP_ENABLED      = "true"
+    CORS_ORIGINS                    = var.cors_origins
+    DB_POOL_SIZE                    = tostring(var.db_pool_size)
+    DB_MAX_OVERFLOW                 = tostring(var.db_max_overflow)
+    SQS_QUEUE_URL                   = var.sqs_queue_url
+    SQS_REGION                      = var.sqs_region
+    AWS_REGION                      = var.region
+    SMTP_HOST                       = var.smtp_host
+    SMTP_PORT                       = tostring(var.smtp_port)
+    SMTP_USER                       = var.smtp_user
+    SMTP_PASSWORD                   = var.smtp_password
+    SMTP_FROM                       = var.smtp_from
+    SMTP_STARTTLS                   = tostring(var.smtp_starttls)
+    R2_ENDPOINT                     = var.r2_endpoint
+    R2_ACCESS_KEY_ID                = var.r2_access_key_id
+    R2_SECRET_ACCESS_KEY            = var.r2_secret_access_key
+    R2_BUCKET_NAME                  = var.r2_bucket_name
+    R2_PUBLIC_BASE_URL              = var.r2_public_base_url
+  }
+}
+
 resource "aws_ecs_task_definition" "backend" {
   family                   = "vetcore-backend"
   network_mode             = "awsvpc"
@@ -183,35 +235,7 @@ resource "aws_ecs_task_definition" "backend" {
       portMappings = [
         { containerPort = var.app_port, protocol = "tcp" }
       ]
-      environment = [
-        { name = "APP_NAME", value = "VetCore API" },
-        { name = "ENV", value = "production" },
-        { name = "DEBUG", value = "false" },
-        { name = "DATABASE_URL", value = var.database_url },
-        { name = "JWT_SECRET", value = var.jwt_secret },
-        { name = "JWT_ALGORITHM", value = "HS256" },
-        { name = "JWT_ACCESS_TOKEN_EXPIRE_MINUTES", value = "480" },
-        { name = "SUPER_ADMIN_EMAIL", value = var.super_admin_email },
-        { name = "SUPER_ADMIN_PASSWORD", value = var.super_admin_password },
-        { name = "SMART_ALERTS_SWEEP_ENABLED", value = "true" },
-        { name = "CORS_ORIGINS", value = var.cors_origins },
-        { name = "DB_POOL_SIZE", value = tostring(var.db_pool_size) },
-        { name = "DB_MAX_OVERFLOW", value = tostring(var.db_max_overflow) },
-        { name = "SQS_QUEUE_URL", value = var.sqs_queue_url },
-        { name = "SQS_REGION", value = var.sqs_region },
-        { name = "AWS_REGION", value = var.region },
-        { name = "SMTP_HOST", value = var.smtp_host },
-        { name = "SMTP_PORT", value = tostring(var.smtp_port) },
-        { name = "SMTP_USER", value = var.smtp_user },
-        { name = "SMTP_PASSWORD", value = var.smtp_password },
-        { name = "SMTP_FROM", value = var.smtp_from },
-        { name = "SMTP_STARTTLS", value = tostring(var.smtp_starttls) },
-        { name = "R2_ENDPOINT", value = var.r2_endpoint },
-        { name = "R2_ACCESS_KEY_ID", value = var.r2_access_key_id },
-        { name = "R2_SECRET_ACCESS_KEY", value = var.r2_secret_access_key },
-        { name = "R2_BUCKET_NAME", value = var.r2_bucket_name },
-        { name = "R2_PUBLIC_BASE_URL", value = var.r2_public_base_url },
-      ]
+      environment = [for k, v in local.app_env : { name = k, value = v }]
       logConfiguration = {
         logDriver = "awslogs"
         options = {

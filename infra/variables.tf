@@ -53,7 +53,7 @@ variable "db_pool_size" {
 
 variable "db_max_overflow" {
   type    = number
-  default = 10
+  default = 5
 }
 
 # VPC opcional: si la BD está dentro de una VPC, indica subnets y security group.
