@@ -190,15 +190,21 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <div className="bg-brand-gradient flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-xl text-primary-foreground shadow-card">
             {clinicLogoUrl ? (
               <img src={clinicLogoUrl} alt={clinicName} className="size-full object-cover" />
+            ) : profileLoading ? (
+              <span className="block size-4 animate-pulse rounded bg-white/40" />
             ) : (
               <PawPrint className="size-5" aria-hidden="true" />
             )}
           </div>
           {!collapsed && (
             <div className="min-w-0 flex-1 leading-tight">
-              <p className="break-words font-display text-sm font-semibold text-foreground">
-                {clinicName || 'VetCore'}
-              </p>
+              {profileLoading ? (
+                <span className="block h-4 w-28 animate-pulse rounded bg-secondary" />
+              ) : (
+                <p className="break-words font-display text-sm font-semibold text-foreground">
+                  {clinicName || 'VetCore'}
+                </p>
+              )}
               <p className="text-xs text-muted-foreground">Panel clínico</p>
             </div>
           )}

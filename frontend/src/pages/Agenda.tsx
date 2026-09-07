@@ -67,6 +67,32 @@ function startOfWeek(d: Date): Date {
   return copy
 }
 
+function diffDays(a: Date, b: Date): number {
+  const da = new Date(a)
+  const db = new Date(b)
+  da.setHours(0, 0, 0, 0)
+  db.setHours(0, 0, 0, 0)
+  return Math.round((da.getTime() - db.getTime()) / 86_400_000)
+}
+
+function relativeDayLabel(d: Date): string {
+  const diff = diffDays(d, new Date())
+  if (diff === 0) return 'Hoy'
+  if (diff === -1) return 'Ayer'
+  if (diff === 1) return 'Mañana'
+  if (diff < 0) return `Hace ${Math.abs(diff)} días`
+  return `En ${diff} días`
+}
+
+function weekNavLabel(d: Date): string {
+  const diff = Math.round(diffDays(startOfWeek(d), startOfWeek(new Date())) / 7)
+  if (diff === 0) return 'Esta semana'
+  if (diff === -1) return 'Semana pasada'
+  if (diff === 1) return 'Próxima semana'
+  if (diff < 0) return `Hace ${Math.abs(diff)} semanas`
+  return `En ${diff} semanas`
+}
+
 export function Agenda() {
   const [view, setView] = useState<'day' | 'week'>('day')
   const [cursor, setCursor] = useState(() => new Date())
@@ -89,35 +115,43 @@ export function Agenda() {
     return { from, to }
   }, [view, cursor])
 
-  const loadData = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const params = new URLSearchParams({
-        from: range.from.toISOString(),
-        to: range.to.toISOString(),
-      })
-      if (branchId) params.set('branch_id', branchId)
-      const [appts, blks, branchList] = await Promise.all([
-        apiFetch<Appointment[]>(`/appointments?${params}`),
-        apiFetch<ScheduleBlock[]>(`/schedule-blocks?${params}`),
-        apiFetch<{ id: string; name: string }[]>('/branches'),
-      ])
-      setAppointments(appts)
-      setBlocks(blks)
-      if (!branchId && branchList.length > 0) {
-        setBranchId(branchList[0].id)
+  const loadData = useCallback(
+    async (signal?: AbortSignal) => {
+      setLoading(true)
+      setError(null)
+      try {
+        const params = new URLSearchParams({
+          from: range.from.toISOString(),
+          to: range.to.toISOString(),
+        })
+        if (branchId) params.set('branch_id', branchId)
+        const [appts, blks, branchList] = await Promise.all([
+          apiFetch<Appointment[]>(`/appointments?${params}`, { signal }),
+          apiFetch<ScheduleBlock[]>(`/schedule-blocks?${params}`, { signal }),
+          apiFetch<{ id: string; name: string }[]>('/branches', { signal }),
+        ])
+        if (signal?.aborted) return
+        setAppointments(appts)
+        setBlocks(blks)
+        if (!branchId && branchList.length > 0) {
+          setBranchId(branchList[0].id)
+        }
+        setBranches(branchList)
+      } catch (err) {
+        // Una petición abortada al cambiar de vista/rango no debe mostrar error.
+        if (signal?.aborted) return
+        setError(err instanceof Error ? err.message : 'No se pudo cargar la agenda')
+      } finally {
+        if (!signal?.aborted) setLoading(false)
       }
-      setBranches(branchList)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo cargar la agenda')
-    } finally {
-      setLoading(false)
-    }
-  }, [range, branchId])
+    },
+    [range, branchId],
+  )
 
   useEffect(() => {
-    loadData()
+    const controller = new AbortController()
+    loadData(controller.signal)
+    return () => controller.abort()
   }, [loadData])
 
   const days = useMemo(() => {
@@ -185,9 +219,10 @@ export function Agenda() {
               variant="ghost"
               size="sm"
               onClick={() => setCursor(new Date())}
-              className="font-medium"
+              className="min-w-24 font-medium"
+              title="Ir a la fecha de hoy"
             >
-              Hoy
+              {view === 'day' ? relativeDayLabel(cursor) : weekNavLabel(cursor)}
             </Button>
             <Button variant="ghost" size="icon-sm" onClick={() => move(1)} aria-label="Siguiente">
               <ChevronRight />

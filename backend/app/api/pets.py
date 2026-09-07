@@ -30,8 +30,11 @@ from app.core.security import (
     InvalidTokenError,
     create_share_token,
     decode_share_token,
+    get_share_token_version,
+    share_token_version,
 )
 from app.core.storage import (
+    read_upload_limited,
     ALLOWED_IMAGE_EXTENSIONS,
     public_url,
     save_media,
@@ -266,15 +269,17 @@ def create_walkin_photo(
     file: UploadFile = File(...),
     name: str = Form(..., min_length=1, max_length=150),
     label: str = Form(default="", max_length=200),
+    note: str = Form(default="", max_length=2000),
     ctx: CurrentClinic = Depends(require_clinic_roles(*PET_MUTATORS)),
     db: Session = Depends(get_db),
 ) -> dict:
     validate_extension(file.filename or "", ALLOWED_IMAGE_EXTENSIONS)
-    content = file.file.read()
-    if len(content) > MAX_IMAGE_BYTES:
+    try:
+        content = read_upload_limited(file, MAX_IMAGE_BYTES)
+    except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail="La imagen supera el límite de 5 MB",
+            detail=str(exc),
         )
     rel = save_media(f"walkin/{date.today().isoformat()}", file.filename or "photo.jpg", content)
     photo = PetPhoto(
@@ -284,6 +289,7 @@ def create_walkin_photo(
         vet_user_id=ctx.user.sub,
         url=public_url(rel),
         label=label.strip() or None,
+        annotation_json={"note": note.strip()} if note.strip() else None,
         taken_at=datetime.now(UTC),
     )
     db.add(photo)
@@ -303,6 +309,7 @@ def create_walkin_photo(
         "id": str(photo.id),
         "url": photo.url,
         "label": photo.label,
+        "note": (photo.annotation_json or {}).get("note"),
         "walk_in_name": photo.walk_in_name,
         "taken_at": photo.taken_at.isoformat(),
     }
@@ -327,6 +334,7 @@ def list_walkin_photos(
             "id": str(p.id),
             "url": p.url,
             "label": p.label,
+            "note": (p.annotation_json or {}).get("note"),
             "walk_in_name": p.walk_in_name,
             "taken_at": p.taken_at.isoformat(),
         }
@@ -455,7 +463,12 @@ def _pet_from_qr_or_share_token(db: Session, token: str) -> Pet | None:
     """Resuelve una mascota desde un token de cartilla JWT o un qr_token."""
     try:
         pet_id = decode_share_token(token)
-        return db.get(Pet, pet_id)
+        pet = db.get(Pet, pet_id)
+        if pet is not None:
+            ver = get_share_token_version(token)
+            if ver is not None and ver != share_token_version(pet.qr_token):
+                raise InvalidTokenError("Enlace revocado")
+        return pet
     except InvalidTokenError:
         return db.scalar(select(Pet).where(Pet.qr_token == token))
 
@@ -630,11 +643,12 @@ def upload_pet_photo(
     pet = _get_pet_or_404(db, ctx.clinic["id"], pet_id)
 
     validate_extension(file.filename or "", ALLOWED_IMAGE_EXTENSIONS)
-    content = file.file.read()
-    if len(content) > MAX_IMAGE_BYTES:
+    try:
+        content = read_upload_limited(file, MAX_IMAGE_BYTES)
+    except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail="La imagen supera el límite de 5 MB",
+            detail=str(exc),
         )
 
     rel = save_media(f"pets/{pet_id}", file.filename or "photo.jpg", content)
@@ -671,6 +685,7 @@ def pet_photos_list(
             "id": str(p.id),
             "url": p.url,
             "label": p.label,
+            "note": (p.annotation_json or {}).get("note"),
             "taken_at": p.taken_at.isoformat(),
         }
         for p in photos
@@ -686,16 +701,18 @@ def create_pet_photo(
     pet_id: str,
     file: UploadFile = File(...),
     label: str = Form(default="", max_length=200),
+    note: str = Form(default="", max_length=2000),
     ctx: CurrentClinic = Depends(require_clinic_roles(*PET_MUTATORS)),
     db: Session = Depends(get_db),
 ) -> dict:
     pet = _get_pet_or_404(db, ctx.clinic["id"], pet_id)
     validate_extension(file.filename or "", ALLOWED_IMAGE_EXTENSIONS)
-    content = file.file.read()
-    if len(content) > MAX_IMAGE_BYTES:
+    try:
+        content = read_upload_limited(file, MAX_IMAGE_BYTES)
+    except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail="La imagen supera el límite de 5 MB",
+            detail=str(exc),
         )
     rel = save_media(f"pets/{pet_id}/photos", file.filename or "photo.jpg", content)
     photo = PetPhoto(
@@ -705,6 +722,7 @@ def create_pet_photo(
         vet_user_id=ctx.user.sub,
         url=public_url(rel),
         label=label.strip() or None,
+        annotation_json={"note": note.strip()} if note.strip() else None,
         taken_at=datetime.now(UTC),
     )
     db.add(photo)
@@ -724,6 +742,7 @@ def create_pet_photo(
         "id": str(photo.id),
         "url": photo.url,
         "label": photo.label,
+        "note": (photo.annotation_json or {}).get("note"),
         "taken_at": photo.taken_at.isoformat(),
     }
 
@@ -1036,7 +1055,8 @@ def create_share_link(
     db: Session = Depends(get_db),
 ) -> dict:
     pet = _get_pet_or_404(db, ctx.clinic["id"], pet_id)
-    token, expires_at = create_share_token(str(pet.id))
+    qr = ensure_qr_token(db, pet)
+    token, expires_at = create_share_token(str(pet.id), share_token_version(qr))
     record_audit(
         db,
         clinic_id=ctx.clinic["id"],

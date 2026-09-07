@@ -51,6 +51,25 @@ export function TimeGrid({
 
   return (
     <div className="relative overflow-x-auto">
+      {/* Líneas de la cuadrícula detrás de las columnas: el backdrop-blur de
+          cada columna las difumina (efecto frosted) sin aplicar backdrop-filter
+          a cada cita (evita el glitch de scroll). */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-y-0 left-[52px] right-0 z-0"
+      >
+        {Array.from({ length: END_HOUR - START_HOUR }, (_, i) => (
+          <div
+            key={i}
+            className={cn(
+              'absolute left-0 right-0 border-b border-border/50',
+              i % 2 === 1 && 'bg-muted/20',
+            )}
+            style={{ top: i * HOUR_PX, height: HOUR_PX }}
+          />
+        ))}
+      </div>
+
       <div
         className="grid"
         style={{ gridTemplateColumns: `52px repeat(${days.length}, minmax(0, 1fr))` }}
@@ -83,21 +102,12 @@ export function TimeGrid({
           return (
             <div
               key={day.toISOString()}
-              className={cn('relative border-l border-border', isToday && 'bg-primary/[0.03]')}
+              className={cn(
+                'relative border-l border-border backdrop-blur-md',
+                isToday && 'bg-primary/[0.03]',
+              )}
               style={{ height: TRACK_HEIGHT }}
             >
-              {/* filas de horas */}
-              {Array.from({ length: END_HOUR - START_HOUR }, (_, i) => (
-                <div
-                  key={i}
-                  className={cn(
-                    'absolute w-full border-b border-border/50',
-                    i % 2 === 1 && 'bg-muted/20',
-                  )}
-                  style={{ top: i * HOUR_PX, height: HOUR_PX }}
-                />
-              ))}
-
               {/* línea "ahora" */}
               {isToday && now.getHours() >= START_HOUR && now.getHours() < END_HOUR && (
                 <div
@@ -135,7 +145,7 @@ export function TimeGrid({
                     type="button"
                     onClick={() => onSelectAppointment(a)}
                     className={cn(
-                      'group absolute inset-x-1 z-20 flex cursor-pointer flex-col gap-0.5 overflow-hidden rounded-lg border border-border/60 px-2.5 py-1 text-left shadow-sm backdrop-blur-sm transition-all duration-150 hover:-translate-y-px hover:shadow-elevated',
+                      'group absolute inset-x-1 z-20 flex cursor-pointer flex-col gap-0.5 overflow-hidden rounded-lg border border-border/60 px-2.5 py-1 text-left shadow-sm transition-all duration-150 hover:-translate-y-px hover:shadow-elevated',
                       meta.soft,
                     )}
                     style={{ top: topPx(start), height: heightPx(start, end) }}

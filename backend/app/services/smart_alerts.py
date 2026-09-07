@@ -17,6 +17,7 @@ from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
 from sqlalchemy import func, or_, select, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.db.session import SessionLocal
@@ -691,21 +692,34 @@ def sync_alerts(
             elif key in dismissed_set:
                 continue
             else:
-                db.add(
-                    SmartAlert(
-                        clinic_id=clinic_id,
-                        branch_id=branch_id,
-                        rule_key=rule_key,
-                        entity_type=ev.entity_type,
-                        entity_id=ev.entity_id,
-                        status=ALERT_ACTIVE,
-                        triggered_at=now,
-                        last_evaluated_at=now,
-                        metadata_json=ev.metadata,
-                        message=ev.message,
-                        link=ev.link,
+                # El barrido periódico (sweep) corre en otra sesión: puede
+                # crear el mismo aviso entre nuestro SELECT y el INSERT. Un
+                # savepoint por aviso evita que la colisión aborte la
+                # transacción completa (ya existe un `active` equivalente).
+                try:
+                    with db.begin_nested():
+                        db.add(
+                            SmartAlert(
+                                clinic_id=clinic_id,
+                                branch_id=branch_id,
+                                rule_key=rule_key,
+                                entity_type=ev.entity_type,
+                                entity_id=ev.entity_id,
+                                status=ALERT_ACTIVE,
+                                triggered_at=now,
+                                last_evaluated_at=now,
+                                metadata_json=ev.metadata,
+                                message=ev.message,
+                                link=ev.link,
+                            )
+                        )
+                except IntegrityError:
+                    logger.debug(
+                        "Aviso %s/%s/%s ya creado por otra sesión; se omite",
+                        rule_key,
+                        ev.entity_type,
+                        ev.entity_id,
                     )
-                )
         for key, alert in active_map.items():
             if key not in seen:
                 alert.status = ALERT_RESOLVED

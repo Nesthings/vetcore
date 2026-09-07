@@ -89,7 +89,10 @@ def get_current_owner(
     return user
 
 
-def require_staff(user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
+def require_staff(
+    user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> CurrentUser:
     if user.role not in STAFF_ROLES:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -99,6 +102,19 @@ def require_staff(user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Token sin clínica asociada",
+        )
+    # Valida que el usuario siga existiendo y activo: un empleado desactivado
+    # no debe conservar acceso aunque su token aún no haya expirado.
+    active = db.execute(
+        text(
+            "SELECT 1 FROM users WHERE id = :uid AND clinic_id = :cid AND is_active = true"
+        ),
+        {"uid": user.sub, "cid": user.clinic_id},
+    ).scalar()
+    if not active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Cuenta de usuario desactivada o no encontrada",
         )
     return user
 

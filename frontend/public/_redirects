@@ -3,10 +3,10 @@
 # Proxy inverso: Netlify reenvía la petición y devuelve 200 (sin CORS/Mixed Content).
 
 # Proxy del API hacia el backend (ECS/ALB)
-/api/*    http://vetcore-alb-2040749110.us-east-1.elb.amazonaws.com/api/:splat    200
+/api/*    http://vetcore-alb-2014879163.us-east-1.elb.amazonaws.com/api/:splat    200
 
 # Proxy de media (fotos, PDFs de recibos, etc.)
-/media/*  http://vetcore-alb-2040749110.us-east-1.elb.amazonaws.com/media/:splat  200
+/media/*  http://vetcore-alb-2014879163.us-east-1.elb.amazonaws.com/media/:splat  200
 
 # Fallback SPA: todas las rutas sirven index.html (cartilla, mascotas, etc.)
 /*        /index.html                                                             200

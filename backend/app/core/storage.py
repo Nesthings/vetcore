@@ -138,3 +138,18 @@ def validate_extension(filename: str, allowed: set[str]) -> None:
             f"Extensión no permitida: {suffix or '(sin extensión)'}. "
             f"Permitidas: {', '.join(sorted(allowed))}"
         )
+
+
+def read_upload_limited(upload_file, max_bytes: int = 5 * 1024 * 1024) -> bytes:
+    """Lee el contenido de un UploadFile con tope de tamaño.
+
+    Lee en chunks y corta al superar `max_bytes` para no bufferizar archivos
+    gigantes en memoria (anti DoS). Lanza ValueError si se excede el límite.
+    """
+    limit = max(1, max_bytes)
+    content = upload_file.file.read(limit + 1)
+    if len(content) > limit:
+        raise ValueError(
+            f"El archivo supera el límite de {limit // (1024 * 1024)} MB"
+        )
+    return content

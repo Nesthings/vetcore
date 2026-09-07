@@ -1,4 +1,8 @@
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_DEFAULT_JWT_SECRET = "dev-only-secret-change-in-production"
+_DEFAULT_SUPER_ADMIN_PASSWORD = "change-me-in-production"
 
 
 class Settings(BaseSettings):
@@ -20,13 +24,27 @@ class Settings(BaseSettings):
     postgres_port: int = 5433
     database_url: str = ""
 
-    jwt_secret: str = "dev-only-secret-change-in-production"
+    # Pool de conexiones (parametrizable por entorno)
+    db_pool_size: int = 2
+    db_max_overflow: int = 4
+
+    jwt_secret: str = _DEFAULT_JWT_SECRET
     jwt_algorithm: str = "HS256"
     jwt_access_token_expire_minutes: int = 480
 
     super_admin_email: str = "admin@vetcore.app"
-    super_admin_password: str = "change-me-in-production"
+    super_admin_password: str = _DEFAULT_SUPER_ADMIN_PASSWORD
     super_admin_name: str = "Super Admin"
+
+    # CORS: orígenes explícitos separados por coma (env CORS_ORIGINS)
+    cors_origins: str = (
+        "http://localhost:5173,http://localhost:5179,"
+        "http://127.0.0.1:5173,http://127.0.0.1:5179"
+    )
+
+    # Barrido de alertas inteligentes (0 = desactivado; env para un solo worker)
+    smart_alerts_sweep_seconds: int = 900
+    smart_alerts_sweep_enabled: bool = True
 
     r2_endpoint: str = ""
     r2_access_key_id: str = ""
@@ -56,8 +74,22 @@ class Settings(BaseSettings):
     smtp_from: str = ""
     smtp_starttls: bool = True
 
-    # Alertas inteligentes: barrido periódico (segundos; 0 = desactivado)
-    smart_alerts_sweep_seconds: int = 900
+    @model_validator(mode="after")
+    def _validate_security(self) -> "Settings":
+        # Bloquea secretos por defecto fuera de desarrollo para evitar
+        # tokens falsificables y cuentas predecibles en producción.
+        if self.env != "development":
+            if self.jwt_secret in (_DEFAULT_JWT_SECRET, "change-me-in-production"):
+                raise ValueError(
+                    "JWT_SECRET debe configurarse con un valor fuerte en entornos "
+                    "que no sean development."
+                )
+            if self.super_admin_password in (_DEFAULT_SUPER_ADMIN_PASSWORD, "vetcore_dev123"):
+                raise ValueError(
+                    "SUPER_ADMIN_PASSWORD debe configurarse con un valor fuerte en "
+                    "entornos que no sean development."
+                )
+        return self
 
     @property
     def resolved_database_url(self) -> str:
@@ -67,6 +99,10 @@ class Settings(BaseSettings):
             f"postgresql+psycopg://{self.postgres_user}:{self.postgres_password}"
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
         )
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
 
 settings = Settings()

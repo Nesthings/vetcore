@@ -5,6 +5,7 @@ import {
   BedDouble,
   CalendarClock,
   Check,
+  Info,
   Loader2,
   PawPrint,
   Pencil,
@@ -212,6 +213,24 @@ export function Hospitalizacion() {
         </div>
       </div>
 
+      <div className="mb-4 flex items-start gap-3 rounded-xl border border-info/30 bg-info/5 px-4 py-3 text-sm">
+        <Info className="mt-0.5 size-4 shrink-0 text-info" aria-hidden="true" />
+        <div className="space-y-1 text-muted-foreground">
+          <p className="font-medium text-foreground">¿Cómo funciona esta pantalla?</p>
+          <ol className="list-inside list-decimal space-y-0.5">
+            <li>
+              <b>Admite</b> a un paciente con «Nueva hospitalización» y asígnalo a una jaula.
+            </li>
+            <li>
+              Desde su ficha registra <b>signos vitales, tareas, medicación y alimentación</b>.
+            </li>
+            <li>
+              Cuando mejore, <b>solicita el alta</b> y entrégalo con su seguimiento.
+            </li>
+          </ol>
+        </div>
+      </div>
+
       <div className="mb-4 flex flex-wrap gap-2">
         <StatChip label="Hospitalizados" value={summary?.active ?? 0} icon={BedDouble} tint="bg-primary/10 text-primary" />
         <StatChip label="Críticos" value={summary?.critical ?? 0} icon={Stethoscope} tint="bg-destructive/10 text-destructive" />
@@ -289,9 +308,9 @@ export function Hospitalizacion() {
       {!loading && !error && (
         <>
           {overview && overview.accommodations.length > 0 && (
-            <div className="mb-6">
+<div className="mb-6">
               <div className="mb-2 flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-foreground">Ocupación de espacios</h2>
+<h2 className="text-sm font-semibold text-foreground">Ocupación de espacios</h2>
                 <span className="text-xs text-muted-foreground">
                   {overview.accommodations.filter((a) => a.occupied).length}/{overview.accommodations.length} ocupados
                 </span>
@@ -301,14 +320,59 @@ export function Hospitalizacion() {
                 hospitalizations={items}
                 latestVitals={latestVitals}
               />
+              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="size-2.5 rounded-full bg-success" aria-hidden="true" /> Disponible
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="size-2.5 rounded-full bg-destructive" aria-hidden="true" /> Ocupado
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="size-2.5 rounded-full bg-warning" aria-hidden="true" /> Mantenimiento
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <BedDouble className="size-3.5 text-primary" aria-hidden="true" /> Haz clic en un
+                  ocupado para abrir su ficha
+                </span>
+              </div>
             </div>
-          )}
+            )}
 
-          {filtered.length === 0 ? (
+            <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
+              <span className="font-medium uppercase tracking-wide">Estado del paciente:</span>
+              <span className="inline-flex items-center gap-1">
+                <span className="size-2 rounded-full bg-success" aria-hidden="true" /> Estable
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <span className="size-2 rounded-full bg-info" aria-hidden="true" /> En vigilancia
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <span className="size-2 rounded-full bg-warning" aria-hidden="true" /> Delicado
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <span className="size-2 rounded-full bg-destructive" aria-hidden="true" /> Crítico
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <span className="size-2 rounded-full bg-orange-500" aria-hidden="true" /> Aislamiento
+              </span>
+            </div>
+
+            {filtered.length === 0 ? (
             <EmptyState
               title="Sin hospitalizaciones"
-              description="No hay pacientes internados con estos filtros."
+              description={
+                items.length === 0
+                  ? 'Ningún paciente está internado. Usa «Nueva hospitalización» para admitir a uno.'
+                  : 'No hay pacientes internados con estos filtros.'
+              }
               icon={BedDouble}
+              action={
+                items.length === 0 ? (
+                  <Button size="sm" onClick={() => setCreateOpen(true)}>
+                    <Plus /> Nueva hospitalización
+                  </Button>
+                ) : undefined
+              }
             />
           ) : (
             <div className="space-y-3">
@@ -424,9 +488,17 @@ function CreateHospitalizationDialog({
 }) {
   const { toast } = useToast()
   const [petQuery, setPetQuery] = useState('')
-  const [petResults, setPetResults] = useState<{ id: string; name: string; species: string }[]>([])
+  const [petResults, setPetResults] = useState<
+    {
+      id: string
+      name: string
+      species: string
+      owners?: Array<{ full_name?: string | null; is_active?: boolean }> | null
+    }[]
+  >([])
   const [petId, setPetId] = useState('')
   const [petName, setPetName] = useState('')
+  const [petSelected, setPetSelected] = useState(false)
   const [branchId, setBranchId] = useState('')
   const [accommodationId, setAccommodationId] = useState('')
   const [vetUserId, setVetUserId] = useState('')
@@ -445,6 +517,7 @@ function CreateHospitalizationDialog({
     setPetResults([])
     setPetId('')
     setPetName('')
+    setPetSelected(false)
     setBranchId(branches[0]?.id ?? '')
     setAccommodationId('')
     setVetUserId('')
@@ -465,9 +538,10 @@ function CreateHospitalizationDialog({
       .catch(() => setAccommodations([]))
   }, [open, branchId])
 
-  // Búsqueda de mascotas en tiempo real (con debounce).
-  useEffect(() => {
-    if (!open) return
+// Búsqueda de mascotas en tiempo real (con debounce). Se detiene una vez
+// que el usuario seleccionó un paciente para no reabrir la lista.
+useEffect(() => {
+    if (!open || petSelected) return
     const term = petQuery.trim()
     if (term.length < 2) {
       setPetResults([])
@@ -475,16 +549,21 @@ function CreateHospitalizationDialog({
     }
     const handle = window.setTimeout(async () => {
       try {
-        const res = await apiFetch<{ id: string; name: string; species: string }[]>(
-          `/pets?search=${encodeURIComponent(term)}`,
-        )
+        const res = await apiFetch<
+          {
+            id: string
+            name: string
+            species: string
+            owners?: Array<{ full_name?: string | null; is_active?: boolean }> | null
+          }[]
+        >(`/pets?search=${encodeURIComponent(term)}`)
         setPetResults(res)
       } catch {
         setPetResults([])
       }
     }, 300)
     return () => window.clearTimeout(handle)
-  }, [petQuery, open])
+  }, [petQuery, open, petSelected])
 
   const submit = async () => {
     setError(null)
@@ -531,11 +610,18 @@ function CreateHospitalizationDialog({
             <div className="relative">
               <Input
                 value={petQuery}
-                onChange={(e) => setPetQuery(e.target.value)}
+                onChange={(e) => {
+                  setPetQuery(e.target.value)
+                  if (petSelected) {
+                    setPetSelected(false)
+                    setPetId('')
+                    setPetName('')
+                  }
+                }}
                 placeholder="Escribe el nombre para buscar…"
                 autoComplete="off"
               />
-              {petResults.length > 0 && (
+              {!petSelected && petResults.length > 0 && (
                 <div className="absolute z-20 mt-1 max-h-40 w-full overflow-y-auto rounded-md border border-border bg-card p-1 shadow-card">
                   {petResults.map((p) => (
                     <button
@@ -544,17 +630,24 @@ function CreateHospitalizationDialog({
                       onClick={() => {
                         setPetId(p.id)
                         setPetName(p.name)
+                        setPetSelected(true)
                         setPetResults([])
                         setPetQuery(p.name)
                       }}
-                      className="block w-full rounded px-2 py-1.5 text-left text-sm capitalize hover:bg-accent"
+                      className="block w-full rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
                     >
-                      {p.name} · {p.species}
+                      <span className="font-medium capitalize">
+                        {p.name} · {p.species}
+                      </span>
+                      <span className="block truncate text-xs text-muted-foreground">
+                        Dueño:{' '}
+                        {p.owners?.find((o) => o.is_active)?.full_name ?? 'Sin dueño'}
+                      </span>
                     </button>
                   ))}
                 </div>
               )}
-              {petQuery.trim().length >= 2 && petResults.length === 0 && (
+              {!petSelected && petQuery.trim().length >= 2 && petResults.length === 0 && (
                 <p className="mt-1 text-xs text-muted-foreground">Sin resultados.</p>
               )}
             </div>

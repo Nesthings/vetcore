@@ -5,12 +5,14 @@ import { mdiPaw } from '@mdi/js'
 import {
   ArrowLeft,
   Camera,
+  Check,
   FileText,
   Home,
   Loader2,
   Plus,
   Search,
   Trash2,
+  User,
   UserPlus,
   X,
 } from 'lucide-react'
@@ -18,8 +20,16 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { apiFetch } from '@/lib/api'
 import { SPECIES_ICONS, speciesLabel } from '@/lib/species'
 
@@ -28,12 +38,14 @@ interface PetHit {
   name: string
   species: string
   breed?: string | null
+  owners?: { owner_id: string; full_name?: string | null; phone?: string | null }[]
 }
 
 interface PhotoItem {
   id: string
   url: string
   label?: string | null
+  note?: string | null
   taken_at: string
 }
 
@@ -56,6 +68,11 @@ const SPECIES_OPTIONS = [
 function toDateInput(d: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+function toTimeInput(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
 function dateFromAge(years: number, months: number): Date {
@@ -82,11 +99,17 @@ export function Movil() {
 
   // sesión de fotos
   const [photos, setPhotos] = useState<PhotoItem[]>([])
-  const [label, setLabel] = useState('')
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [confirm, setConfirm] = useState<{ title: string; onConfirm: () => void } | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+
+  // diálogo de detalles tras capturar la foto
+  const [pendingFile, setPendingFile] = useState<File | null>(null)
+  const [pendingPreview, setPendingPreview] = useState<string | null>(null)
+  const [pendingLabel, setPendingLabel] = useState('')
+  const [pendingNote, setPendingNote] = useState('')
+  const [capturedAt, setCapturedAt] = useState<Date | null>(null)
 
   const runSearch = useCallback(async (q: string) => {
     setSearching(true)
@@ -114,7 +137,6 @@ export function Movil() {
     setQuery('')
     setHits([])
     setPhotos([])
-    setLabel('')
   }
 
   const registerAndStart = async () => {
@@ -154,7 +176,7 @@ export function Movil() {
         const res = await apiFetch<(PhotoItem & { walk_in_name?: string })[]>(
           `/pets/photos/walkin?${params}`,
         )
-        setPhotos(res.map((p) => ({ id: p.id, url: p.url, label: p.label, taken_at: p.taken_at })))
+        setPhotos(res.map((p) => ({ id: p.id, url: p.url, label: p.label, note: p.note, taken_at: p.taken_at })))
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudieron cargar las fotos')
@@ -165,21 +187,36 @@ export function Movil() {
     if (session) loadPhotos(session)
   }, [session, loadPhotos])
 
-  const upload = async (file: File) => {
+  const onFileSelected = (file: File) => {
     if (!session) return
+    // Capturamos fecha/hora en el momento desde el dispositivo (no editable)
+    setCapturedAt(new Date())
+    setPendingLabel('')
+    setPendingNote('')
+    setPendingFile(file)
+    setPendingPreview(URL.createObjectURL(file))
+  }
+
+  const uploadPending = async () => {
+    if (!session || !pendingFile) return
     setUploading(true)
     setError(null)
     try {
       const fd = new FormData()
-      fd.append('file', file)
-      if (label.trim()) fd.append('label', label.trim())
+      fd.append('file', pendingFile)
+      if (pendingLabel.trim()) fd.append('label', pendingLabel.trim())
+      if (pendingNote.trim()) fd.append('note', pendingNote.trim())
       if (session.kind === 'pet') {
         await apiFetch(`/pets/${session.petId}/photos`, { method: 'POST', body: fd })
       } else {
         fd.append('name', session.name)
         await apiFetch('/pets/photos/walkin', { method: 'POST', body: fd })
       }
-      setLabel('')
+      setPendingFile(null)
+      setPendingPreview(null)
+      setPendingLabel('')
+      setPendingNote('')
+      setCapturedAt(null)
       await loadPhotos(session)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo subir la foto')
@@ -243,16 +280,6 @@ export function Movil() {
             </p>
           )}
 
-          <div className="space-y-2">
-            <Label htmlFor="movil-label">Etiqueta (opcional)</Label>
-            <Input
-              id="movil-label"
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-              placeholder="Ej. herida pata trasera, post-curación…"
-            />
-          </div>
-
           <input
             ref={fileRef}
             type="file"
@@ -261,7 +288,7 @@ export function Movil() {
             className="hidden"
             onChange={(e) => {
               const f = e.target.files?.[0]
-              if (f) upload(f)
+              if (f) onFileSelected(f)
               e.target.value = ''
             }}
           />
@@ -306,10 +333,15 @@ export function Movil() {
                     >
                       <Trash2 className="size-3.5" />
                     </button>
-                    {p.label && (
-                      <p className="border-t border-border/60 bg-card px-2 py-1.5 text-xs font-medium">
-                        {p.label}
-                      </p>
+                    {(p.label || p.note) && (
+                      <div className="border-t border-border/60 bg-card px-2 py-1.5">
+                        {p.label && <p className="text-xs font-semibold">{p.label}</p>}
+                        {p.note && (
+                          <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
+                            {p.note}
+                          </p>
+                        )}
+                      </div>
                     )}
                   </div>
                 ))}
@@ -326,6 +358,67 @@ export function Movil() {
           variant="destructive"
           onConfirm={() => confirm?.onConfirm()}
         />
+
+        <Dialog open={Boolean(pendingFile)} onOpenChange={(open) => !open && setPendingFile(null)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Detalles de la foto</DialogTitle>
+            </DialogHeader>
+
+            {pendingPreview && (
+              <div className="overflow-hidden rounded-xl border border-border/60">
+                <img src={pendingPreview} alt="Vista previa" className="aspect-square w-full object-cover" />
+              </div>
+            )}
+
+            <div className="space-y-1">
+              <Label>Fecha y hora</Label>
+              <Input
+                readOnly
+                value={
+                  capturedAt
+                    ? `${toDateInput(capturedAt)} · ${toTimeInput(capturedAt)}`
+                    : ''
+                }
+                className="bg-muted text-muted-foreground"
+              />
+              <p className="text-xs text-muted-foreground">
+                Se registra automáticamente desde el dispositivo y no se puede modificar.
+              </p>
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="movil-pending-label">Encabezado (opcional)</Label>
+              <Input
+                id="movil-pending-label"
+                value={pendingLabel}
+                onChange={(e) => setPendingLabel(e.target.value)}
+                placeholder="Ej. herida pata trasera, post-curación…"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="movil-pending-note">Nota (opcional)</Label>
+              <Textarea
+                id="movil-pending-note"
+                value={pendingNote}
+                onChange={(e) => setPendingNote(e.target.value)}
+                placeholder="Agrega una observación sobre esta foto…"
+                rows={3}
+              />
+            </div>
+
+            <DialogFooter className="gap-2 sm:gap-2">
+              <Button variant="outline" onClick={() => setPendingFile(null)}>
+                Descartar
+              </Button>
+              <Button onClick={uploadPending} disabled={uploading}>
+                {uploading ? <Loader2 className="animate-spin" /> : <Check className="size-4" />}
+                Guardar foto
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     )
   }
@@ -400,30 +493,44 @@ export function Movil() {
 
             {hits.length > 0 && (
               <div className="space-y-2">
-                {hits.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => startPetSession(p)}
-                    className="flex w-full items-center gap-3 rounded-xl border border-border/60 bg-card p-3 text-left shadow-sm transition-colors hover:border-primary/40 hover:bg-accent"
-                  >
-                    <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-300">
-                      <MDIIcon
-                        path={SPECIES_ICONS[p.species] ?? mdiPaw}
-                        size={0.9}
-                        aria-hidden="true"
-                      />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-base font-semibold">{p.name}</span>
-                      <span className="block truncate text-xs capitalize text-muted-foreground">
-                        {speciesLabel(p.species)}
-                        {p.breed ? ` · ${p.breed}` : ''}
+                {hits.map((p) => {
+                  const owner = p.owners?.[0]
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => startPetSession(p)}
+                      className="flex w-full items-center gap-3 rounded-xl border border-border/60 bg-card p-3 text-left shadow-sm transition-colors hover:border-primary/40 hover:bg-accent"
+                    >
+                      <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-300">
+                        <MDIIcon
+                          path={SPECIES_ICONS[p.species] ?? mdiPaw}
+                          size={0.9}
+                          aria-hidden="true"
+                        />
                       </span>
-                    </span>
-                    <Badge variant="outline">Abrir</Badge>
-                  </button>
-                ))}
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-base font-semibold">{p.name}</span>
+                        <span className="block truncate text-xs capitalize text-muted-foreground">
+                          {speciesLabel(p.species)}
+                          {p.breed ? ` · ${p.breed}` : ''}
+                        </span>
+                        {owner?.full_name ? (
+                          <span className="mt-0.5 flex items-center gap-1 truncate text-xs text-muted-foreground">
+                            <User className="size-3 shrink-0" />
+                            {owner.full_name}
+                            {owner.phone ? ` · ${owner.phone}` : ''}
+                          </span>
+                        ) : (
+                          <span className="mt-0.5 block truncate text-xs text-muted-foreground/70">
+                            Sin dueño registrado
+                          </span>
+                        )}
+                      </span>
+                      <Badge variant="outline">Abrir</Badge>
+                    </button>
+                  )
+                })}
               </div>
             )}
 

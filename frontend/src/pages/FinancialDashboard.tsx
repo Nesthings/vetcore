@@ -70,6 +70,10 @@ function fmt(n: number) {
   return `$${n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
+function MoneyAmount({ value, className }: { value: number; className?: string }) {
+  return <p className={`whitespace-nowrap tabular-nums ${className ?? ''}`}>{fmt(value)}</p>
+}
+
 function TopBarChart({
   title,
   data,
@@ -315,14 +319,14 @@ export function FinancialDashboard() {
 
       {data && !loading && !error && (
         <div className="space-y-6">
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6">
             <Card className="shadow-card">
               <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
                 <CardDescription>Ingresos</CardDescription>
                 <DollarSign className="size-4 text-primary" aria-hidden="true" />
               </CardHeader>
               <CardContent>
-                <p className="text-2xl font-semibold tracking-tight">{fmt(data.ingresos_total)}</p>
+                <MoneyAmount value={data.ingresos_total} className="text-lg font-semibold tracking-tight xl:text-xl 2xl:text-2xl" />
               </CardContent>
             </Card>
             <Card className="shadow-card">
@@ -331,9 +335,10 @@ export function FinancialDashboard() {
                 <Stethoscope className="size-4 text-primary" aria-hidden="true" />
               </CardHeader>
               <CardContent>
-                <p className="text-2xl font-semibold tracking-tight">
-                  {fmt(data.ingresos_servicios_total)}
-                </p>
+                <MoneyAmount
+                  value={data.ingresos_servicios_total}
+                  className="text-lg font-semibold tracking-tight xl:text-xl 2xl:text-2xl"
+                />
               </CardContent>
             </Card>
             <Card className="shadow-card">
@@ -342,9 +347,10 @@ export function FinancialDashboard() {
                 <Package className="size-4 text-primary" aria-hidden="true" />
               </CardHeader>
               <CardContent>
-                <p className="text-2xl font-semibold tracking-tight">
-                  {fmt(data.ingresos_productos_total)}
-                </p>
+                <MoneyAmount
+                  value={data.ingresos_productos_total}
+                  className="text-lg font-semibold tracking-tight xl:text-xl 2xl:text-2xl"
+                />
               </CardContent>
             </Card>
             <Card className="shadow-card">
@@ -353,7 +359,7 @@ export function FinancialDashboard() {
                 <TrendingUp className="size-4 text-primary" aria-hidden="true" />
               </CardHeader>
               <CardContent>
-                <p className="text-2xl font-semibold tracking-tight">{fmt(data.ticket_promedio)}</p>
+                <MoneyAmount value={data.ticket_promedio} className="text-lg font-semibold tracking-tight xl:text-xl 2xl:text-2xl" />
               </CardContent>
             </Card>
             <Card className="shadow-card">
@@ -362,7 +368,7 @@ export function FinancialDashboard() {
                 <Receipt className="size-4 text-primary" aria-hidden="true" />
               </CardHeader>
               <CardContent>
-                <p className="text-2xl font-semibold tracking-tight">
+                <p className="text-lg font-semibold tracking-tight xl:text-xl 2xl:text-2xl">
                   {data.facturas_por_estado.paid ?? 0}
                 </p>
               </CardContent>
@@ -373,9 +379,10 @@ export function FinancialDashboard() {
                 <DollarSign className="size-4 text-warning" aria-hidden="true" />
               </CardHeader>
               <CardContent>
-                <p className="text-2xl font-semibold tracking-tight">
-                  {fmt(data.pendientes_por_cobrar)}
-                </p>
+                <MoneyAmount
+                  value={data.pendientes_por_cobrar}
+                  className="text-lg font-semibold tracking-tight xl:text-xl 2xl:text-2xl"
+                />
               </CardContent>
             </Card>
           </div>

@@ -6,6 +6,7 @@ import jsPDF from 'jspdf'
 import { Icon as MDIIcon } from '@mdi/react'
 import { mdiPaw } from '@mdi/js'
 import {
+  BedDouble,
   Camera,
   Cake,
   CalendarDays,
@@ -34,6 +35,10 @@ import { SignaturePad } from '@/components/pets/SignaturePad'
 import { PetQrCard } from '@/components/pets/PetQrCard'
 import { DoseStamps } from '@/components/pets/DoseStamps'
 import { WeightChart } from '@/components/pets/WeightChart'
+import {
+  HospitalizacionGameCard,
+  type HospitalizationShare,
+} from '@/components/cartilla/HospitalizacionGameCard'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -209,6 +214,7 @@ interface ShareData {
   timeline: ShareTimelineEvent[]
   photos: SharePhoto[]
   family: ShareFamily[]
+  hospitalization?: HospitalizationShare | null
 }
 
 const CITA_STATUS: Record<
@@ -1302,7 +1308,7 @@ export function CartillaShare() {
 
           <div className="border-t border-border p-5 sm:p-6">
             <Tabs defaultValue="timeline" className="space-y-5">
-              <TabsList className="w-full justify-start gap-1 overflow-x-auto rounded-xl border border-border bg-card p-1 sm:w-auto sm:overflow-visible">
+              <TabsList className="flex w-full justify-start gap-1 overflow-x-auto whitespace-nowrap rounded-xl border border-border bg-card p-1 pb-1.5 [scrollbar-color:var(--border)_transparent] [scrollbar-width:thin] [&_[data-slot=tabs-trigger]]:flex-none [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-border [&::-webkit-scrollbar-track]:bg-transparent">
                 <TabsTrigger value="timeline" className="gap-1.5">
                   <History className="size-4" aria-hidden="true" /> Línea de tiempo
                 </TabsTrigger>
@@ -1325,6 +1331,9 @@ export function CartillaShare() {
                 </TabsTrigger>
                 <TabsTrigger value="familia" className="gap-1.5">
                   <Users className="size-4" aria-hidden="true" /> Familia
+                </TabsTrigger>
+                <TabsTrigger value="hospitalizacion" className="gap-1.5">
+                  <BedDouble className="size-4" aria-hidden="true" /> Hospitalización
                 </TabsTrigger>
               </TabsList>
 
@@ -1663,6 +1672,38 @@ export function CartillaShare() {
                         </div>
                       )
                     })}
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="hospitalizacion">
+                {!data.hospitalization ? (
+                  <EmptyState
+                    title="No está hospitalizado"
+                    description={`Si ${pet.name} estuviera en hospitalización, aquí verías su monitoreo en vivo.`}
+                    icon={BedDouble}
+                  />
+                ) : (
+                  <div className="space-y-3">
+                    <HospitalizacionGameCard
+                      h={data.hospitalization}
+                      petName={pet.name}
+                      petPhoto={pet.clinical_photo_url}
+                    />
+                    {data.hospitalization.last_vet?.seen_at && (
+                      <p className="text-center text-xs text-muted-foreground">
+                        Última revisión:{' '}
+                        {new Date(
+                          data.hospitalization.last_vet.seen_at,
+                        ).toLocaleString('es-MX', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </p>
+                    )}
                   </div>
                 )}
               </TabsContent>

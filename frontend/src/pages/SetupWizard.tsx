@@ -9,7 +9,6 @@ import {
   Loader2,
   MapPin,
   Network,
-  PawPrint,
   ShieldCheck,
   Sparkles,
   UserPlus,
@@ -21,6 +20,7 @@ import { Label } from '@/components/ui/label'
 import { apiFetch } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
 import { useSetup } from '@/lib/setup'
+import { useTheme } from '@/lib/theme'
 import { cn } from '@/lib/utils'
 
 const STEPS = [
@@ -179,6 +179,7 @@ export function SetupWizard() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const { refresh } = useSetup()
+  const { theme } = useTheme()
   const [step, setStep] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -256,21 +257,49 @@ export function SetupWizard() {
     loadData()
   }, [loadData])
 
-  const saveStep = async () => {
-    setError(null)
-    setSaving(true)
-    try {
-      if (step === 0) {
-        await apiFetch('/clinics/me', {
-          method: 'PATCH',
-          body: JSON.stringify(clinicForm),
-        })
-        if (logoFile) {
-          const form = new FormData()
-          form.append('file', logoFile)
-          await apiFetch('/clinics/me/logo', { method: 'POST', body: form })
-        }
-      } else if (step === 1) {
+  const validateStep = (): string | null => {
+  if (step === 0) {
+    if (!clinicForm.name.trim()) return 'El nombre de la clínica es obligatorio.'
+    if (!clinicForm.contact_name.trim()) return 'El nombre de contacto es obligatorio.'
+    if (!clinicForm.contact_phone.trim()) return 'El teléfono de contacto es obligatorio.'
+    if (!clinicForm.contact_email.trim()) return 'El correo de contacto es obligatorio.'
+  } else if (step === 1) {
+    if (!superForm.full_name.trim()) return 'El nombre completo del administrador es obligatorio.'
+    if (!superForm.job_title.trim()) return 'El cargo/puesto es obligatorio.'
+  } else if (step === 2) {
+    if (newBranches.some((b) => !b.name.trim())) {
+      return 'Cada sucursal debe tener un nombre.'
+    }
+  } else if (step === 3) {
+    const pending = team.filter((t) => !t.full_name.trim() || !t.email.trim() || !t.password.trim() || !t.job_title.trim())
+    if (pending.length > 0) {
+      return 'Cada dependiente debe tener nombre completo, correo, contraseña y puesto.'
+    }
+  }
+  return null
+}
+
+const saveStep = async () => {
+  setError(null)
+  const validationError = validateStep()
+  if (validationError) {
+    setError(validationError)
+    setSaving(false)
+    return
+  }
+  setSaving(true)
+  try {
+    if (step === 0) {
+      await apiFetch('/clinics/me', {
+        method: 'PATCH',
+        body: JSON.stringify(clinicForm),
+      })
+      if (logoFile) {
+        const form = new FormData()
+        form.append('file', logoFile)
+        await apiFetch('/clinics/me/logo', { method: 'POST', body: form })
+      }
+    } else if (step === 1) {
         await apiFetch('/users/me', {
           method: 'PATCH',
           body: JSON.stringify(superForm),
@@ -399,17 +428,11 @@ export function SetupWizard() {
         {/* Header */}
         <header className="mb-6 flex flex-wrap items-center justify-between gap-4 sm:mb-8">
           <div className="flex items-center gap-4">
-            <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-gradient-brand text-white shadow-elevated">
-              {logoFile || logoUrl ? (
-                <img
-                  src={logoFile ? URL.createObjectURL(logoFile) : logoUrl ?? ''}
-                  alt="Logo de la clínica"
-                  className="size-full object-cover"
-                />
-              ) : (
-                <PawPrint className="size-6" aria-hidden="true" />
-              )}
-            </div>
+            <img
+              src={theme === 'dark' ? '/logo_for_darkmode.png' : '/logo_for_whitemode.png'}
+              alt="VetCore"
+              className="size-12 shrink-0 rounded-2xl object-contain"
+            />
             <div>
               <h1 className="font-display text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
                 Configura tu clínica

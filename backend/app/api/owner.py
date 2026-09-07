@@ -17,6 +17,7 @@ from app.api.deps import CurrentUser, get_current_owner
 from app.core.events import record_audit
 from app.core.images import process_cartilla_photo
 from app.core.storage import (
+    read_upload_limited,
     ALLOWED_IMAGE_EXTENSIONS,
     public_url,
     save_media,
@@ -95,6 +96,9 @@ def _pet_cartilla(db: Session, pet: Pet, clinic: dict) -> dict:
             "species": pet.species,
             "breed": pet.breed,
             "sex": pet.sex,
+            "color_primary": pet.color_primary,
+            "color_secondary": pet.color_secondary,
+            "markings": pet.markings,
             "birth_date": pet.birth_date.isoformat() if pet.birth_date else None,
             "cartilla_photo_url": pet.cartilla_photo_url,
             "latest_weight_kg": float(latest) if latest is not None else None,
@@ -228,11 +232,12 @@ def upload_cartilla_photo(
     pet, clinic = _linked_pet(db, owner.sub, pet_id)
 
     validate_extension(file.filename or "", ALLOWED_IMAGE_EXTENSIONS)
-    content = file.file.read()
-    if len(content) > MAX_IMAGE_BYTES:
+    try:
+        content = read_upload_limited(file, MAX_IMAGE_BYTES)
+    except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail="La imagen supera el límite de 5 MB",
+            detail=str(exc),
         )
     try:
         processed = process_cartilla_photo(content)

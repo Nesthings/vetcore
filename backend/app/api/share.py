@@ -25,8 +25,14 @@ from sqlalchemy.orm import Session
 from app.api.pets import ensure_qr_token
 from app.core.events import notify_roles, record_audit
 from app.core.images import process_cartilla_photo
-from app.core.security import InvalidTokenError, decode_share_token
+from app.core.security import (
+    InvalidTokenError,
+    decode_share_token,
+    get_share_token_version,
+    share_token_version,
+)
 from app.core.storage import (
+    read_upload_limited,
     ALLOWED_IMAGE_EXTENSIONS,
     public_url,
     save_media,
@@ -42,6 +48,10 @@ from app.models import (
     Consultation,
     ConsultationAttachment,
     DigitalConsent,
+    Hospitalization,
+    HospitalizationAccommodation,
+    HospitalizationNote,
+    HospitalizationVital,
     Pet,
     PetPhoto,
     PetWeightRecord,
@@ -60,6 +70,10 @@ def _pet_from_token(token: str, db: Session) -> Pet:
     try:
         pet_id = decode_share_token(token)
         pet = db.get(Pet, pet_id)
+        if pet is not None:
+            ver = get_share_token_version(token)
+            if ver is not None and ver != share_token_version(pet.qr_token):
+                raise InvalidTokenError("Enlace revocado")
     except InvalidTokenError:
         pet = db.scalar(select(Pet).where(Pet.qr_token == token))
     if pet is None or not pet.is_active:
@@ -110,6 +124,85 @@ def _pet_dict(db: Session, pet: Pet) -> dict:
     }
     data["owners"] = _with_owners(db, pet)
     return data
+
+
+def _hospitalization_payload(db: Session, pet: Pet) -> dict | None:
+    """Estancia activa de la mascota con signos y último veterinario (si hay)."""
+    hosp = db.scalar(
+        select(Hospitalization)
+        .where(
+            Hospitalization.pet_id == pet.id,
+            Hospitalization.status.in_(("admitted", "active", "discharge_pending")),
+        )
+        .order_by(Hospitalization.admitted_at.desc())
+    )
+    if hosp is None:
+        return None
+
+    acc = (
+        db.get(HospitalizationAccommodation, hosp.accommodation_id)
+        if hosp.accommodation_id
+        else None
+    )
+
+    vital_rows = db.execute(
+        text(
+            "SELECT DISTINCT ON (parameter) parameter, value, unit, observed_at "
+            "FROM hospitalization_vitals WHERE hospitalization_id = :hid "
+            "ORDER BY parameter, observed_at DESC"
+        ),
+        {"hid": hosp.id},
+    ).mappings().all()
+    vitals: dict = {}
+    for r in vital_rows:
+        vitals[r["parameter"]] = {
+            "value": float(r["value"]) if r["value"] is not None else None,
+            "unit": r["unit"],
+            "observed_at": r["observed_at"].isoformat(),
+        }
+
+    note = db.execute(
+        text(
+            "SELECT n.user_id, u.full_name, u.photo_url, n.created_at "
+            "FROM hospitalization_notes n "
+            "LEFT JOIN users u ON u.id = n.user_id "
+            "WHERE n.hospitalization_id = :hid "
+            "ORDER BY n.created_at DESC LIMIT 1"
+        ),
+        {"hid": hosp.id},
+    ).mappings().first()
+    vet = db.get(User, hosp.vet_user_id) if hosp.vet_user_id else None
+    last_vet = None
+    if note and note["full_name"]:
+        last_vet = {
+            "name": note["full_name"],
+            "photo_url": note["photo_url"],
+            "seen_at": note["created_at"].isoformat(),
+        }
+    elif vet:
+        last_vet = {
+            "name": vet.full_name,
+            "photo_url": vet.photo_url,
+            "seen_at": hosp.updated_at.isoformat(),
+        }
+
+    return {
+        "status": hosp.status,
+        "monitoring_level": hosp.monitoring_level,
+        "operational_status": hosp.operational_status,
+        "isolation_status": hosp.isolation_status,
+        "diagnosis": hosp.diagnosis,
+        "reason": hosp.reason,
+        "admitted_at": hosp.admitted_at.isoformat(),
+        "expected_discharge_at": (
+            hosp.expected_discharge_at.isoformat() if hosp.expected_discharge_at else None
+        ),
+        "accommodation": (
+            {"code": acc.code, "name": acc.name, "type": acc.type} if acc else None
+        ),
+        "vitals": vitals,
+        "last_vet": last_vet,
+    }
 
 
 @router.get("/cartilla", summary="Datos de la cartilla del dueño (por token)")
@@ -350,6 +443,7 @@ def share_cartilla(
         "timeline": timeline,
         "photos": photos,
         "family": family,
+        "hospitalization": _hospitalization_payload(db, pet),
     }
 
 
@@ -521,11 +615,12 @@ def share_upload_photo(
 ) -> dict:
     pet = _pet_from_token(token, db)
     validate_extension(file.filename or "", ALLOWED_IMAGE_EXTENSIONS)
-    content = file.file.read()
-    if len(content) > MAX_IMAGE_BYTES:
+    try:
+        content = read_upload_limited(file, MAX_IMAGE_BYTES)
+    except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail="La imagen supera el límite de 5 MB",
+            detail=str(exc),
         )
     try:
         processed = process_cartilla_photo(content)
@@ -567,11 +662,12 @@ def share_upload_owner_photo(
             status_code=status.HTTP_404_NOT_FOUND, detail="La mascota no tiene un dueño activo"
         )
     validate_extension(file.filename or "", ALLOWED_IMAGE_EXTENSIONS)
-    content = file.file.read()
-    if len(content) > MAX_IMAGE_BYTES:
+    try:
+        content = read_upload_limited(file, MAX_IMAGE_BYTES)
+    except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail="La imagen supera el límite de 5 MB",
+            detail=str(exc),
         )
     try:
         processed = process_cartilla_photo(content)
@@ -628,11 +724,12 @@ def share_upload_owner_signature(
     pet = _pet_from_token(token, db)
     row = _active_owner_row(db, pet)
     validate_extension(file.filename or "", ALLOWED_IMAGE_EXTENSIONS)
-    content = file.file.read()
-    if len(content) > MAX_IMAGE_BYTES:
+    try:
+        content = read_upload_limited(file, MAX_IMAGE_BYTES)
+    except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail="La imagen supera el límite de 5 MB",
+            detail=str(exc),
         )
     import io
 

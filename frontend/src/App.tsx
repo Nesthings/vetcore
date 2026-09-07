@@ -56,7 +56,16 @@ function App() {
                   <Route path="/forgot-password" element={<ForgotPassword />} />
                   <Route path="/reset-password" element={<ResetPassword />} />
                   <Route path="/cartilla" element={<CartillaShare />} />
-                  <Route path="/design-system" element={<DesignSystem />} />
+                  <Route
+                    path="/design-system"
+                    element={
+                      import.meta.env.DEV ? (
+                        <DesignSystem />
+                      ) : (
+                        <Navigate to="/" replace />
+                      )
+                    }
+                  />
 
                   <Route
                     path="/platform"

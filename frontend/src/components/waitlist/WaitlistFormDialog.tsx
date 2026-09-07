@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Info, Loader2 } from 'lucide-react'
 
+import { PetCombobox } from '@/components/waitlist/PetCombobox'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -30,9 +31,9 @@ export function WaitlistFormDialog({
   onSaved: () => void
 }) {
   const [branches, setBranches] = useState<{ id: string; name: string }[]>([])
-  const [pets, setPets] = useState<{ id: string; name: string }[]>([])
   const [branchId, setBranchId] = useState('')
   const [petId, setPetId] = useState('')
+  const [petName, setPetName] = useState<string | null>(null)
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -41,6 +42,7 @@ export function WaitlistFormDialog({
   useEffect(() => {
     if (!open) return
     setPetId('')
+    setPetName(null)
     setError(null)
     const d = new Date()
     d.setMinutes(0, 0, 0)
@@ -51,13 +53,9 @@ export function WaitlistFormDialog({
     t.setHours(12)
     setFrom(toLocalInputValue(f.toISOString()))
     setTo(toLocalInputValue(t.toISOString()))
-    Promise.all([
-      apiFetch<{ id: string; name: string }[]>('/branches'),
-      apiFetch<{ id: string; name: string }[]>('/pets'),
-    ])
-      .then(([b, p]) => {
+    apiFetch<{ id: string; name: string }[]>('/branches')
+      .then((b) => {
         setBranches(b)
-        setPets(p)
         if (b.length > 0) setBranchId((cur) => cur || b[0].id)
       })
       .catch((err) =>
@@ -106,19 +104,14 @@ export function WaitlistFormDialog({
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Paciente *</Label>
-              <select
+              <PetCombobox
                 value={petId}
-                onChange={(e) => setPetId(e.target.value)}
-                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-              >
-                <option value="">— Selecciona —</option>
-                {pets.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
+                selectedName={petName}
+                onSelect={(pet) => {
+                  setPetId(pet?.id ?? '')
+                  setPetName(pet?.name ?? null)
+                }}
+              />
             </div>
             <div className="space-y-2">
               <Label>Sucursal</Label>

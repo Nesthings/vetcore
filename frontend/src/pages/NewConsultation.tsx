@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import {
   ArrowLeft,
+  ArrowRight,
+  Check,
   CheckCircle2,
   FileText,
   Loader2,
@@ -26,11 +28,12 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/components/ui/toast'
 import { BrandCombobox } from '@/components/pets/BrandCombobox'
-import { ClinicalAlertSelector } from '@/components/pets/ClinicalAlertSelector'
+import { PetFormDialog } from '@/components/pets/PetFormDialog'
 import type { Pet, PetOwner } from '@/pages/Pets'
 import { apiFetch } from '@/lib/api'
 import type { SaleProduct } from '@/lib/product'
 import type { PetVaccinationPlan } from '@/lib/vaccination'
+import { cn } from '@/lib/utils'
 
 interface Branch {
   id: string
@@ -130,6 +133,51 @@ export function NewConsultation() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState<CheckoutResult | null>(null)
+  const [step, setStep] = useState(0)
+
+  const STEPS = [
+    { title: 'Paciente', desc: 'Veterinario, sucursal y mascota' },
+    { title: 'Dueño y clínica', desc: 'Contacto y alertas del paciente' },
+    { title: 'Consulta', desc: 'Peso, fecha, hora y motivo' },
+    { title: 'Servicios, productos y vacunas', desc: 'Conceptos a cobrar y vacunación' },
+    { title: 'Resumen y cobro', desc: 'Verifica y genera el recibo' },
+  ]
+
+  useEffect(() => {
+    if (!pet) setStep((s) => (s > 0 ? 0 : s))
+  }, [pet])
+
+  const [mode, setMode] = useState<'choose' | 'existing' | 'new'>('choose')
+  const [petDialogOpen, setPetDialogOpen] = useState(false)
+
+  const switchMode = (m: 'choose' | 'existing' | 'new') => {
+    setMode(m)
+    setPet(null)
+    setResults([])
+    setQuery('')
+  }
+
+  const selectedPetPreview = pet ? (
+    <div className="flex items-center gap-3 rounded-md border border-border/60 p-3">
+      <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-secondary">
+        {pet.clinical_photo_url ? (
+          <img src={pet.clinical_photo_url} alt={pet.name} className="size-full object-cover" />
+        ) : (
+          <Users className="size-5 text-muted-foreground" />
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="font-medium">{pet.name}</p>
+        <p className="text-xs text-muted-foreground">
+          {pet.species}
+          {pet.breed ? ` · ${pet.breed}` : ''}
+          {pet.sex ? ` · ${pet.sex === 'M' ? 'Macho' : 'Hembra'}` : ''}
+          {pet.color_primary ? ` · ${pet.color_primary}` : ''}
+        </p>
+      </div>
+      <Badge variant="secondary">Seleccionado</Badge>
+    </div>
+  ) : null
 
   const loadBase = useCallback(async () => {
     try {
@@ -385,8 +433,8 @@ export function NewConsultation() {
   const productStock = (productId: string) =>
     products.find((p) => p.id === productId)?.stock_quantity ?? 0
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const submit = async (_e?: React.FormEvent) => {
+    _e?.preventDefault()
     setError(null)
     if (!pet) {
       setError('Selecciona una mascota.')
@@ -487,114 +535,229 @@ export function NewConsultation() {
         </div>
       </div>
 
-      <form onSubmit={submit} className="max-w-4xl space-y-6">
+      {/* Indicador de pasos del asistente */}
+      {mode !== 'choose' && (
+      <div className="mb-8 flex items-center gap-2 sm:gap-3">
+        {STEPS.map((s, i) => {
+          const reachable = i === 0 || Boolean(pet)
+          const active = i === step
+          const done = i < step
+          return (
+            <Fragment key={s.title}>
+              <button
+                type="button"
+                disabled={!reachable}
+                onClick={() => reachable && setStep(i)}
+                title={s.desc}
+                className={cn(
+                  'group flex items-center gap-2',
+                  !reachable && 'cursor-not-allowed opacity-50',
+                )}
+              >
+                <span
+                  className={cn(
+                    'flex size-8 shrink-0 items-center justify-center rounded-full border text-sm font-semibold transition-colors',
+                    active
+                      ? 'border-primary bg-primary text-primary-foreground shadow-glow'
+                      : done
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-border bg-card text-muted-foreground',
+                  )}
+                >
+                  {done ? <Check className="size-4" aria-hidden="true" /> : i + 1}
+                </span>
+                <span
+                  className={cn(
+                    'hidden text-sm font-medium md:block',
+                    active ? 'text-foreground' : 'text-muted-foreground',
+                  )}
+                >
+                  {s.title}
+                </span>
+              </button>
+              {i < STEPS.length - 1 && (
+                <div className={cn('h-px flex-1', i < step ? 'bg-primary/40' : 'bg-border')} />
+              )}
+            </Fragment>
+          )
+        })}
+      </div>
+      )}
+
+      <form onSubmit={(e) => e.preventDefault()} className="mx-auto max-w-4xl space-y-6">
+        {step === 0 && (
         <Card className="shadow-card">
           <CardHeader>
-            <CardTitle>1. ¿A quién se consultó y qué paciente?</CardTitle>
+            <CardTitle>¿A quién se consultó y qué paciente?</CardTitle>
             <CardDescription>Selecciona el veterinario y busca a la mascota</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Veterinario que atendió *</Label>
-                <select
-                  value={vetUserId}
-                  onChange={(e) => setVetUserId(e.target.value)}
-                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                  required
+            {mode === 'choose' ? (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => switchMode('existing')}
+                  className="group flex flex-col items-start gap-1 rounded-xl border border-border bg-card p-5 text-left shadow-card transition-colors hover:border-primary/50 hover:bg-accent"
                 >
-                  <option value="">— Selecciona —</option>
-                  {vets.map((v) => (
-                    <option key={v.id} value={v.id}>
-                      {v.full_name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <Label>Sucursal</Label>
-                <select
-                  value={branchId}
-                  onChange={(e) => setBranchId(e.target.value)}
-                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  <span className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <Users className="size-5" aria-hidden="true" />
+                  </span>
+                  <span className="mt-2 font-semibold">Paciente existente</span>
+                  <span className="text-xs text-muted-foreground">
+                    Busca y selecciona una mascota ya registrada
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => switchMode('new')}
+                  className="group flex flex-col items-start gap-1 rounded-xl border border-border bg-card p-5 text-left shadow-card transition-colors hover:border-primary/50 hover:bg-accent"
                 >
-                  {branches.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.name}
-                    </option>
-                  ))}
-                </select>
+                  <span className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <Plus className="size-5" aria-hidden="true" />
+                  </span>
+                  <span className="mt-2 font-semibold">Nuevo paciente</span>
+                  <span className="text-xs text-muted-foreground">
+                    Registra una mascota nueva y continúa con la consulta
+                  </span>
+                </button>
               </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), search())}
-                placeholder="Buscar mascota por nombre…"
-              />
-              <Button type="button" variant="outline" onClick={search} disabled={searching}>
-                {searching ? <Loader2 className="animate-spin" /> : <Search />}
-                Buscar
-              </Button>
-            </div>
-
-            {results.length > 0 && (
-              <div className="max-h-60 space-y-2 overflow-y-auto rounded-md border border-border p-2">
-                {results.map((p) => (
-                  <button
+            ) : (
+              <>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    {mode === 'existing' ? 'Paciente existente' : 'Nuevo paciente'}
+                  </p>
+                  <Button
                     type="button"
-                    key={p.id}
-                    onClick={() => pickPet(p.id)}
-                    className="flex w-full items-center justify-between gap-3 rounded-md px-3 py-2 text-left hover:bg-accent"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => switchMode('choose')}
                   >
-                    <div>
-                      <p className="font-medium">{p.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {p.species}
-                        {p.breed ? ` · ${p.breed}` : ''}
-                        {p.sex ? ` · ${p.sex === 'M' ? 'Macho' : 'Hembra'}` : ''}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xs text-muted-foreground">
-                        {p.owners?.find((o) => o.is_active)?.full_name ?? 'Sin dueño'}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {p.owners?.find((o) => o.is_active)?.phone ?? ''}
-                      </p>
-                    </div>
-                  </button>
-                ))}
-              </div>
+                    Cambiar
+                  </Button>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Veterinario que atendió *</Label>
+                    <select
+                      value={vetUserId}
+                      onChange={(e) => setVetUserId(e.target.value)}
+                      className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                      required
+                    >
+                      <option value="">— Selecciona —</option>
+                      {vets.map((v) => (
+                        <option key={v.id} value={v.id}>
+                          {v.full_name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Sucursal</Label>
+                    <select
+                      value={branchId}
+                      onChange={(e) => setBranchId(e.target.value)}
+                      className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                    >
+                      {branches.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+            {mode === 'existing' && (
+              <>
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), search())}
+                    placeholder="Buscar mascota por nombre…"
+                  />
+                  <Button type="button" variant="outline" onClick={search} disabled={searching}>
+                    {searching ? <Loader2 className="animate-spin" /> : <Search />}
+                    Buscar
+                  </Button>
+                </div>
+
+                {results.length > 0 && (
+                  <div className="max-h-60 space-y-2 overflow-y-auto rounded-md border border-border p-2">
+                    {results.map((p) => (
+                      <button
+                        type="button"
+                        key={p.id}
+                        onClick={() => pickPet(p.id)}
+                        className="flex w-full items-center justify-between gap-3 rounded-md px-3 py-2 text-left hover:bg-accent"
+                      >
+                        <div>
+                          <p className="font-medium">{p.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {p.species}
+                            {p.breed ? ` · ${p.breed}` : ''}
+                            {p.sex ? ` · ${p.sex === 'M' ? 'Macho' : 'Hembra'}` : ''}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-muted-foreground">
+                            {p.owners?.find((o) => o.is_active)?.full_name ?? 'Sin dueño'}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {p.owners?.find((o) => o.is_active)?.phone ?? ''}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {selectedPetPreview}
+              </>
             )}
 
-            {pet && (
-              <div className="flex items-center gap-3 rounded-md border border-border/60 p-3">
-                <div className="flex size-10 items-center justify-center rounded-md bg-secondary">
-                  <Users className="size-5 text-muted-foreground" />
+            {mode === 'new' && (
+              <>
+                <div className="rounded-md border border-border/60 p-4">
+                  {pet ? (
+                    selectedPetPreview
+                  ) : (
+                    <div className="flex flex-col items-center gap-3 py-6 text-center">
+                      <p className="max-w-md text-sm text-muted-foreground">
+                        Registra al paciente con el formulario completo (incluye dueño, foto y
+                        planes de vacunación).
+                      </p>
+                      <Button type="button" onClick={() => setPetDialogOpen(true)}>
+                        <Plus /> Registrar nuevo paciente
+                      </Button>
+                    </div>
+                  )}
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium">{pet.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {pet.species}
-                    {pet.breed ? ` · ${pet.breed}` : ''}
-                    {pet.sex ? ` · ${pet.sex === 'M' ? 'Macho' : 'Hembra'}` : ''}
-                    {pet.color_primary ? ` · ${pet.color_primary}` : ''}
-                  </p>
-                </div>
-                <Badge variant="secondary">Seleccionado</Badge>
-              </div>
+
+                <PetFormDialog
+                  open={petDialogOpen}
+                  pet={null}
+                  onOpenChange={setPetDialogOpen}
+                  onSaved={(created) => {
+                    setPetDialogOpen(false)
+                    if (created?.id) loadPet(created.id)
+                  }}
+                />
+              </>
+            )}
+              </>
             )}
           </CardContent>
         </Card>
+        )}
 
-        {pet && (
+        {pet && step === 1 && (
           <>
             <Card className="shadow-card">
               <CardHeader>
-                <CardTitle>2. Dueño y contacto</CardTitle>
+                <CardTitle>Dueño y contacto</CardTitle>
                 <CardDescription>
                   Datos del dueño para el recibo — solo visualización (verifícalos)
                 </CardDescription>
@@ -640,21 +803,11 @@ export function NewConsultation() {
                 )}
               </CardContent>
             </Card>
+          </>
+          )}
 
-            <Card className="shadow-card">
-              <CardHeader>
-                <CardTitle>Alertas clínicas</CardTitle>
-                <CardDescription>
-                  Alergias, comportamiento y medidas especiales de {pet.name} (se guardan en el
-                  expediente con el mismo selector de la cartilla)
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ClinicalAlertSelector petId={pet.id} />
-              </CardContent>
-            </Card>
-
-            <div className="grid gap-6 lg:grid-cols-2">
+          {pet && step === 2 && (
+          <div className="grid gap-6 lg:grid-cols-2">
               <Card className="shadow-card">
                 <CardHeader>
                   <CardTitle>Último peso de la mascota</CardTitle>
@@ -705,10 +858,13 @@ export function NewConsultation() {
                 </CardContent>
               </Card>
             </div>
+          )}
 
+          {pet && step === 3 && (
+          <>
             <Card className="shadow-card">
               <CardHeader>
-                <CardTitle>3. Servicios realizados</CardTitle>
+                <CardTitle>Servicios realizados</CardTitle>
                 <CardDescription>Del catálogo de servicios — se suman al subtotal</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -780,7 +936,7 @@ export function NewConsultation() {
 
             <Card className="shadow-card">
               <CardHeader>
-                <CardTitle>4. Productos que llevó</CardTitle>
+                <CardTitle>Productos que llevó</CardTitle>
                 <CardDescription>
                   Del catálogo de Productos — se suman al subtotal y se descuenta stock
                 </CardDescription>
@@ -996,10 +1152,14 @@ export function NewConsultation() {
                 )}
               </CardContent>
             </Card>
+          </>
+          )}
 
+          {pet && step === 4 && (
+          <>
             <Card className="shadow-card">
               <CardHeader>
-                <CardTitle>5. Resumen y cobro</CardTitle>
+                <CardTitle>Resumen y cobro</CardTitle>
                 <CardDescription>Subtotal de servicios y productos</CardDescription>
               </CardHeader>
               <CardContent className="space-y-2">
@@ -1071,12 +1231,36 @@ export function NewConsultation() {
                 <span>{error}</span>
               </div>
             )}
+          </>
+          )}
 
-            <div className="flex items-center justify-end gap-3">
-              <Button asChild variant="outline">
-                <Link to={pet ? `/pets/${pet.id}` : '/'}>Cancelar</Link>
+          {!(step === 0 && mode === 'choose') && (
+          <div className="space-y-2 pt-2">
+            {step === 0 && !(pet && vetUserId) && (
+              <p className="text-xs text-muted-foreground">
+                Selecciona el veterinario que atendió y un paciente para poder continuar.
+              </p>
+            )}
+          <div className="flex items-center justify-between gap-3">
+            {step > 0 ? (
+              <Button type="button" variant="outline" onClick={() => setStep((s) => s - 1)}>
+                <ArrowLeft /> Anterior
               </Button>
-              <Button type="submit" disabled={submitting}>
+            ) : (
+              <Button type="button" variant="outline" onClick={() => switchMode('choose')}>
+                <ArrowLeft /> Cancelar
+              </Button>
+            )}
+            {step < STEPS.length - 1 ? (
+              <Button
+                type="button"
+                onClick={() => setStep((s) => s + 1)}
+                disabled={step === 0 && !(pet && vetUserId)}
+              >
+                Siguiente <ArrowRight />
+              </Button>
+            ) : (
+              <Button type="button" onClick={() => submit()} disabled={submitting}>
                 {submitting ? (
                   <>
                     <Loader2 className="animate-spin" aria-hidden="true" />
@@ -1088,10 +1272,11 @@ export function NewConsultation() {
                   </>
                 )}
               </Button>
-            </div>
-          </>
-        )}
-      </form>
+            )}
+          </div>
+          </div>
+          )}
+        </form>
     </AppLayout>
   )
 }

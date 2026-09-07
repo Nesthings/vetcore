@@ -224,6 +224,9 @@ export function OwnerPetDetail() {
                   {pet.species}
                   {pet.breed ? ` · ${pet.breed}` : ''}
                   {pet.sex ? ` · ${pet.sex === 'M' ? 'Macho' : 'Hembra'}` : ''}
+                  {pet.color_primary
+                    ? ` · Color: ${pet.color_primary}${pet.color_secondary ? ` / ${pet.color_secondary}` : ''}`
+                    : ''}
                   {pet.birth_date
                     ? ` · Nac. ${new Date(pet.birth_date).toLocaleDateString('es-MX')}`
                     : ''}

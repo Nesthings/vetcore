@@ -68,7 +68,7 @@ export function PetFormDialog({
   open: boolean
   pet?: PetFormValue | null
   onOpenChange: (open: boolean) => void
-  onSaved: () => void
+  onSaved: (pet?: { id: string }) => void
 }) {
   const [catalog, setCatalog] = useState<BreedsCatalog | null>(null)
   const [name, setName] = useState('')
@@ -325,11 +325,13 @@ export function PetFormDialog({
         sex: sex || null,
         birth_date: birthDate || null,
       }
+      let savedId: string | undefined
       if (pet) {
         await apiFetch(`/pets/${pet.id}`, {
           method: 'PATCH',
           body: JSON.stringify(payload),
         })
+        savedId = pet.id
       } else {
         if (assignPlan && selectedPlans.length === 0) {
           setError('Selecciona al menos un plan de vacunación y la sucursal.')
@@ -350,6 +352,7 @@ export function PetFormDialog({
           method: 'POST',
           body: JSON.stringify({ ...payload, owner }),
         })
+        savedId = created.id
         for (const alert of pendingAlerts) {
           await apiFetch(`/pets/${created.id}/alerts`, {
             method: 'POST',
@@ -383,7 +386,7 @@ export function PetFormDialog({
           variant: 'success',
         })
       }
-      onSaved()
+      onSaved(savedId ? { id: savedId } : undefined)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo guardar la mascota')
     } finally {

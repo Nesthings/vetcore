@@ -6,11 +6,14 @@ from app.core.config import settings
 engine = create_engine(
     settings.resolved_database_url,
     pool_pre_ping=True,
-    # Pool reducido: Supabase (session pooler) limita a 15 conexiones y el pool
-    # comparte ese límite con otros clientes. 2+4 deja margen y evita
-    # "max clients reached" bajo carga.
-    pool_size=2,
-    max_overflow=4,
+    # Pool parametrizable por entorno (DB_POOL_SIZE / DB_MAX_OVERFLOW).
+    pool_size=settings.db_pool_size,
+    max_overflow=settings.db_max_overflow,
+    connect_args={
+        # psycopg 3 + pooler (Supabase): desactiva prepared statements para
+        # evitar "prepared statement already exists" al reutilizar conexiones.
+        "prepare_threshold": None,
+    },
 )
 
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)

@@ -3,7 +3,7 @@ import { createContext, useContext, useEffect, useState } from 'react'
 import { useAuth } from '@/lib/auth'
 import { DASHBOARD_CATALOG } from '@/lib/dashboards'
 
-const DEFAULT_ACTIVE = ['species', 'new_pets', 'appt_heatmap', 'vet_load']
+const DEFAULT_ACTIVE = ['species', 'new_pets', 'appt_heatmap', 'vet_load', 'procedures']
 
 const CATALOG_SLUGS = new Set(DASHBOARD_CATALOG.map((d) => d.slug))
 

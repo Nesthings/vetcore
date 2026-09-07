@@ -5,6 +5,7 @@ import { mdiPaw } from '@mdi/js'
 import {
   ArrowLeft,
   BadgeCheck,
+  BedDouble,
   Cake,
   CalendarDays,
   Camera,
@@ -22,6 +23,7 @@ import {
   Plus,
   RotateCcw,
   Send,
+  SquarePen,
   Stethoscope,
   Syringe,
   TriangleAlert,
@@ -43,6 +45,11 @@ import { AssignPlanDialog } from '@/components/pets/AssignPlanDialog'
 import { BrandCombobox } from '@/components/pets/BrandCombobox'
 import { PhotoComparison } from '@/components/pets/PhotoComparison'
 import { TransferOwnerDialog } from '@/components/pets/TransferOwnerDialog'
+import { PetFormDialog } from '@/components/pets/PetFormDialog'
+import {
+  HospitalizacionGameCard,
+  type HospitalizationShare,
+} from '@/components/cartilla/HospitalizacionGameCard'
 import { Avatar } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -64,6 +71,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import type { Pet } from '@/pages/Pets'
+import { petColorHex } from '@/lib/pet-colors'
 import { apiFetch } from '@/lib/api'
 import { ALERT_STYLES, ALERT_TYPES } from '@/lib/clinical-alerts'
 import { SPECIES_ICONS, speciesLabel } from '@/lib/species'
@@ -401,6 +409,7 @@ export function PetDetail() {
   const [inviteOpen, setInviteOpen] = useState(false)
   const [transferOpen, setTransferOpen] = useState(false)
   const [consentOpen, setConsentOpen] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
   const [qrUrl, setQrUrl] = useState<string | null>(null)
   const [confirmConsent, setConfirmConsent] = useState<Consent | null>(null)
   const [assignOpen, setAssignOpen] = useState(false)
@@ -414,6 +423,7 @@ export function PetDetail() {
   const [activeTab, setActiveTab] = useState(
     searchParams.get('tab') === 'consents' ? 'consents' : 'timeline',
   )
+  const [hospitalization, setHospitalization] = useState<HospitalizationShare | null>(null)
   const tabsRef = useRef<HTMLDivElement>(null)
   const scrolledToConsents = useRef(false)
   const [alertType, setAlertType] = useState(ALERT_TYPES[0])
@@ -460,6 +470,49 @@ export function PetDetail() {
       setFamily(fm)
       setVets(us.filter((u) => u.role === 'admin' || u.role === 'veterinario'))
       setQrUrl(qr?.url ?? null)
+
+      // Hospitalización activa de la mascota (si está internada)
+      let hosp: HospitalizationShare | null = null
+      try {
+        const active = await apiFetch<
+          {
+            id: string
+            pet_id: string
+            status: string
+            monitoring_level: string | null
+            operational_status: string
+            isolation_status: string
+            diagnosis: string | null
+            reason: string | null
+            admitted_at: string | null
+            expected_discharge_at: string | null
+            accommodation: { code: string; name: string; type: string } | null
+            vet: { full_name: string } | null
+          }[]
+        >('/hospitalization/hospitalizations?status=active&limit=200')
+        const mine = active.find((h) => h.pet_id === id)
+        if (mine) {
+          const vitals = await apiFetch<
+            Record<string, { value: number | null; unit?: string | null; observed_at?: string | null }>
+          >(`/hospitalization/${mine.id}/vitals/latest`)
+          hosp = {
+            status: mine.status,
+            monitoring_level: mine.monitoring_level,
+            operational_status: mine.operational_status,
+            isolation_status: mine.isolation_status,
+            diagnosis: mine.diagnosis,
+            reason: mine.reason,
+            admitted_at: mine.admitted_at,
+            expected_discharge_at: mine.expected_discharge_at,
+            accommodation: mine.accommodation,
+            vitals,
+            last_vet: mine.vet ? { name: mine.vet.full_name, photo_url: null } : null,
+          }
+        }
+      } catch {
+        hosp = null
+      }
+      setHospitalization(hosp)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo cargar el paciente')
     } finally {
@@ -694,6 +747,17 @@ export function PetDetail() {
                       {sexLabel(pet.sex) && (
                         <Badge className={accent.chip}>{sexLabel(pet.sex)}</Badge>
                       )}
+                      {pet.color_primary && (
+                        <Badge variant="outline" className="gap-1.5 text-muted-foreground">
+                          <span
+                            className="inline-block size-2.5 shrink-0 rounded-full border border-black/10"
+                            style={{ backgroundColor: petColorHex(pet.color_primary) }}
+                            aria-hidden="true"
+                          />
+                          {pet.color_primary}
+                          {pet.color_secondary ? ` / ${pet.color_secondary}` : ''}
+                        </Badge>
+                      )}
                       {pet.markings && (
                         <Badge variant="outline" className="text-muted-foreground">
                           {pet.markings}
@@ -746,6 +810,9 @@ export function PetDetail() {
                       </Button>
                       <Button variant="outline" size="sm" onClick={() => setTransferOpen(true)}>
                         <UserRoundCog /> Transferir dueño
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+                        <SquarePen /> Editar
                       </Button>
                     </div>
                   </div>
@@ -1103,7 +1170,7 @@ export function PetDetail() {
           <div className="border-t border-border p-5 sm:p-6">
             <div ref={tabsRef} className="scroll-mt-20">
               <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-5">
-                <TabsList className="w-full justify-start gap-1 overflow-x-auto rounded-xl border border-border bg-card p-1 sm:w-auto sm:overflow-visible">
+                <TabsList className="flex w-full justify-start gap-1 overflow-x-auto whitespace-nowrap rounded-xl border border-border bg-card p-1 pb-1.5 [scrollbar-color:var(--border)_transparent] [scrollbar-width:thin] [&_[data-slot=tabs-trigger]]:flex-none [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-border [&::-webkit-scrollbar-track]:bg-transparent">
                   <TabsTrigger value="timeline" className="gap-1.5">
                     <History className="size-4" aria-hidden="true" />
                     Línea de tiempo
@@ -1127,6 +1194,10 @@ export function PetDetail() {
                   <TabsTrigger value="familia" className="gap-1.5">
                     <Users className="size-4" aria-hidden="true" />
                     Familia
+                  </TabsTrigger>
+                  <TabsTrigger value="hospitalizacion" className="gap-1.5">
+                    <BedDouble className="size-4" aria-hidden="true" />
+                    Hospitalización
                   </TabsTrigger>
                 </TabsList>
 
@@ -1279,7 +1350,7 @@ export function PetDetail() {
                         <select
                           value={compareIdx}
                           onChange={(e) => setCompareIdx(Number(e.target.value))}
-                          className="h-9 flex-1 rounded-md border border-input bg-background px-2 text-sm"
+                          className="h-9 min-w-0 flex-1 truncate rounded-md border border-input bg-background px-2 text-sm"
                         >
                           {photos.map((p, i) => (
                             <option key={p.consultation_id} value={i}>
@@ -1630,6 +1701,22 @@ export function PetDetail() {
                     </div>
                   )}
                 </TabsContent>
+
+                <TabsContent value="hospitalizacion" className="space-y-3">
+                  {!hospitalization ? (
+                    <EmptyState
+                      title="No está hospitalizado"
+                      description={`${pet?.name ?? 'Este paciente'} no tiene una estancia activa en hospitalización.`}
+                      icon={BedDouble}
+                    />
+                  ) : (
+                    <HospitalizacionGameCard
+                      h={hospitalization}
+                      petName={pet?.name ?? ''}
+                      petPhoto={pet?.clinical_photo_url}
+                    />
+                  )}
+                </TabsContent>
               </Tabs>
             </div>
           </div>
@@ -1732,6 +1819,18 @@ export function PetDetail() {
         confirmLabel="Confirmar"
         onConfirm={runDoseAction}
       />
+
+      {pet && (
+        <PetFormDialog
+          open={editOpen}
+          pet={pet}
+          onOpenChange={setEditOpen}
+          onSaved={() => {
+            setEditOpen(false)
+            load()
+          }}
+        />
+      )}
     </AppLayout>
   )
 }

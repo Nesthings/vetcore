@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { CalendarX2, PackageMinus, PackagePlus, PackageX, Plus, TriangleAlert } from 'lucide-react'
+import { CalendarX2, PackageMinus, PackagePlus, PackageX, Plus, Trash2, TriangleAlert } from 'lucide-react'
 
 import { AppLayout } from '@/components/layout/AppLayout'
 import { LotFormDialog } from '@/components/inventory/LotFormDialog'
@@ -7,6 +7,7 @@ import { ProductFormDialog } from '@/components/inventory/ProductFormDialog'
 import { StockEntryDialog } from '@/components/inventory/StockEntryDialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState } from '@/components/ui/error-state'
 import { LoadingState } from '@/components/ui/loading-state'
@@ -66,6 +67,8 @@ export function Inventory() {
   const [createOpen, setCreateOpen] = useState(false)
   const [lotFor, setLotFor] = useState<InventoryProduct | null>(null)
   const [stockFor, setStockFor] = useState<InventoryProduct | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<InventoryProduct | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -100,6 +103,20 @@ export function Inventory() {
     bajos: products.filter((p) => p.stock > 0 && p.stock < threshold).length,
     vencidos: products.filter((p) => p.expired).length,
     porVencer: products.filter((p) => p.expiring_soon).length,
+  }
+
+  const removeProduct = async (product: InventoryProduct) => {
+    setDeleting(true)
+    setError(null)
+    try {
+      await apiFetch(`/inventory/${product.id}`, { method: 'DELETE' })
+      setConfirmDelete(null)
+      load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo eliminar el producto')
+    } finally {
+      setDeleting(false)
+    }
   }
 
   return (
@@ -247,6 +264,15 @@ export function Inventory() {
                     <Button variant="ghost" size="sm" onClick={() => setStockFor(p)}>
                       Stock
                     </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive"
+                      onClick={() => setConfirmDelete(p)}
+                      aria-label={`Eliminar ${p.name}`}
+                    >
+                      <Trash2 /> Eliminar
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}
@@ -287,6 +313,18 @@ export function Inventory() {
           }}
         />
       )}
+
+      <ConfirmDialog
+        open={Boolean(confirmDelete)}
+        onOpenChange={(open) => !open && !deleting && setConfirmDelete(null)}
+        title={confirmDelete ? `¿Eliminar el producto "${confirmDelete.name}"?` : ''}
+        description="Se borrarán sus lotes y movimientos de stock. Esta acción no se puede deshacer."
+        confirmLabel={deleting ? 'Eliminando…' : 'Eliminar'}
+        variant="destructive"
+        onConfirm={() => {
+          if (confirmDelete) removeProduct(confirmDelete)
+        }}
+      />
     </AppLayout>
   )
 }

@@ -19,7 +19,6 @@ import { AppLayout } from '@/components/layout/AppLayout'
 import { PetFormDialog } from '@/components/pets/PetFormDialog'
 import { Avatar } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState } from '@/components/ui/error-state'
 import { LoadingState } from '@/components/ui/loading-state'
@@ -34,6 +33,7 @@ import {
 } from '@/components/ui/table'
 import { apiFetch } from '@/lib/api'
 import { cn } from '@/lib/utils'
+import { petColorHex } from '@/lib/pet-colors'
 
 export interface PetOwner {
   owner_id: string
@@ -273,13 +273,10 @@ export function Pets() {
               <TableRow>
                 <TableHead>Paciente</TableHead>
                 <TableHead>Dueño</TableHead>
-                <TableHead>Especie</TableHead>
-                <TableHead>Raza</TableHead>
+                <TableHead>Especie / Raza</TableHead>
                 <TableHead>Color</TableHead>
-                <TableHead className="hidden xl:table-cell">Características</TableHead>
                 <TableHead className="hidden lg:table-cell">Sexo</TableHead>
                 <TableHead>Último peso</TableHead>
-                <TableHead>Alertas</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
@@ -287,60 +284,69 @@ export function Pets() {
               {visible.map((p) => (
                 <TableRow key={p.id}>
                   <TableCell>
-                    <Link
-                      to={`/pets/${p.id}`}
-                      title="Abrir cartilla de la mascota"
-                      className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-primary/30 bg-primary/5 px-2.5 py-1 text-sm font-medium text-primary transition-colors hover:border-primary/60 hover:bg-primary/10 hover:underline hover:underline-offset-2"
-                    >
-                      <span className="truncate">{p.name}</span>
-                      <ArrowUpRight className="size-3.5 shrink-0" aria-hidden="true" />
-                    </Link>
+                    <div className="flex items-center gap-3">
+                      <Avatar
+                        src={p.clinical_photo_url}
+                        name={p.name}
+                        alt={`Foto de ${p.name}`}
+                        className="size-10 shrink-0"
+                      />
+                      <Link
+                        to={`/pets/${p.id}`}
+                        title="Abrir cartilla de la mascota"
+                        className="inline-flex max-w-40 items-center gap-1.5 rounded-full border border-primary/30 bg-primary/5 px-2.5 py-1 text-sm font-medium text-primary transition-colors hover:border-primary/60 hover:bg-primary/10 hover:underline hover:underline-offset-2"
+                      >
+                        <span className="truncate">{p.name}</span>
+                        <ArrowUpRight className="size-3.5 shrink-0" aria-hidden="true" />
+                      </Link>
+                    </div>
                   </TableCell>
                   <TableCell>
                     {(() => {
                       const owner = p.owners?.find((o) => o.is_active)
                       return owner?.full_name ? (
-                        <span className="inline-flex items-center gap-2">
+                        <span className="inline-flex min-w-0 items-center gap-2">
                           <Avatar
                             src={owner.profile_photo_url}
                             name={owner.full_name}
-                            className="size-6"
+                            className="size-6 shrink-0"
                           />
-                          <span className="truncate text-sm">{owner.full_name}</span>
+                          <span className="max-w-40 truncate text-sm">{owner.full_name}</span>
                         </span>
                       ) : (
                         <span className="text-muted-foreground">—</span>
                       )
                     })()}
                   </TableCell>
-                  <TableCell className="capitalize">{p.species}</TableCell>
-                  <TableCell>{p.breed ?? '—'}</TableCell>
+                  <TableCell>
+                    <span className="block max-w-44 truncate text-sm capitalize">
+                      {p.species}
+                      {p.breed ? ` · ${p.breed}` : ''}
+                    </span>
+                  </TableCell>
                   <TableCell>
                     {p.color_primary ? (
-                      <span className="inline-flex items-center gap-1.5">
-                        <span
-                          className="inline-block size-2.5 rounded-full border border-border"
-                          aria-hidden="true"
-                        />
-                        {p.color_primary}
-                        {p.color_secondary ? ` / ${p.color_secondary}` : ''}
-                      </span>
+                      <div className="min-w-0">
+                        <span className="inline-flex min-w-0 items-center gap-1.5">
+                          <span
+                            className="inline-block size-2.5 shrink-0 rounded-full border border-black/10"
+                            style={{ backgroundColor: petColorHex(p.color_primary) }}
+                            aria-hidden="true"
+                          />
+                          <span className="truncate">{p.color_primary}</span>
+                        </span>
+                        {p.color_secondary ? (
+                          <span className="block truncate pl-4 text-xs text-muted-foreground">
+                            {p.color_secondary}
+                          </span>
+                        ) : null}
+                      </div>
                     ) : (
                       '—'
                     )}
                   </TableCell>
-                  <TableCell className="hidden xl:table-cell">{p.markings ?? '—'}</TableCell>
                   <TableCell className="hidden lg:table-cell">{p.sex ?? '—'}</TableCell>
                   <TableCell>{p.latest_weight_kg ? `${p.latest_weight_kg} kg` : '—'}</TableCell>
-                  <TableCell>
-                    {p.clinical_alert_text || (p.alert_count && p.alert_count > 0) ? (
-                      <Badge variant="destructive">
-                        Alerta{p.alert_count && p.alert_count > 0 ? ` ×${p.alert_count}` : ''}
-                      </Badge>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
                   <TableCell className="text-right">
                     <Button
                       variant="ghost"

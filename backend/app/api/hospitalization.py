@@ -1669,11 +1669,12 @@ def upload_hospitalization_photo(
 ) -> HospitalizationPhoto:
     row = _get_hospitalization_or_404(db, ctx.clinic["id"], hosp_id)
     validate_extension(file.filename or "", ALLOWED_IMAGE_EXTENSIONS)
-    content = file.file.read()
-    if len(content) > MAX_IMAGE_BYTES:
+    try:
+        content = read_upload_limited(file, MAX_IMAGE_BYTES)
+    except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail="La imagen supera el límite de 5 MB",
+            detail=str(exc),
         )
     try:
         processed = process_cartilla_photo(content)
