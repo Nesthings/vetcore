@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Camera, Loader2, PenLine, Save, Trash2, UserRound } from 'lucide-react'
+import { Camera, CircleHelp, Loader2, PenLine, Save, Trash2, UserRound } from 'lucide-react'
 
 import { AppLayout } from '@/components/layout/AppLayout'
 import { SignaturePad } from '@/components/pets/SignaturePad'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -26,6 +27,16 @@ interface Me {
   specialty?: string | null
 }
 
+interface Ticket {
+  id: string
+  subject: string
+  description: string
+  status: string
+  resolution_notes?: string | null
+  resolved_at?: string | null
+  created_at: string
+}
+
 export function Profile() {
   const [me, setMe] = useState<Me | null>(null)
   const [fullName, setFullName] = useState('')
@@ -43,6 +54,8 @@ export function Profile() {
   const [savingSignature, setSavingSignature] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
+  const [tickets, setTickets] = useState<Ticket[]>([])
+  const [ticketsLoading, setTicketsLoading] = useState(true)
 
   const load = useCallback(async () => {
     try {
@@ -63,6 +76,20 @@ export function Profile() {
   useEffect(() => {
     load()
   }, [load])
+
+  const loadTickets = useCallback(async () => {
+    try {
+      setTickets(await apiFetch<Ticket[]>('/support-tickets'))
+    } catch {
+      setTickets([])
+    } finally {
+      setTicketsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadTickets()
+  }, [loadTickets])
 
   const uploadPhoto = async (file: File) => {
     setError(null)
@@ -290,6 +317,49 @@ export function Profile() {
                 {submitting ? <Loader2 className="animate-spin" /> : <Save />} Guardar cambios
               </Button>
             </form>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-card">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CircleHelp className="size-5 text-primary" /> Mis reportes
+            </CardTitle>
+            <CardDescription>Problemas que has reportado y su estado.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {ticketsLoading ? (
+              <p className="text-sm text-muted-foreground">Cargando…</p>
+            ) : tickets.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Aún no has reportado problemas.{' '}
+                <span className="font-medium text-foreground">Reporta uno nuevo</span> desde el menú
+                de tu foto de perfil.
+              </p>
+            ) : (
+              tickets.map((t) => (
+                <div
+                  key={t.id}
+                  className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="truncate text-sm font-medium">{t.subject}</p>
+                    <Badge variant={t.status === 'resolved' ? 'success' : 'warning'}>
+                      {t.status === 'resolved' ? 'Resuelto' : 'Abierto'}
+                    </Badge>
+                  </div>
+                  <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
+                    {t.description}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Enviado el {new Date(t.created_at).toLocaleString('es-MX')}
+                    {t.status === 'resolved' && t.resolved_at
+                      ? ` · resuelto el ${new Date(t.resolved_at).toLocaleDateString('es-MX')}`
+                      : ''}
+                  </p>
+                </div>
+              ))
+            )}
           </CardContent>
         </Card>
 

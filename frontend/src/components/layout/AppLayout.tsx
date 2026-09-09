@@ -1,4 +1,5 @@
 import {
+  CircleHelp,
   History,
   Home,
   LogOut,
@@ -374,6 +375,14 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                         Modo veterinario (móvil)
                       </NavLink>
                     ) : null}
+                    <NavLink
+                      to="/reportar-problema"
+                      onClick={() => setProfileOpen(false)}
+                      className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                    >
+                      <CircleHelp className="size-4" aria-hidden="true" />
+                      Reportar un problema
+                    </NavLink>
                   </div>
                   <div className="border-t border-border p-1.5">
                     <button

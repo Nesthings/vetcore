@@ -23,6 +23,7 @@ class Clinic(UUIDPkMixin, Base):
     subscription_status: Mapped[str] = mapped_column(
         String(20), nullable=False, default="trial", server_default="trial"
     )
+    subscription_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     logo_url: Mapped[str | None] = mapped_column(String(255))
     timezone: Mapped[str] = mapped_column(
         String(50), nullable=False, default="UTC", server_default="UTC"

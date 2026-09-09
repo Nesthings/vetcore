@@ -38,6 +38,7 @@ from app.api import (
     services,
     share,
     smart_alerts,
+    support_tickets,
     users,
     vaccination_plans,
     waitlist,
@@ -127,6 +128,7 @@ app.include_router(vaccination_plans.router, prefix="/api/v1")
 app.include_router(share.router, prefix="/api/v1")
 app.include_router(smart_alerts.router, prefix="/api/v1")
 app.include_router(platform.router, prefix="/api/v1")
+app.include_router(support_tickets.router, prefix="/api/v1")
 app.include_router(create_clinic.router, prefix="/api/v1")
 app.include_router(whatsapp.router, prefix="/api/v1")
 

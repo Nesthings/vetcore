@@ -34,6 +34,7 @@ import { Profile } from '@/pages/Profile'
 import { Products } from '@/pages/Products'
 import { Platform } from '@/pages/Platform'
 import { PurchaseOrders } from '@/pages/PurchaseOrders'
+import { ReportProblem } from '@/pages/ReportProblem'
 import { Services } from '@/pages/Services'
 import { Settings } from '@/pages/Settings'
 import { SetupWizard } from '@/pages/SetupWizard'
@@ -193,6 +194,14 @@ function App() {
                     element={
                       <ProtectedRoute>
                         <Profile />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/reportar-problema"
+                    element={
+                      <ProtectedRoute>
+                        <ReportProblem />
                       </ProtectedRoute>
                     }
                   />

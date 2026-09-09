@@ -1,18 +1,27 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
+  ArrowLeft,
   Building2,
+  CheckCircle2,
   ChevronDown,
   ChevronRight,
+  CircleHelp,
   Clipboard,
   Copy,
+  FileText,
   KeyRound,
   Link2,
+  Loader2,
   LogOut,
+  Paperclip,
+  PawPrint,
   Plus,
   QrCode,
   RefreshCw,
+  RotateCcw,
   ShieldCheck,
+  Users,
 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -21,9 +30,11 @@ import { Label } from '@/components/ui/label'
 import { OtpInput } from '@/components/ui/otp-input'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tabs, TabsContent } from '@/components/ui/tabs'
+import { Textarea } from '@/components/ui/textarea'
 import { apiFetch } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
+import { useTheme } from '@/lib/theme'
 
 interface Invite {
   id: string
@@ -49,11 +60,15 @@ interface ClinicRow {
   contact_phone?: string | null
   contact_email?: string | null
   subscription_status: string
+  subscription_expires_at?: string | null
   setup_completed: boolean
   timezone: string
   currency: string
   stock_alert_threshold?: number | null
   created_at: string
+  branches_count?: number
+  staff_count?: number
+  pets_count?: number
 }
 
 interface ClinicSummary {
@@ -74,6 +89,28 @@ interface ClinicEvent {
   created_at: string
 }
 
+interface TicketAttachment {
+  id: string
+  file_type: string
+  url: string
+  created_at: string
+}
+
+interface Ticket {
+  id: string
+  reporter_name: string
+  reporter_email: string
+  clinic_id?: string | null
+  clinic_name?: string | null
+  subject: string
+  description: string
+  status: string
+  resolution_notes?: string | null
+  resolved_at?: string | null
+  created_at: string
+  attachments: TicketAttachment[]
+}
+
 const SUBSCRIPTION_LABEL: Record<
   string,
   { label: string; variant: 'success' | 'warning' | 'destructive' | 'secondary' | 'info' }
@@ -84,8 +121,27 @@ const SUBSCRIPTION_LABEL: Record<
   cancelled: { label: 'Cancelada', variant: 'destructive' },
 }
 
+const SUBSCRIPTION_ACCENT: Record<string, string> = {
+  active: 'border-l-success',
+  trial: 'border-l-info',
+  suspended: 'border-l-warning',
+  cancelled: 'border-l-destructive',
+}
+
+function subscriptionProgress(clinic: ClinicRow): number | null {
+  if (!clinic.subscription_expires_at || !clinic.created_at) return null
+  const now = Date.now()
+  const start = new Date(clinic.created_at).getTime()
+  const end = new Date(clinic.subscription_expires_at).getTime()
+  if (end <= now) return 0
+  if (end <= start) return 100
+  const pct = Math.round(((end - now) / (end - start)) * 100)
+  return Math.max(0, Math.min(100, pct))
+}
+
 export function Platform() {
   const { logout } = useAuth()
+  const { theme } = useTheme()
   const navigate = useNavigate()
   const [invites, setInvites] = useState<Invite[]>([])
   const [invName, setInvName] = useState('')
@@ -107,7 +163,19 @@ export function Platform() {
   const [clinicStaff, setClinicStaff] = useState<StaffUser[]>([])
   const [events, setEvents] = useState<ClinicEvent[]>([])
   const [loadingClinics, setLoadingClinics] = useState(true)
-  const [tab, setTab] = useState('links')
+  const [tab, setTab] = useState<'home' | 'links' | 'clinics' | 'recover' | 'security' | 'tickets'>(
+    'home',
+  )
+  const [adminName, setAdminName] = useState('')
+
+  // Estado de tickets de soporte
+  const [tickets, setTickets] = useState<Ticket[]>([])
+  const [ticketsLoading, setTicketsLoading] = useState(false)
+  const [openTicketId, setOpenTicketId] = useState<string | null>(null)
+  const [resolveNotes, setResolveNotes] = useState('')
+  const [resolveFiles, setResolveFiles] = useState<File[]>([])
+  const [resolvingId, setResolvingId] = useState<string | null>(null)
+  const [ticketError, setTicketError] = useState<string | null>(null)
 
   // Estado 2FA del super-admin
   const [totpEnabled, setTotpEnabled] = useState(false)
@@ -138,10 +206,23 @@ export function Platform() {
     }
   }, [])
 
+  const loadTickets = useCallback(async () => {
+    setTicketsLoading(true)
+    setTicketError(null)
+    try {
+      setTickets(await apiFetch<Ticket[]>('/support-tickets/admin'))
+    } catch (err) {
+      setTicketError(err instanceof Error ? err.message : 'No se pudieron cargar los tickets')
+    } finally {
+      setTicketsLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     loadInvites()
     loadClinics()
-  }, [loadInvites, loadClinics])
+    loadTickets()
+  }, [loadInvites, loadClinics, loadTickets])
 
   const toggleDetail = async (id: string) => {
     if (detailId === id) {
@@ -257,6 +338,39 @@ export function Platform() {
     }
   }
 
+  const toggleTicket = (id: string) => {
+    setOpenTicketId((prev) => (prev === id ? null : id))
+  }
+
+  const resolveTicket = async (id: string) => {
+    setResolvingId(id)
+    setTicketError(null)
+    try {
+      const form = new FormData()
+      form.append('notes', resolveNotes.trim())
+      for (const f of resolveFiles) form.append('files', f)
+      await apiFetch(`/support-tickets/${id}/resolve`, { method: 'POST', body: form })
+      setOpenTicketId(null)
+      setResolveNotes('')
+      setResolveFiles([])
+      await loadTickets()
+    } catch (err) {
+      setTicketError(err instanceof Error ? err.message : 'No se pudo resolver el ticket')
+    } finally {
+      setResolvingId(null)
+    }
+  }
+
+  const reopenTicket = async (id: string) => {
+    setTicketError(null)
+    try {
+      await apiFetch(`/support-tickets/${id}/reopen`, { method: 'POST' })
+      await loadTickets()
+    } catch (err) {
+      setTicketError(err instanceof Error ? err.message : 'No se pudo reabrir el ticket')
+    }
+  }
+
   const loadTotpStatus = useCallback(async () => {
     setTotpStatusLoading(true)
     try {
@@ -272,6 +386,12 @@ export function Platform() {
   useEffect(() => {
     loadTotpStatus()
   }, [loadTotpStatus])
+
+  useEffect(() => {
+    apiFetch<{ full_name?: string | null }>('/auth/me')
+      .then((res) => setAdminName(res.full_name ?? ''))
+      .catch(() => {})
+  }, [])
 
   const startTotpSetup = async () => {
     setTotpSetupLoading(true)
@@ -334,15 +454,19 @@ export function Platform() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl p-4 sm:p-6">
+    <div className="mx-auto max-w-5xl p-4 sm:p-6">
       <div className="mb-6 flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            <ShieldCheck className="size-6" aria-hidden="true" />
-          </div>
+          <img
+            src={theme === 'dark' ? '/logo_for_darkmode.png' : '/logo_for_whitemode.png'}
+            alt="VetCore"
+            className="h-11 w-auto"
+          />
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Plataforma</h1>
-            <p className="text-sm text-muted-foreground">Dueño del producto · admin@vetcore.app</p>
+            <h1 className="text-2xl font-semibold tracking-tight">Administración de VetCore</h1>
+            <p className="text-sm text-muted-foreground">
+              Bienvenido, {adminName || 'administrador'}.
+            </p>
           </div>
         </div>
         <Button
@@ -362,13 +486,91 @@ export function Platform() {
         {error && <p className="text-sm text-destructive">{error}</p>}
       </div>
 
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="relative z-10 w-full flex-wrap justify-start gap-1 rounded-xl border border-border bg-card p-1">
-          <TabsTrigger value="links">Links de invitación</TabsTrigger>
-          <TabsTrigger value="clinics">Clínicas</TabsTrigger>
-          <TabsTrigger value="recover">Recuperar acceso</TabsTrigger>
-          <TabsTrigger value="security">Seguridad</TabsTrigger>
-        </TabsList>
+      {tab === 'home' ? (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {(() => {
+            const openTickets = tickets.filter((t) => t.status === 'open').length
+            const pendingInvites = invites.filter((i) => i.status === 'pending').length
+            const modules = [
+              {
+                key: 'links' as const,
+                icon: Link2,
+                title: 'Links de invitación',
+                description: 'Genera enlaces únicos para crear clínicas',
+                badge: pendingInvites,
+              },
+              {
+                key: 'clinics' as const,
+                icon: Building2,
+                title: 'Clínicas',
+                description: 'Suscripciones, empleados, sucursales y pacientes',
+                badge: 0,
+              },
+              {
+                key: 'recover' as const,
+                icon: KeyRound,
+                title: 'Recuperar acceso',
+                description: 'Restablece la contraseña de cualquier usuario',
+                badge: 0,
+              },
+              {
+                key: 'security' as const,
+                icon: ShieldCheck,
+                title: 'Seguridad',
+                description: 'Autenticación en dos pasos de la plataforma',
+                badge: 0,
+              },
+              {
+                key: 'tickets' as const,
+                icon: CircleHelp,
+                title: 'Soporte',
+                description: 'Tickets de problemas reportados por las clínicas',
+                badge: openTickets,
+              },
+            ]
+            return modules.map((m) => (
+              <button
+                key={m.key}
+                type="button"
+                onClick={() => setTab(m.key)}
+                className="group relative overflow-hidden rounded-2xl border border-border bg-card p-5 text-left shadow-card transition-all hover:border-primary/40 hover:shadow-elevated"
+              >
+                {m.badge > 0 && (
+                  <span className="absolute right-3 top-3 flex size-6 items-center justify-center rounded-full bg-destructive text-xs font-bold text-white shadow">
+                    {m.badge > 9 ? '9+' : m.badge}
+                  </span>
+                )}
+                <div className="flex items-center gap-3">
+                  <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                    <m.icon className="size-5" aria-hidden="true" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-semibold text-foreground">{m.title}</p>
+                    <p className="text-xs leading-snug text-muted-foreground">{m.description}</p>
+                  </div>
+                </div>
+                <ChevronRight className="absolute bottom-4 right-4 size-4 text-muted-foreground/60 transition-transform group-hover:translate-x-0.5" />
+              </button>
+            ))
+          })()}
+        </div>
+      ) : (
+        <div className="mb-4">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setTab('home')}
+            className="-ml-2"
+          >
+            <ArrowLeft className="size-4" aria-hidden="true" />
+            Volver al inicio
+          </Button>
+        </div>
+      )}
+
+      {tab !== 'home' && (
+      <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
 
         <TabsContent value="links" className="space-y-4">
           <Card className="shadow-card">
@@ -510,7 +712,7 @@ export function Platform() {
               {loadingClinics ? (
                 <p className="text-sm text-muted-foreground">Cargando clínicas…</p>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {clinics
                     .filter((c) => c.name.toLowerCase().includes(clinicSearch.trim().toLowerCase()))
                     .map((c) => {
@@ -519,21 +721,26 @@ export function Platform() {
                         variant: 'secondary' as const,
                       }
                       const open = detailId === c.id
+                      const pct = subscriptionProgress(c)
                       return (
-                        <div key={c.id} className="rounded-lg border border-border/60 bg-muted/20">
-                          <div className="flex items-center justify-between gap-2 px-3 py-2">
+                        <div
+                          key={c.id}
+                          className={`overflow-hidden rounded-xl border border-border bg-card shadow-md ${SUBSCRIPTION_ACCENT[c.subscription_status] ?? 'border-l-4 border-l-border'}`}
+                        >
+                          <div className="flex items-center justify-between gap-2 px-4 py-3">
                             <div className="min-w-0">
-                              <p className="truncate text-sm font-medium">{c.name}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {c.id.slice(0, 8)}… · Creada{' '}
-                                {new Date(c.created_at).toLocaleDateString('es-MX')}
+                              <p className="truncate text-sm font-semibold text-foreground">
+                                {c.name}
+                              </p>
+                              <p className="mt-0.5 text-xs text-muted-foreground">
+                                Creada {new Date(c.created_at).toLocaleDateString('es-MX')}
                               </p>
                             </div>
                             <div className="flex shrink-0 items-center gap-2">
                               <Badge variant={st.variant}>{st.label}</Badge>
                               <Button
                                 type="button"
-                                variant="ghost"
+                                variant="outline"
                                 size="sm"
                                 onClick={() => toggleDetail(c.id)}
                               >
@@ -542,8 +749,49 @@ export function Platform() {
                             </div>
                           </div>
 
+                          {['active', 'trial'].includes(c.subscription_status) && pct !== null && (
+                            <div className="border-t border-border px-4 py-3">
+                              <div className="mb-1 flex items-center justify-between text-xs">
+                                <span className="text-muted-foreground">Suscripción</span>
+                                <span className="font-medium">{pct}% restante</span>
+                              </div>
+                              <div className="h-2 overflow-hidden rounded-full bg-muted">
+                                <div
+                                  className={`h-full rounded-full ${
+                                    pct <= 20
+                                      ? 'bg-destructive'
+                                      : pct <= 50
+                                        ? 'bg-warning'
+                                        : 'bg-success'
+                                  }`}
+                                  style={{ width: `${pct}%` }}
+                                />
+                              </div>
+                              {c.subscription_expires_at && (
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                  Vence el {new Date(c.subscription_expires_at).toLocaleDateString('es-MX')}
+                                </p>
+                              )}
+                            </div>
+                          )}
+
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border px-4 py-2.5 text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              <Users className="size-3.5" aria-hidden="true" />
+                              {c.staff_count ?? 0} empleados
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Building2 className="size-3.5" aria-hidden="true" />
+                              {c.branches_count ?? 0} sucursales
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <PawPrint className="size-3.5" aria-hidden="true" />
+                              {c.pets_count ?? 0} pacientes
+                            </span>
+                          </div>
+
                           {open && (
-                            <div className="space-y-4 border-t border-border px-3 py-3">
+                            <div className="space-y-4 border-t border-border px-4 py-3">
                               <div className="grid gap-3 sm:grid-cols-2">
                                 <div>
                                   <p className="text-xs font-medium text-muted-foreground">
@@ -683,7 +931,7 @@ export function Platform() {
           <Card className="shadow-card">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <KeyRound className="size-5 text-primary" /> Restablecer contraseña de un admin
+                <KeyRound className="size-5 text-primary" /> Restablecer contraseña de usuario
               </CardTitle>
               <CardDescription>
                 Busca al usuario por correo o nombre y asigna una nueva contraseña.
@@ -871,7 +1119,194 @@ export function Platform() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="tickets" className="space-y-4">
+          <Card className="shadow-card">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CircleHelp className="size-5 text-primary" /> Tickets de soporte
+              </CardTitle>
+              <CardDescription>
+                Reportes de problemas enviados por el staff de las clínicas.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {ticketError && <p className="text-sm text-destructive">{ticketError}</p>}
+              {ticketsLoading && tickets.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Cargando…</p>
+              ) : tickets.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Sin tickets de soporte.</p>
+              ) : (
+                tickets.map((t) => {
+                  const open = openTicketId === t.id
+                  const resolved = t.status === 'resolved'
+                  return (
+                    <div
+                      key={t.id}
+                      className="rounded-lg border border-border/60 bg-muted/30"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => toggleTicket(t.id)}
+                        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium">{t.subject}</p>
+                          <p className="truncate text-xs text-muted-foreground">
+                            {t.reporter_name} · {t.reporter_email}
+                            {t.clinic_name ? ` · ${t.clinic_name}` : ''} ·{' '}
+                            {new Date(t.created_at).toLocaleString('es-MX')}
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2">
+                          <Badge variant={resolved ? 'success' : 'warning'}>
+                            {resolved ? 'Resuelto' : 'Abierto'}
+                          </Badge>
+                          {open ? (
+                            <ChevronDown className="size-4 text-muted-foreground" />
+                          ) : (
+                            <ChevronRight className="size-4 text-muted-foreground" />
+                          )}
+                        </div>
+                      </button>
+
+                      {open && (
+                        <div className="space-y-3 border-t border-border/60 px-3 py-3">
+                          <p className="whitespace-pre-wrap text-sm text-foreground/90">
+                            {t.description}
+                          </p>
+
+                          {t.attachments.length > 0 && (
+                            <div>
+                              <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                Adjuntos ({t.attachments.length})
+                              </p>
+                              <div className="flex flex-wrap gap-2">
+                                {t.attachments.map((a) =>
+                                  a.file_type === 'image' ? (
+                                    <a
+                                      key={a.id}
+                                      href={a.url}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="block size-16 overflow-hidden rounded-md border border-border"
+                                      title="Ver imagen"
+                                    >
+                                      <img
+                                        src={a.url}
+                                        alt="Adjunto del ticket"
+                                        className="size-full object-cover"
+                                      />
+                                    </a>
+                                  ) : (
+                                    <a
+                                      key={a.id}
+                                      href={a.url}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="flex items-center gap-1.5 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                                    >
+                                      <FileText className="size-3.5" /> Ver PDF
+                                    </a>
+                                  ),
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {t.resolution_notes && (
+                            <div className="rounded-md border border-success/30 bg-success/5 p-3">
+                              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-success">
+                                Nota de resolución
+                              </p>
+                              <p className="whitespace-pre-wrap text-sm">
+                                {t.resolution_notes}
+                              </p>
+                            </div>
+                          )}
+
+                          {resolved ? (
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-xs text-muted-foreground">
+                                Resuelto el{' '}
+                                {t.resolved_at
+                                  ? new Date(t.resolved_at).toLocaleString('es-MX')
+                                  : ''}
+                              </p>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => reopenTicket(t.id)}
+                              >
+                                <RotateCcw className="size-3.5" /> Reabrir
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="space-y-2 rounded-md border border-border bg-background/60 p-3">
+                              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                Marcar como resuelto
+                              </p>
+                              <Textarea
+                                value={resolveNotes}
+                                onChange={(e) => setResolveNotes(e.target.value)}
+                                placeholder="Notas de la solución (opcional)…"
+                                rows={3}
+                              />
+                              <div className="flex flex-wrap items-center gap-2">
+                                <input
+                                  id={`ticket-files-${t.id}`}
+                                  type="file"
+                                  multiple
+                                  accept=".jpg,.jpeg,.png,.webp,.pdf"
+                                  className="hidden"
+                                  onChange={(e) => {
+                                    const list = e.target.files
+                                    if (list) setResolveFiles(Array.from(list))
+                                    e.currentTarget.value = ''
+                                  }}
+                                />
+                                <Button type="button" variant="outline" size="sm">
+                                  <label
+                                    htmlFor={`ticket-files-${t.id}`}
+                                    className="flex cursor-pointer items-center gap-2"
+                                  >
+                                    <Paperclip /> Adjuntar
+                                  </label>
+                                </Button>
+                                {resolveFiles.length > 0 && (
+                                  <span className="text-xs text-muted-foreground">
+                                    {resolveFiles.length} archivo(s) seleccionado(s)
+                                  </span>
+                                )}
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="success"
+                                  disabled={resolvingId === t.id}
+                                  onClick={() => resolveTicket(t.id)}
+                                >
+                                  {resolvingId === t.id ? (
+                                    <Loader2 className="size-3.5 animate-spin" />
+                                  ) : (
+                                    <CheckCircle2 className="size-3.5" />
+                                  )}
+                                  Marcar como resuelto
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
+      )}
     </div>
   )
 }

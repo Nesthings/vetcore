@@ -19,11 +19,11 @@ export default defineConfig({
     },
     proxy: {
       '/api': {
-        target: 'http://localhost:8009',
+        target: process.env.VITE_API_PROXY || 'http://localhost:8009',
         changeOrigin: true,
       },
       '/media': {
-        target: 'http://localhost:8009',
+        target: process.env.VITE_API_PROXY || 'http://localhost:8009',
         changeOrigin: true,
       },
     },

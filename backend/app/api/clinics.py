@@ -9,6 +9,8 @@ y editar el perfil de la clínica (logo, datos fiscales, moneda, timezone)
 desde la Configuración.
 """
 
+from datetime import UTC, datetime, timedelta
+
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -70,10 +72,33 @@ def list_clinics(
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
     _: object = Depends(require_roles("super-admin")),
-) -> list[Clinic]:
-    return list(
+) -> list[ClinicRead]:
+    clinics = list(
         db.scalars(select(Clinic).order_by(Clinic.created_at.desc()).limit(limit).offset(offset))
     )
+    if not clinics:
+        return []
+
+    branch_counts = dict(
+        db.execute(
+            select(ClinicBranch.clinic_id, func.count()).group_by(ClinicBranch.clinic_id)
+        ).all()
+    )
+    staff_counts = dict(
+        db.execute(select(User.clinic_id, func.count()).group_by(User.clinic_id)).all()
+    )
+    pet_counts = dict(
+        db.execute(select(Pet.clinic_id, func.count()).group_by(Pet.clinic_id)).all()
+    )
+
+    rows = []
+    for clinic in clinics:
+        data = ClinicRead.model_validate(clinic).model_dump()
+        data["branches_count"] = branch_counts.get(clinic.id, 0)
+        data["staff_count"] = staff_counts.get(clinic.id, 0)
+        data["pets_count"] = pet_counts.get(clinic.id, 0)
+        rows.append(data)
+    return rows
 
 
 @router.get("/me", response_model=ClinicRead, summary="Perfil de mi propia clínica (staff)")
@@ -309,6 +334,8 @@ def change_subscription(
     }.get(body.status, "activated")
 
     clinic.subscription_status = body.status
+    if body.status in ("active", "trial"):
+        clinic.subscription_expires_at = datetime.now(UTC) + timedelta(days=30)
     db.add(
         ClinicSubscriptionEvent(
             clinic_id=clinic.id,

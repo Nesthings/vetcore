@@ -70,6 +70,7 @@ class ClinicRead(ClinicBase):
 
     id: uuid.UUID
     subscription_status: str
+    subscription_expires_at: datetime | None = None
     logo_url: str | None = None
     setup_completed: bool
     stock_alert_threshold: float
@@ -82,6 +83,10 @@ class ClinicRead(ClinicBase):
     whatsapp_enabled: bool = False
     created_at: datetime
     updated_at: datetime
+    # Conteos calculados (solo en el listado del super-admin).
+    branches_count: int = 0
+    staff_count: int = 0
+    pets_count: int = 0
 
 
 class WhatsAppConfig(BaseModel):

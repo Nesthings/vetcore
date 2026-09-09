@@ -41,6 +41,7 @@ from app.models.pet import ClinicalAlert, CustomBreed, Pet, PetPhoto, PetWeightR
 from app.models.product import SaleProduct
 from app.models.smart_alert import SmartAlert, SmartAlertRule
 from app.models.staff import User, UserComponentPermission
+from app.models.support_ticket import SupportTicket, SupportTicketAttachment
 from app.models.vaccination import (
     PetCarnetRecord,
     PetVaccinationDose,
@@ -101,6 +102,8 @@ __all__ = [
     "ServiceCatalog",
     "SmartAlert",
     "SmartAlertRule",
+    "SupportTicket",
+    "SupportTicketAttachment",
     "User",
     "UserComponentPermission",
     "VaccinationPlan",
