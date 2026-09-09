@@ -202,7 +202,7 @@ locals {
     CORS_ORIGINS                    = var.cors_origins
     DB_POOL_SIZE                    = tostring(var.db_pool_size)
     DB_MAX_OVERFLOW                 = tostring(var.db_max_overflow)
-    SQS_QUEUE_URL                   = var.sqs_queue_url
+    SQS_QUEUE_URL                   = aws_sqs_queue.vetcore_whatsapp_main.url
     SQS_REGION                      = var.sqs_region
     AWS_REGION                      = var.region
     SMTP_HOST                       = var.smtp_host
@@ -235,7 +235,7 @@ resource "aws_ecs_task_definition" "backend" {
       portMappings = [
         { containerPort = var.app_port, protocol = "tcp" }
       ]
-      environment = [for k, v in local.app_env : { name = k, value = v }]
+environment = [for k, v in local.app_env : { name = k, value = v }]
       logConfiguration = {
         logDriver = "awslogs"
         options = {
