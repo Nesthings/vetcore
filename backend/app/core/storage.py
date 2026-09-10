@@ -100,11 +100,23 @@ def public_url(relative_path: str) -> str:
 
 
 def media_path_from_url(url: str | None) -> Path | None:
-    """Resuelve una URL pública `/media/...` al Path local, si existe."""
+    """Resuelve una URL pública `/media/...` al Path local, si existe.
+
+    Valida que la ruta resuelta quede DENTRO de `media_root` (anti path
+    traversal): rechaza cualquier segmento `..` o URL con escape de directorio.
+    """
     if not url or not url.startswith("/media/"):
         return None
-    p = media_root_path() / url[len("/media/") :]
-    return p if p.is_file() else None
+    rel = url[len("/media/") :]
+    candidate = media_root_path() / rel
+    try:
+        candidate = candidate.resolve()
+    except OSError:
+        return None
+    root = media_root_path().resolve()
+    if not candidate.is_relative_to(root):
+        return None
+    return candidate if candidate.is_file() else None
 
 
 def read_media_bytes(url: str | None) -> bytes | None:
@@ -138,6 +150,25 @@ def validate_extension(filename: str, allowed: set[str]) -> None:
             f"Extensión no permitida: {suffix or '(sin extensión)'}. "
             f"Permitidas: {', '.join(sorted(allowed))}"
         )
+
+
+def validate_content_magic(filename: str, content: bytes) -> None:
+    """Valida el contenido real (magic bytes) según la extensión declarada.
+
+    Evita subir archivos arbitrarios (scripts, HTML, polyglots) usando solo
+    una extensión de imagen/PDF como camuflaje.
+    """
+    suffix = Path(filename).suffix.lower()
+    head = content[:16]
+    if suffix in ALLOWED_IMAGE_EXTENSIONS:
+        is_png = head.startswith(b"\x89PNG\r\n\x1a\n")
+        is_jpeg = head.startswith(b"\xff\xd8\xff")
+        is_webp = head[0:4] == b"RIFF" and head[8:12] == b"WEBP"
+        if not (is_png or is_jpeg or is_webp):
+            raise ValueError("El archivo no es una imagen válida (JPG/PNG/WebP).")
+    elif suffix in ALLOWED_PDF_EXTENSIONS:
+        if not content.startswith(b"%PDF"):
+            raise ValueError("El archivo no es un PDF válido.")
 
 
 def read_upload_limited(upload_file, max_bytes: int = 5 * 1024 * 1024) -> bytes:

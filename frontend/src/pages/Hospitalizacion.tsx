@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   ArrowDownUp,
@@ -86,6 +86,7 @@ export function Hospitalizacion() {
   const [branchId, setBranchId] = useState('')
   const [statusFilter, setStatusFilter] = useState('active')
   const [search, setSearch] = useState('')
+  const loadSeq = useRef(0)
   const [spaceFilter, setSpaceFilter] = useState('')
   const [vetFilter, setVetFilter] = useState('')
   const [monitoringFilter, setMonitoringFilter] = useState('')
@@ -113,6 +114,7 @@ export function Hospitalizacion() {
   }, [branchId])
 
   const load = useCallback(async () => {
+    const seq = ++loadSeq.current
     setLoading(true)
     setError(null)
     try {
@@ -120,17 +122,25 @@ export function Hospitalizacion() {
       if (statusFilter) params.set('status', statusFilter)
       if (branchId) params.set('branch_id', branchId)
       if (search.trim()) params.set('search', search.trim())
-      setItems(await apiFetch<HospitalizationItem[]>(`/hospitalization/hospitalizations?${params}`))
+      const res = await apiFetch<HospitalizationItem[]>(
+        `/hospitalization/hospitalizations?${params}`,
+      )
+      // Solo aplica la respuesta más reciente (evita datos stale por respuestas
+      // desordenadas al escribir en la búsqueda).
+      if (seq === loadSeq.current) setItems(res)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudieron cargar las hospitalizaciones')
+      if (seq === loadSeq.current) {
+        setError(err instanceof Error ? err.message : 'No se pudieron cargar las hospitalizaciones')
+      }
     } finally {
-      setLoading(false)
+      if (seq === loadSeq.current) setLoading(false)
     }
   }, [statusFilter, branchId, search])
 
   useEffect(() => {
-    load()
-  }, [load])
+    const t = setTimeout(() => load(), search.trim() ? 250 : 0)
+    return () => clearTimeout(t)
+  }, [load, search])
 
   useEffect(() => {
     loadOverview()

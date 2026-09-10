@@ -21,7 +21,9 @@ from app.db.session import get_db
 from app.models import (
     Clinic,
     ClinicBranch,
+    InventoryLot,
     InventoryMovement,
+    InventoryProduct,
     Invoice,
     InvoiceItem,
     Pet,
@@ -120,12 +122,73 @@ def _line_total(item: InvoiceItemCreate) -> Decimal:
     )
 
 
+def _validate_invoice_tenancy(db: Session, clinic_id, body: InvoiceCreate) -> None:
+    """Aísla multi-tenant: cada recurso referenciado debe pertenecer a la clínica."""
+    cid = str(clinic_id)
+    if body.branch_id:
+        branch = db.get(ClinicBranch, body.branch_id)
+        if branch is None or str(branch.clinic_id) != cid:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Sucursal no encontrada en esta clínica",
+            )
+    if body.pet_id:
+        pet = db.get(Pet, body.pet_id)
+        if pet is None or str(pet.clinic_id) != cid:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Paciente no encontrado en esta clínica",
+            )
+    for item in body.items:
+        if item.service_id:
+            service = db.get(ServiceCatalog, item.service_id)
+            if service is None or str(service.clinic_id) != cid:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Servicio no encontrado en esta clínica",
+                )
+        if item.product_id:
+            product = db.get(InventoryProduct, item.product_id)
+            if product is None or str(product.clinic_id) != cid:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Producto no encontrado en esta clínica",
+                )
+
+
+def _restore_stock_for_invoice(db: Session, invoice: Invoice) -> None:
+    """Revierte los movimientos de stock de una factura cancelada (y sus lotes).
+
+    Restaura `lot.quantity` y registra movimientos inversos para mantener la
+    trazabilidad y el stock consistente.
+    """
+    movements = db.scalars(
+        select(InventoryMovement).where(InventoryMovement.reference_id == invoice.id)
+    ).all()
+    for mv in movements:
+        delta = Decimal(str(mv.quantity_delta))
+        if mv.lot_id:
+            lot = db.get(InventoryLot, mv.lot_id)
+            if lot is not None:
+                lot.quantity = float(Decimal(str(lot.quantity)) - delta)  # +abs (delta es negativo)
+        db.add(
+            InventoryMovement(
+                product_id=mv.product_id,
+                lot_id=mv.lot_id,
+                quantity_delta=-delta,
+                reason="sale_reversal",
+                reference_id=invoice.id,
+            )
+        )
+
+
 @router.post("", response_model=InvoiceRead, status_code=status.HTTP_201_CREATED)
 def create_invoice(
     body: InvoiceCreate,
     ctx: CurrentClinic = Depends(get_current_clinic),
     db: Session = Depends(get_db),
 ) -> dict:
+    _validate_invoice_tenancy(db, ctx.clinic["id"], body)
     invoice = Invoice(
         clinic_id=ctx.clinic["id"],
         branch_id=body.branch_id,
@@ -280,7 +343,10 @@ def update_invoice_status(
     db: Session = Depends(get_db),
 ) -> dict:
     invoice = _get_invoice_or_404(db, ctx.clinic["id"], invoice_id)
-    for field, value in body.model_dump(exclude_unset=True).items():
+    data = body.model_dump(exclude_unset=True)
+    if data.get("status") == "cancelled" and invoice.status != "cancelled":
+        _restore_stock_for_invoice(db, invoice)
+    for field, value in data.items():
         setattr(invoice, field, value)
     db.commit()
     return _with_names(db, [_get_invoice_or_404(db, ctx.clinic["id"], invoice_id)])[0]
@@ -293,6 +359,8 @@ def cancel_invoice(
     db: Session = Depends(get_db),
 ) -> None:
     invoice = _get_invoice_or_404(db, ctx.clinic["id"], invoice_id)
+    if invoice.status != "cancelled":
+        _restore_stock_for_invoice(db, invoice)
     invoice.status = "cancelled"
     record_audit(
         db,

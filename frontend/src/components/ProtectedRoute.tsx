@@ -54,7 +54,12 @@ export function ProtectedRoute({
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 
-  if (roles && user && !roles.includes(user.role)) {
+  // Token presente pero payload inválido o vencido → se trata como no autenticado.
+  if (!user) {
+    return <Navigate to="/login" state={{ from: location }} replace />
+  }
+
+  if (roles && !roles.includes(user.role)) {
     return <AccessDenied />
   }
 
@@ -74,6 +79,17 @@ export function ProtectedRoute({
   // permisos cargan, mostramos un estado de carga en vez de denegar.
   const isStaff =
     user?.role === 'admin' || user?.role === 'veterinario' || user?.role === 'recepcion'
+
+  // Una ruta que declara `component` es exclusiva del staff de clínica: un
+  // owner o super-admin no debe renderizarla (se le redirige a su home).
+  if (!isStaff && component) {
+    const home = ROLE_HOME[user.role] ?? '/'
+    if (location.pathname !== home) {
+      return <Navigate to={home} replace />
+    }
+    return <AccessDenied />
+  }
+
   if (isStaff && component) {
     if (permsLoading) {
       return <RouteLoading />
@@ -81,7 +97,13 @@ export function ProtectedRoute({
     if (!hasComponent(component)) {
       // Si no tiene acceso a esta pantalla, lo llevamos a la primera ruta a
       // la que sí tiene acceso, en vez de mostrar "Acceso restringido".
-      return <Navigate to={firstAllowedRoute(hasComponent)} replace />
+      const next = firstAllowedRoute(hasComponent)
+      // Evita el bucle de redirección cuando el staff no tiene ningún
+      // componente permitido y el destino vuelve a ser la ruta actual.
+      if (next === location.pathname) {
+        return <AccessDenied />
+      }
+      return <Navigate to={next} replace />
     }
   }
 

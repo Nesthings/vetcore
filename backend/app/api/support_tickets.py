@@ -18,6 +18,7 @@ from app.core.storage import (
     public_url,
     read_upload_limited,
     save_media,
+    validate_content_magic,
     validate_extension,
 )
 from app.db.session import get_db
@@ -69,6 +70,7 @@ def _read_files(files: list[UploadFile]) -> list[tuple[str, bytes]]:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from None
         try:
             content = read_upload_limited(file, MAX_TICKET_FILE_BYTES)
+            validate_content_magic(filename, content)
         except ValueError as exc:
             raise HTTPException(
                 status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail=str(exc)
@@ -84,15 +86,27 @@ def _save_files(db: Session, ticket_id, validated: list[tuple[str, bytes]]) -> l
         rel = save_media(f"tickets/{ticket_id}", filename, content)
         attachment = SupportTicketAttachment(
             ticket_id=ticket_id,
-            file_type="image" if filename.lower().endswith(tuple(ALLOWED_IMAGE_EXTENSIONS)) else "file",
+            file_type=(
+                "image"
+                if filename.lower().endswith(tuple(ALLOWED_IMAGE_EXTENSIONS))
+                else "file"
+            ),
             url=public_url(rel),
         )
         db.add(attachment)
-        saved.append({"id": str(attachment.id), "file_type": attachment.file_type, "url": attachment.url})
+        saved.append(
+            {
+                "id": str(attachment.id),
+                "file_type": attachment.file_type,
+                "url": attachment.url,
+            }
+        )
     return saved
 
 
-@router.post("", status_code=status.HTTP_201_CREATED, summary="Reporta un problema (ticket de soporte)")
+@router.post(
+    "", status_code=status.HTTP_201_CREATED, summary="Reporta un problema (ticket de soporte)"
+)
 def create_ticket(
     subject: str = Form(..., min_length=1, max_length=200),
     description: str = Form(..., min_length=1, max_length=5000),
@@ -105,7 +119,9 @@ def create_ticket(
         {"uid": user.sub},
     ).mappings().first()
     if reporter is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuario no encontrado")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuario no encontrado"
+        )
 
     validated = _read_files(files)
 
@@ -201,7 +217,11 @@ def list_all_tickets(
         )
 
     return [
-        _ticket_dict(t, clinic_name=clinic_names.get(str(t.clinic_id)), attachments=attachments.get(str(t.id), []))
+        _ticket_dict(
+            t,
+            clinic_name=clinic_names.get(str(t.clinic_id)),
+            attachments=attachments.get(str(t.id), []),
+        )
         for t in tickets
     ]
 

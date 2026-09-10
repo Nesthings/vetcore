@@ -115,6 +115,7 @@ export function Pets() {
 
   useEffect(() => {
     let cancelled = false
+    setError(null)
     const t = setTimeout(
       () => {
         ;(async () => {

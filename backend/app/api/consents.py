@@ -19,11 +19,11 @@ from sqlalchemy.orm import Session
 from app.api.deps import CurrentClinic, get_current_clinic, require_clinic_roles
 from app.core.events import record_audit
 from app.core.storage import (
-    read_upload_limited,
     ALLOWED_IMAGE_EXTENSIONS,
     ALLOWED_PDF_EXTENSIONS,
     public_url,
     read_media_bytes,
+    read_upload_limited,
     save_media,
     validate_extension,
 )
@@ -102,7 +102,7 @@ def create_pending_consent(
             raise HTTPException(
                 status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
                 detail=str(exc),
-            )
+            ) from exc
         rel = save_media(f"consents/{pet.id}", attachment.filename, content)
         attachment_url = public_url(rel)
         attachment_name = attachment.filename

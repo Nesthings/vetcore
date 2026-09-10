@@ -383,6 +383,7 @@ function Stat({
 
 export function PetDetail() {
   const { id } = useParams<{ id: string }>()
+  const loadSeq = useRef(0)
   const [pet, setPet] = useState<Pet | null>(null)
   const [timeline, setTimeline] = useState<TimelineEvent[]>([])
   const [weights, setWeights] = useState<WeightRecord[]>([])
@@ -437,26 +438,37 @@ export function PetDetail() {
 
   const load = useCallback(async () => {
     if (!id) return
+    const seq = ++loadSeq.current
     setLoading(true)
     setError(null)
     try {
+      // El único endpoint crítico es /pets/{id}: si falla, se muestra error.
+      // El resto de secciones tolera fallos individuales (Promise.all con
+      // fallbacks) para que un endpoint secundario no deje la ficha en blanco.
       const [p, tl, w, al, ph, cs, vp, ca, fm, us, qr] = await Promise.all([
         apiFetch<Pet>(`/pets/${id}`),
-        apiFetch<TimelineEvent[]>(`/pets/${id}/timeline`),
-        apiFetch<WeightRecord[]>(`/pets/${id}/weights`),
-        apiFetch<ClinicalAlert[]>(`/pets/${id}/alerts`),
-        apiFetch<PhotoEvolutionItem[]>(`/pets/${id}/photo-evolution`),
-        apiFetch<Consent[]>(`/consents/pets/${id}`),
-        apiFetch<PetVaccinationPlan[]>(`/vaccination-plans/pets/${id}`),
+        apiFetch<TimelineEvent[]>(`/pets/${id}/timeline`).catch(() => [] as TimelineEvent[]),
+        apiFetch<WeightRecord[]>(`/pets/${id}/weights`).catch(() => [] as WeightRecord[]),
+        apiFetch<ClinicalAlert[]>(`/pets/${id}/alerts`).catch(() => [] as ClinicalAlert[]),
+        apiFetch<PhotoEvolutionItem[]>(`/pets/${id}/photo-evolution`).catch(
+          () => [] as PhotoEvolutionItem[],
+        ),
+        apiFetch<Consent[]>(`/consents/pets/${id}`).catch(() => [] as Consent[]),
+        apiFetch<PetVaccinationPlan[]>(`/vaccination-plans/pets/${id}`).catch(
+          () => [] as PetVaccinationPlan[],
+        ),
         apiFetch<{ species: string; vaccines: CarnetVaccine[]; brands: string[] }>(
           `/pets/${id}/carnet`,
-        ),
-        apiFetch<FamilyMember[]>(`/pets/${id}/family`),
+        ).catch(() => ({ species: '', vaccines: [], brands: [] })),
+        apiFetch<FamilyMember[]>(`/pets/${id}/family`).catch(() => [] as FamilyMember[]),
         apiFetch<
           { id: string; full_name: string; role: string; professional_title?: string | null }[]
-        >('/users'),
+        >('/users').catch(() => []),
         apiFetch<{ url: string }>(`/pets/${id}/qr`).catch(() => null),
       ])
+      // Solo aplica si sigue siendo la misma mascota (evita datos stale al
+      // navegar rápido entre fichas).
+      if (seq !== loadSeq.current) return
       setPet(p)
       setTimeline(tl)
       setWeights(w)
@@ -512,11 +524,13 @@ export function PetDetail() {
       } catch {
         hosp = null
       }
-      setHospitalization(hosp)
+      if (seq === loadSeq.current) setHospitalization(hosp)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo cargar el paciente')
+      if (seq === loadSeq.current) {
+        setError(err instanceof Error ? err.message : 'No se pudo cargar el paciente')
+      }
     } finally {
-      setLoading(false)
+      if (seq === loadSeq.current) setLoading(false)
     }
   }, [id])
 

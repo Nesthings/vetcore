@@ -28,9 +28,9 @@ from app.core.permissions import (
 )
 from app.core.security import hash_password, verify_password
 from app.core.storage import (
-    read_upload_limited,
     ALLOWED_IMAGE_EXTENSIONS,
     public_url,
+    read_upload_limited,
     save_media,
     validate_extension,
 )
@@ -312,7 +312,7 @@ def upload_user_photo(
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail=str(exc),
-        )
+        ) from exc
     try:
         processed = process_cartilla_photo(content)
     except ValueError as exc:

@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useState } from 'react'
+import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 
 import { decodeJwtPayload, getToken, setToken } from '@/lib/api'
 
@@ -22,6 +22,10 @@ function sessionFromToken(token: string | null): SessionUser | null {
   if (!token) return null
   const payload = decodeJwtPayload(token)
   if (!payload?.sub || !payload?.role) return null
+  // Un token vencido no debe mantener la sesión activa: se trata como no
+  // autenticado para forzar re-login (ProtegidoRoute redirige a /login).
+  const exp = typeof payload.exp === 'number' ? payload.exp * 1000 : null
+  if (exp !== null && exp <= Date.now()) return null
   return {
     sub: String(payload.sub),
     role: payload.role as SessionUser['role'],
@@ -32,6 +36,14 @@ function sessionFromToken(token: string | null): SessionUser | null {
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setTokenState] = useState<string | null>(() => getToken())
+
+  useEffect(() => {
+    const onUnauthorized = () => {
+      setTokenState(null)
+    }
+    window.addEventListener('vetcore:unauthorized', onUnauthorized)
+    return () => window.removeEventListener('vetcore:unauthorized', onUnauthorized)
+  }, [])
 
   const value = useMemo<AuthContextValue>(() => {
     return {

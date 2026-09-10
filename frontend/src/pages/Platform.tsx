@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -167,6 +167,8 @@ export function Platform() {
     'home',
   )
   const [adminName, setAdminName] = useState('')
+  const detailSeq = useRef(0)
+  const searchSeq = useRef(0)
 
   // Estado de tickets de soporte
   const [tickets, setTickets] = useState<Ticket[]>([])
@@ -229,6 +231,7 @@ export function Platform() {
       setDetailId(null)
       return
     }
+    const seq = ++detailSeq.current
     setDetailId(id)
     setSummary(null)
     setClinicStaff([])
@@ -240,11 +243,17 @@ export function Platform() {
         apiFetch<StaffUser[]>(`/platform/users?clinic_id=${id}`),
         apiFetch<ClinicEvent[]>(`/clinics/${id}/events`),
       ])
-      setSummary(sum)
-      setClinicStaff(staff)
-      setEvents(evts)
+      // Solo aplica si sigue siendo la clínica seleccionada (evita datos stale
+      // al abrir otra clínica rápido).
+      if (seq === detailSeq.current && detailId === id) {
+        setSummary(sum)
+        setClinicStaff(staff)
+        setEvents(evts)
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo cargar el detalle')
+      if (seq === detailSeq.current) {
+        setError(err instanceof Error ? err.message : 'No se pudo cargar el detalle')
+      }
     }
   }
 
@@ -309,12 +318,17 @@ export function Platform() {
       setUsers([])
       return
     }
+    const seq = ++searchSeq.current
     try {
-      setUsers(
-        await apiFetch<StaffUser[]>(`/platform/users?search=${encodeURIComponent(term.trim())}`),
+      const res = await apiFetch<StaffUser[]>(
+        `/platform/users?search=${encodeURIComponent(term.trim())}`,
       )
+      // Solo aplica la respuesta del término más reciente.
+      if (seq === searchSeq.current) setUsers(res)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo buscar')
+      if (seq === searchSeq.current) {
+        setError(err instanceof Error ? err.message : 'No se pudo buscar')
+      }
     }
   }
 

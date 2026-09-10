@@ -26,9 +26,9 @@ from app.core.events import record_audit
 from app.core.images import process_cartilla_photo
 from app.core.security import create_access_token, hash_password
 from app.core.storage import (
-    read_upload_limited,
     ALLOWED_IMAGE_EXTENSIONS,
     public_url,
+    read_upload_limited,
     save_media,
     validate_extension,
 )
@@ -142,7 +142,7 @@ def upload_clinic_logo(
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail=str(exc),
-        )
+        ) from exc
     try:
         processed = process_cartilla_photo(content)
     except ValueError as exc:

@@ -52,6 +52,9 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
 
   if (res.status === 401) {
     setToken(null)
+    // Notifica a los providers (AuthProvider) para cerrar la sesión de la UI y
+    // redirigir a /login en vez de dejar al usuario "atrapado" sin token.
+    window.dispatchEvent(new CustomEvent('vetcore:unauthorized'))
   }
 
   if (!res.ok) {

@@ -44,7 +44,10 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 # --- Rate limiting de login (anti fuerza bruta, en memoria) ---
 LOGIN_MAX_ATTEMPTS = 6
 LOGIN_WINDOW_SECONDS = 60
+TOTP_MAX_ATTEMPTS = 5
+TOTP_WINDOW_SECONDS = 120
 _login_attempts: dict[str, list[float]] = defaultdict(list)
+_totp_attempts: dict[str, list[float]] = defaultdict(list)
 
 
 def _login_key(request: Request, identifier: str) -> str:
@@ -66,6 +69,23 @@ def _enforce_login_rate(key: str) -> None:
 
 def _clear_login_rate(key: str) -> None:
     _login_attempts.pop(key, None)
+
+
+def _enforce_totp_rate(user_id: str) -> None:
+    """Límite de intentos del código TOTP para evitar fuerza bruta (por usuario)."""
+    now = time.time()
+    recent = [t for t in _totp_attempts[user_id] if now - t < TOTP_WINDOW_SECONDS]
+    _totp_attempts[user_id] = recent
+    if len(recent) >= TOTP_MAX_ATTEMPTS:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Demasiados intentos de código. Espera un momento y vuelve a intentarlo.",
+        )
+    _totp_attempts[user_id].append(now)
+
+
+def _clear_totp_rate(user_id: str) -> None:
+    _totp_attempts.pop(user_id, None)
 
 
 def _staff_login(
@@ -332,17 +352,21 @@ def verify_2fa(
 ) -> LoginResponse:
     try:
         payload = get_token_payload(body.challenge_token)
-    except Exception:
+    except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="El challenge de 2FA es inválido o expiró. Vuelve a iniciar sesión.",
-        )
+        ) from exc
     if payload.get("purpose") != "2fa":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="El challenge de 2FA es inválido o expiró. Vuelve a iniciar sesión.",
         )
     challenge_role = payload.get("role")
+    challenge_sub = str(payload.get("sub") or "")
+
+    # Anti fuerza bruta del código TOTP (el límite de login se limpia en el paso 1).
+    _enforce_totp_rate(challenge_sub)
 
     if challenge_role == "super-admin":
         row = (
@@ -371,6 +395,7 @@ def verify_2fa(
             {"uid": row["id"]},
         )
         db.commit()
+        _clear_totp_rate(challenge_sub)
         return LoginResponse(
             access_token=create_access_token(subject=str(row["id"]), role="super-admin"),
             role="super-admin",
@@ -403,6 +428,7 @@ def verify_2fa(
         {"uid": row["id"]},
     )
     db.commit()
+    _clear_totp_rate(challenge_sub)
     return LoginResponse(
         access_token=create_access_token(
             subject=str(row["id"]),

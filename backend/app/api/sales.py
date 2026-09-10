@@ -69,6 +69,11 @@ def create_sale(
                 detail=f"El producto «{product.name}» no tiene precio",
             )
         qty = Decimal(str(p.quantity))
+        if qty != qty.to_integral_value():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="La cantidad de un producto debe ser un número entero",
+            )
         if qty > product.stock_quantity:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -136,8 +141,9 @@ def create_sale(
         entity_id=invoice.id,
         metadata={"sale": True, "total": float(invoice.total)},
     )
-    db.commit()
 
+    # El recibo se genera ANTES del commit: si el PDF falla, la transacción se
+    # revierte y no queda una venta cobrada sin recibo ni stock descontado.
     clinic = db.get(Clinic, clinic_id)
     date_str = performed_at.astimezone().strftime("%d/%m/%Y %H:%M")
     receipt_items = []
@@ -167,6 +173,7 @@ def create_sale(
     }
     receipt_bytes = build_invoice_receipt_pdf(receipt_data)
     receipt_rel = save_media("receipts", f"recibo_{invoice.id}.pdf", receipt_bytes)
+
     db.commit()
 
     if body.send_receipt_whatsapp:

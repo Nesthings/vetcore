@@ -28,8 +28,9 @@ def build_otpauth_uri(email: str, secret: str) -> str:
 def qr_data_uri(otpauth_uri: str) -> str:
     """Genera un QR (data URI) a partir de la URI otpauth, para mostrarlo en el
     navegador sin depender de un servicio externo."""
-    import qrcode
     from io import BytesIO
+
+    import qrcode
 
     img = qrcode.make(otpauth_uri)
     buf = BytesIO()

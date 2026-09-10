@@ -50,7 +50,12 @@ def list_audit(
         else {}
     )
     owner_names = (
-        dict(db.execute(text("SELECT id, full_name FROM owners WHERE id = ANY(:ids)"), {"ids": owner_ids}).all())
+        dict(
+            db.execute(
+                text("SELECT id, full_name FROM owners WHERE id = ANY(:ids)"),
+                {"ids": owner_ids},
+            ).all()
+        )
         if owner_ids
         else {}
     )

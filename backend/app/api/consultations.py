@@ -5,10 +5,9 @@ subida de adjuntos (foto/nota). El checkout (`POST /consultations/checkout`)
 completa la consulta como una caja: consulta + factura + recibo PDF.
 """
 
+import logging
 from datetime import UTC, datetime
 from decimal import Decimal
-
-import logging
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy import select, text
@@ -17,10 +16,11 @@ from sqlalchemy.orm import Session, selectinload
 from app.api.deps import CurrentClinic, get_current_clinic, require_clinic_roles, require_component
 from app.core.events import record_audit
 from app.core.storage import (
-    read_upload_limited,
     ALLOWED_IMAGE_EXTENSIONS,
     public_url,
+    read_upload_limited,
     save_media,
+    validate_content_magic,
     validate_extension,
 )
 from app.db.session import get_db
@@ -233,6 +233,11 @@ def checkout_consultation(
                 detail=f"El producto «{product.name}» no tiene precio",
             )
         qty = Decimal(str(p.quantity))
+        if qty != qty.to_integral_value():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="La cantidad de un producto debe ser un número entero",
+            )
         if qty > product.stock_quantity:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -280,6 +285,10 @@ def checkout_consultation(
         ).scalar()
 
     performed_at = body.performed_at or datetime.now(UTC)
+    # Normaliza fechas naive a aware UTC: evita que se interpreten con la TZ
+    # del servidor y rompan comparaciones naive/aware (bug de timezone).
+    if performed_at.tzinfo is None:
+        performed_at = performed_at.replace(tzinfo=UTC)
     consultation = Consultation(
         clinic_id=clinic_id,
         branch_id=body.branch_id,
@@ -536,11 +545,12 @@ def upload_attachment(
     validate_extension(file.filename or "", ALLOWED_IMAGE_EXTENSIONS)
     try:
         content = read_upload_limited(file, MAX_IMAGE_BYTES)
+        validate_content_magic(file.filename or "", content)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail=str(exc),
-        )
+        ) from exc
 
     rel = save_media(f"consultations/{consultation_id}", file.filename or "attach.jpg", content)
     attachment = ConsultationAttachment(

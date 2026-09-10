@@ -59,17 +59,20 @@ def _consents_batch(
     return out
 
 
-def _sent_templates_batch(db: Session, templates: list[str]) -> set[str]:
+def _sent_templates_batch(
+    db: Session, templates: list[str], clinic_id: str | None = None
+) -> set[str]:
     if not templates:
         return set()
-    return set(
-        db.scalars(
-            select(OutboundNotification.template).where(
-                OutboundNotification.template.in_(templates),
-                OutboundNotification.status == "sent",
-            )
-        ).all()
+    stmt = select(OutboundNotification.template).where(
+        OutboundNotification.template.in_(templates),
+        # Incluye "queued": un recordatorio ya encolado (pendiente de enviar por
+        # el worker) no debe volver a enviarse si run_reminders corre de nuevo.
+        OutboundNotification.status.in_(("sent", "queued")),
     )
+    if clinic_id:
+        stmt = stmt.where(OutboundNotification.clinic_id == clinic_id)
+    return set(db.scalars(stmt).all())
 
 
 def _owner_phones_batch(db: Session, owner_ids: list[str]) -> dict[str, str | None]:
@@ -110,7 +113,7 @@ def reminder_schedule(
     )
 
     templates = [_reminder_template(appointment_id, stage) for stage, _ in REMINDER_STAGES]
-    sent = _sent_templates_batch(db, templates)
+    sent = _sent_templates_batch(db, templates, clinic_id=ctx.clinic["id"])
 
     stages = []
     for stage, hours in REMINDER_STAGES:
@@ -260,7 +263,7 @@ def pending_reminders(
     all_templates = [
         _reminder_template(str(a.id), stage) for a in appointments for stage, _ in REMINDER_STAGES
     ]
-    sent_templates = _sent_templates_batch(db, all_templates)
+    sent_templates = _sent_templates_batch(db, all_templates, clinic_id=ctx.clinic["id"])
 
     out = []
     for appt in appointments:

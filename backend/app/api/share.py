@@ -32,9 +32,9 @@ from app.core.security import (
     share_token_version,
 )
 from app.core.storage import (
-    read_upload_limited,
     ALLOWED_IMAGE_EXTENSIONS,
     public_url,
+    read_upload_limited,
     save_media,
     validate_extension,
 )
@@ -50,8 +50,6 @@ from app.models import (
     DigitalConsent,
     Hospitalization,
     HospitalizationAccommodation,
-    HospitalizationNote,
-    HospitalizationVital,
     Pet,
     PetPhoto,
     PetWeightRecord,
@@ -359,33 +357,32 @@ def share_cartilla(
             }
         )
 
-    # Familia: mismo nombre de dueño
-    owner_names = list(
+    # Familia: mascotas que comparten el MISMO dueño (mismo owner_id), para no
+    # vincular mascotas de dueños distintos que solo coinciden en el nombre.
+    owner_ids = list(
         db.execute(
             text(
-                "SELECT DISTINCT trim(o.full_name) AS full_name "
-                "FROM owner_pet_links l JOIN owners o ON o.id = l.owner_id "
-                "WHERE l.pet_id = :pid AND l.clinic_id = :cid AND l.is_active = true "
-                "AND o.full_name IS NOT NULL AND trim(o.full_name) <> ''"
+                "SELECT DISTINCT l.owner_id "
+                "FROM owner_pet_links l "
+                "WHERE l.pet_id = :pid AND l.clinic_id = :cid AND l.is_active = true"
             ),
             {"pid": pet.id, "cid": clinic_id},
         ).scalars()
     )
     family: list[dict] = []
-    if owner_names:
-        placeholders = ",".join(f":nm{i}" for i in range(len(owner_names)))
+    if owner_ids:
+        placeholders = ",".join(f":oid{i}" for i in range(len(owner_ids)))
         params: dict = {"cid": clinic_id, "pid": pet.id}
-        params.update({f"nm{i}": n for i, n in enumerate(owner_names)})
+        params.update({f"oid{i}": str(o) for i, o in enumerate(owner_ids)})
         rows = db.execute(
             text(
                 "SELECT DISTINCT p.id, p.name, p.species, p.breed, p.sex, "
                 "p.clinical_photo_url AS photo_url "
                 "FROM owner_pet_links l "
-                "JOIN owners o ON o.id = l.owner_id "
                 "JOIN pets p ON p.id = l.pet_id "
                 "WHERE l.clinic_id = :cid AND l.is_active = true "
                 "AND p.id <> :pid AND p.is_active = true "
-                f"AND trim(coalesce(o.full_name, '')) IN ({placeholders})"
+                f"AND l.owner_id IN ({placeholders})"
             ),
             params,
         ).mappings().all()
@@ -621,7 +618,7 @@ def share_upload_photo(
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail=str(exc),
-        )
+        ) from exc
     try:
         processed = process_cartilla_photo(content)
     except ValueError as exc:
@@ -668,7 +665,7 @@ def share_upload_owner_photo(
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail=str(exc),
-        )
+        ) from exc
     try:
         processed = process_cartilla_photo(content)
     except ValueError as exc:
@@ -730,7 +727,7 @@ def share_upload_owner_signature(
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail=str(exc),
-        )
+        ) from exc
     import io
 
     from PIL import Image

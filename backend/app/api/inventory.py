@@ -5,7 +5,7 @@ la fecha de caducidad para las alertas (1.5) y el consumo FIFO (2.2).
 Incluye la predicción de agotamiento (days_remaining).
 """
 
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -62,12 +62,16 @@ def allocate_fifo(db: Session, product_id: str, quantity: float) -> list[tuple[s
 
     Devuelve [(lot_id, cantidad)] que cubren hasta `quantity`. Si los lotes no
     alcanzan, la diferencia se consume sin lote (stock genérico).
+
+    `with_for_update()` bloquea las filas de los lotes para evitar "lost update"
+    cuando dos ventas concurrentes consumen el mismo lote (race condition).
     """
     lots = list(
         db.scalars(
             select(InventoryLot)
             .where(InventoryLot.product_id == product_id, InventoryLot.quantity > 0)
             .order_by(InventoryLot.expiration_date.asc().nulls_last(), InventoryLot.created_at)
+            .with_for_update()
         )
     )
     remaining = Decimal(str(quantity))
@@ -97,7 +101,7 @@ def _enrich(db: Session, products: list[InventoryProduct]) -> list[dict]:
     )
 
     # Predicción de agotamiento: consumo por ventas de los últimos N días
-    since = datetime.now() - timedelta(days=FORECAST_WINDOW_DAYS)
+    since = datetime.now(UTC) - timedelta(days=FORECAST_WINDOW_DAYS)
     sales_rows = dict(
         db.execute(
             select(InventoryMovement.product_id, func.sum(InventoryMovement.quantity_delta))
@@ -215,7 +219,7 @@ def create_lot(
         quantity=body.quantity,
     )
     db.add(lot)
-    # La entrada de stock es un movimiento de compra (consistente con el stock por Σ deltas)
+    db.flush()  # asigna lot.id antes de crear el movimiento que lo referencia
     db.add(
         InventoryMovement(
             product_id=product.id,
@@ -224,7 +228,6 @@ def create_lot(
             reason="purchase",
         )
     )
-    db.flush()
     _maybe_notify_low_stock(db, ctx, product)
     db.commit()
     return _enrich(db, [product])[0]
@@ -242,6 +245,16 @@ def stock_entry(
     db: Session = Depends(get_db),
 ) -> dict:
     product = _get_product_or_404(db, ctx.clinic["id"], product_id)
+    available = db.scalar(
+        select(func.coalesce(func.sum(InventoryMovement.quantity_delta), 0)).where(
+            InventoryMovement.product_id == product.id
+        )
+    )
+    if body.quantity < 0 and Decimal(str(available)) + Decimal(str(body.quantity)) < 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La salida de stock supera el inventario disponible.",
+        )
     db.add(
         InventoryMovement(
             product_id=product.id,

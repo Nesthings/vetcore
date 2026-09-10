@@ -120,6 +120,13 @@ def _check_occupancy(
     if not accommodation_id:
         return
     acc = _get_accommodation_or_404(db, clinic_id, accommodation_id)
+    # Bloquea la fila del espacio para serializar admisiones concurrentes:
+    # dos requests simultáneos no pueden leer el mismo conteo antes de insertar.
+    db.execute(
+        select(HospitalizationAccommodation.id)
+        .where(HospitalizationAccommodation.id == acc.id)
+        .with_for_update()
+    )
     stmt = (
         select(func.count())
         .select_from(Hospitalization)
@@ -1214,7 +1221,18 @@ def administer_medication(
     ctx: CurrentClinic = Depends(require_clinic_roles(*MUTATORS)),
     db: Session = Depends(get_db),
 ) -> HospitalizationMedicationAdministration:
-    admin = _get_administration_or_404(db, ctx.clinic["id"], admin_id)
+    admin = db.scalar(
+        select(HospitalizationMedicationAdministration)
+        .where(
+            HospitalizationMedicationAdministration.id == admin_id,
+            HospitalizationMedicationAdministration.clinic_id == ctx.clinic["id"],
+        )
+        .with_for_update()
+    )
+    if admin is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Administración no encontrada"
+        )
     if admin.status != "pending":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -1248,7 +1266,18 @@ def administer_medication(
 
 
 def _finish_administration(db: Session, ctx, admin_id: str, status_value: str, action: str):
-    admin = _get_administration_or_404(db, ctx.clinic["id"], admin_id)
+    admin = db.scalar(
+        select(HospitalizationMedicationAdministration)
+        .where(
+            HospitalizationMedicationAdministration.id == admin_id,
+            HospitalizationMedicationAdministration.clinic_id == ctx.clinic["id"],
+        )
+        .with_for_update()
+    )
+    if admin is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Administración no encontrada"
+        )
     if admin.status != "pending":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -1545,6 +1574,7 @@ from app.core.images import process_cartilla_photo  # noqa: E402
 from app.core.storage import (  # noqa: E402
     ALLOWED_IMAGE_EXTENSIONS,
     public_url,
+    read_upload_limited,
     save_media,
     validate_extension,
 )
@@ -1675,7 +1705,7 @@ def upload_hospitalization_photo(
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail=str(exc),
-        )
+        ) from exc
     try:
         processed = process_cartilla_photo(content)
     except ValueError as exc:

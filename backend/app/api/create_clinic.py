@@ -7,7 +7,7 @@ expiración). Quien recibe el link crea su clínica con su primer admin.
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.api.clinics import _create_clinic_with_admin
@@ -69,9 +69,32 @@ def create_clinic(
     if invite.clinic_name:
         data["name"] = invite.clinic_name
 
-    response = _create_clinic_with_admin(db, data, body.first_admin.model_dump())
-
-    invite.status = "used"
-    invite.used_at = datetime.now(UTC)
+    # Reclamo atómico del enlace de un solo uso ANTES de crear el tenant:
+    # dos POST concurrentes con el mismo token no pueden crear dos clínicas.
+    claimed = db.execute(
+        text(
+            "UPDATE clinic_invites SET status = 'used', used_at = now() "
+            "WHERE id = :id AND status = 'pending'"
+        ),
+        {"id": invite.id},
+    )
+    if claimed.rowcount == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Este enlace ya fue utilizado o revocado",
+        )
     db.commit()
+
+    try:
+        response = _create_clinic_with_admin(db, data, body.first_admin.model_dump())
+    except Exception:
+        # Si la creación falla, devolvemos el enlace a "pending" (best effort)
+        # para no quemar el link sin haber creado la clínica.
+        reverted = db.get(ClinicInvite, invite.id)
+        if reverted is not None and reverted.status == "used":
+            reverted.status = "pending"
+            reverted.used_at = None
+            db.commit()
+        raise
+
     return response

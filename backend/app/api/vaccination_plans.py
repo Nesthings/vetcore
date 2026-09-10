@@ -7,9 +7,10 @@ golpe y una cita por dosis en la agenda (agenda de vacunación automática).
 
 from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import CurrentClinic, get_current_clinic, require_clinic_roles, require_component
@@ -339,6 +340,13 @@ def assign_plan(
     db: Session = Depends(get_db),
 ) -> dict:
     clinic_id = ctx.clinic["id"]
+    clinic_tz_name = db.scalar(
+        text("SELECT timezone FROM clinics WHERE id = :cid"), {"cid": clinic_id}
+    ) or "UTC"
+    try:
+        clinic_tz = ZoneInfo(clinic_tz_name)
+    except Exception:
+        clinic_tz = UTC
     pet = db.scalar(select(Pet).where(Pet.id == body.pet_id, Pet.clinic_id == clinic_id))
     if pet is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Paciente no encontrado")
@@ -399,7 +407,10 @@ def assign_plan(
     for step in plan.steps:
         cumulative += step.offset_days
         due_date = body.start_date + timedelta(days=cumulative)
-        start = datetime.combine(due_date, body.start_time, tzinfo=UTC)
+        # La hora de la clínica se interpreta en su zona horaria (no forzada a
+        # UTC): un start_time 10:00 en México genera 10:00 local, no 04:00.
+        start = datetime.combine(due_date, body.start_time, tzinfo=clinic_tz)
+        start = start.astimezone(UTC)
         appointment = Appointment(
             clinic_id=clinic_id,
             branch_id=body.branch_id,

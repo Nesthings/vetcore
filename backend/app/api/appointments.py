@@ -3,7 +3,7 @@
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import CurrentClinic, get_current_clinic, require_clinic_roles, require_component
@@ -112,6 +112,40 @@ def _get_appointment_or_404(db: Session, clinic_id: str, appointment_id: str) ->
     return appointment
 
 
+def _check_overlap(
+    db: Session,
+    clinic_id: str,
+    start,
+    end,
+    exclude_id: str | None = None,
+    vet_user_id=None,
+    pet_id=None,
+) -> None:
+    """Rechaza citas solapadas para el mismo veterinario o paciente.
+
+    Mitiga la doble reserva concurrente. Para garantía total ante requests
+    simultáneos se recomienda además un exclusion constraint (tsrange) en BD.
+    """
+    filters = [
+        Appointment.clinic_id == clinic_id,
+        Appointment.start_time < end,
+        Appointment.end_time > start,
+        Appointment.status.notin_(("cancelled", "no_show")),
+    ]
+    if exclude_id:
+        filters.append(Appointment.id != exclude_id)
+    if vet_user_id:
+        filters.append(Appointment.vet_user_id == vet_user_id)
+    if pet_id:
+        filters.append(Appointment.pet_id == pet_id)
+    overlap = db.scalar(select(func.count()).select_from(Appointment).where(*filters))
+    if overlap:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Ya existe una cita en ese horario para este veterinario o paciente.",
+        )
+
+
 def _validate_dependencies(db: Session, clinic_id: str, body: AppointmentCreate) -> None:
     if body.end_time <= body.start_time:
         raise HTTPException(
@@ -150,6 +184,14 @@ def create_appointment(
     db: Session = Depends(get_db),
 ) -> Appointment:
     _validate_dependencies(db, ctx.clinic["id"], body)
+    _check_overlap(
+        db,
+        ctx.clinic["id"],
+        body.start_time,
+        body.end_time,
+        vet_user_id=body.vet_user_id,
+        pet_id=body.pet_id,
+    )
     appointment = Appointment(clinic_id=ctx.clinic["id"], **body.model_dump())
     db.add(appointment)
     db.commit()
@@ -174,6 +216,15 @@ def update_appointment(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="end_time debe ser posterior a start_time",
             )
+        _check_overlap(
+            db,
+            ctx.clinic["id"],
+            new_start,
+            new_end,
+            exclude_id=appointment.id,
+            vet_user_id=data.get("vet_user_id", appointment.vet_user_id),
+            pet_id=data.get("pet_id", appointment.pet_id),
+        )
     old_status = appointment.status
     for field, value in data.items():
         setattr(appointment, field, value)

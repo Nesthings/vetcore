@@ -34,10 +34,11 @@ from app.core.security import (
     share_token_version,
 )
 from app.core.storage import (
-    read_upload_limited,
     ALLOWED_IMAGE_EXTENSIONS,
     public_url,
+    read_upload_limited,
     save_media,
+    validate_content_magic,
     validate_extension,
 )
 from app.data.breeds import (
@@ -276,11 +277,12 @@ def create_walkin_photo(
     validate_extension(file.filename or "", ALLOWED_IMAGE_EXTENSIONS)
     try:
         content = read_upload_limited(file, MAX_IMAGE_BYTES)
+        validate_content_magic(file.filename or "", content)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail=str(exc),
-        )
+        ) from exc
     rel = save_media(f"walkin/{date.today().isoformat()}", file.filename or "photo.jpg", content)
     photo = PetPhoto(
         clinic_id=ctx.clinic["id"],
@@ -645,11 +647,12 @@ def upload_pet_photo(
     validate_extension(file.filename or "", ALLOWED_IMAGE_EXTENSIONS)
     try:
         content = read_upload_limited(file, MAX_IMAGE_BYTES)
+        validate_content_magic(file.filename or "", content)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail=str(exc),
-        )
+        ) from exc
 
     rel = save_media(f"pets/{pet_id}", file.filename or "photo.jpg", content)
     pet.clinical_photo_url = public_url(rel)
@@ -709,11 +712,12 @@ def create_pet_photo(
     validate_extension(file.filename or "", ALLOWED_IMAGE_EXTENSIONS)
     try:
         content = read_upload_limited(file, MAX_IMAGE_BYTES)
+        validate_content_magic(file.filename or "", content)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail=str(exc),
-        )
+        ) from exc
     rel = save_media(f"pets/{pet_id}/photos", file.filename or "photo.jpg", content)
     photo = PetPhoto(
         clinic_id=ctx.clinic["id"],
@@ -1324,7 +1328,7 @@ def transfer_owner(
     """Cambia el dueño de la mascota. Regla global: si ya existe un `owner`
     con ese teléfono/correo, se reutiliza (nunca se duplica). Los links
     anteriores quedan revocados y el nuevo dueño recibe una invitación."""
-    _get_pet_or_404(db, ctx.clinic["id"], pet_id)
+    pet = _get_pet_or_404(db, ctx.clinic["id"], pet_id)
 
     if not body.contact_phone and not body.contact_email:
         raise HTTPException(
@@ -1363,6 +1367,10 @@ def transfer_owner(
         ),
         {"oid": owner, "pid": pet_id, "cid": ctx.clinic["id"]},
     )
+
+    # Revoca el acceso del dueño anterior a la cartilla/QR: regenerar el
+    # qr_token invalida tanto el token crudo como los JWT de cartilla emitidos.
+    pet.qr_token = secrets.token_urlsafe(32)
 
     record_audit(
         db,
