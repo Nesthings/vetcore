@@ -50,8 +50,10 @@ class VaccinationPlanStep(UUIDPkMixin, Base):
     __tablename__ = "vaccination_plan_steps"
 
     plan_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("vaccination_plans.id", ondelete="CASCADE"),
-        nullable=False, index=True,
+        UUID(as_uuid=True),
+        ForeignKey("vaccination_plans.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     label: Mapped[str] = mapped_column(String(150), nullable=False)
     offset_days: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -87,7 +89,8 @@ class PetVaccinationPlan(UUIDPkMixin, Base):
     )
 
     doses: Mapped[list["PetVaccinationDose"]] = relationship(
-        back_populates="vaccination_plan", cascade="all, delete-orphan",
+        back_populates="vaccination_plan",
+        cascade="all, delete-orphan",
         order_by="PetVaccinationDose.due_date",
     )
 

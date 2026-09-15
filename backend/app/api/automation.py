@@ -84,6 +84,28 @@ def _owner_phones_batch(db: Session, owner_ids: list[str]) -> dict[str, str | No
     return {str(r[0]): r[1] for r in rows}
 
 
+def _owner_emails_batch(db: Session, owner_ids: list[str]) -> dict[str, str | None]:
+    if not owner_ids:
+        return {}
+    rows = db.execute(
+        text("SELECT id, email FROM owners WHERE id = ANY(:ids)"), {"ids": owner_ids}
+    ).all()
+    return {str(r[0]): r[1] for r in rows}
+
+
+def _owner_channels_batch(db: Session, owner_ids: list[str]) -> dict[str, str]:
+    """Canal preferido del dueño (whatsapp por defecto) para envíos."""
+    if not owner_ids:
+        return {}
+    rows = db.execute(
+        text(
+            "SELECT owner_id, preferred_channel FROM owner_preferences WHERE owner_id = ANY(:ids)"
+        ),
+        {"ids": owner_ids},
+    ).all()
+    return {str(r[0]): r[1] for r in rows}
+
+
 @router.get(
     "/appointments/{appointment_id}/reminder-schedule",
     response_model=ReminderSchedule,
@@ -169,6 +191,8 @@ def run_reminders(
     consents = _consents_batch(db, ctx.clinic["id"], pet_ids)
     owner_ids = [c[0] for c in consents.values() if c[0]]
     phones = _owner_phones_batch(db, owner_ids)
+    emails = _owner_emails_batch(db, owner_ids)
+    channels = _owner_channels_batch(db, owner_ids)
     pets = {
         str(p.id): p for p in db.scalars(select(Pet).where(Pet.clinic_id == ctx.clinic["id"])).all()
     }
@@ -187,6 +211,8 @@ def run_reminders(
         if owner_id is None:
             continue
         owner_phone = phones.get(owner_id)
+        owner_email = emails.get(owner_id)
+        channel = channels.get(owner_id, "whatsapp")
         pet = pets.get(str(appt.pet_id)) if appt.pet_id else None
         pet_name = pet.name if pet else (appt.walk_in_name or "tu mascota")
         for stage, hours in REMINDER_STAGES:
@@ -204,20 +230,46 @@ def run_reminders(
                 f"es el {start.strftime('%d/%m')} a las {start.strftime('%H:%M')}."
                 f" — {clinic_name}"
             )
-            to = normalize_mx(owner_phone)
-            if not to:
-                failed += 1
-                continue
-            res = dispatch(
-                db,
-                ctx.clinic["id"],
-                "reminder",
-                to,
-                msg,
-                [pet_name, start.strftime("%d/%m"), start.strftime("%H:%M")],
-                template,
-                owner_id,
-            )
+
+            if channel == "email":
+                # El dueño prefiere correo (o no tiene teléfono usable).
+                if not owner_email:
+                    failed += 1
+                    continue
+                from app.services.email import send_email
+                from app.services.email_templates import appointment_reminder_email
+
+                res = send_email(
+                    db,
+                    ctx.clinic["id"],
+                    owner_email,
+                    f"Recordatorio: cita de {pet_name} en {clinic_name}",
+                    msg,
+                    clinic_name=clinic_name,
+                    template=template,
+                    owner_id=owner_id,
+                    html=appointment_reminder_email(
+                        pet_name,
+                        clinic_name,
+                        start.strftime("%d/%m/%Y %H:%M"),
+                        appt.procedure_type,
+                    ),
+                )
+            else:
+                to = normalize_mx(owner_phone)
+                if not to:
+                    failed += 1
+                    continue
+                res = dispatch(
+                    db,
+                    ctx.clinic["id"],
+                    "reminder",
+                    to,
+                    msg,
+                    [pet_name, start.strftime("%d/%m"), start.strftime("%H:%M")],
+                    template,
+                    owner_id,
+                )
             if res["ok"]:
                 processed += 1
             elif res["error"] == "not_configured":

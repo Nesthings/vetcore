@@ -52,10 +52,14 @@ def _owner_display(db: Session, pet_id: str) -> str:
 
 
 def _owner_row(db: Session, owner_id: str) -> dict | None:
-    row = db.execute(
-        text("SELECT id, full_name, signature_url FROM owners WHERE id = :oid"),
-        {"oid": owner_id},
-    ).mappings().first()
+    row = (
+        db.execute(
+            text("SELECT id, full_name, signature_url FROM owners WHERE id = :oid"),
+            {"oid": owner_id},
+        )
+        .mappings()
+        .first()
+    )
     return dict(row) if row else None
 
 
@@ -79,9 +83,7 @@ def create_pending_consent(
     ctx: CurrentClinic = Depends(require_clinic_roles(*CONSENT_MUTATORS)),
     db: Session = Depends(get_db),
 ) -> DigitalConsent:
-    pet = db.scalar(
-        select(Pet).where(Pet.id == pet_id, Pet.clinic_id == ctx.clinic["id"])
-    )
+    pet = db.scalar(select(Pet).where(Pet.id == pet_id, Pet.clinic_id == ctx.clinic["id"]))
     if pet is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Paciente no encontrado")
     if vet_user_id is not None and owner_id is not None:
@@ -93,9 +95,7 @@ def create_pending_consent(
     attachment_url = None
     attachment_name = None
     if attachment is not None and attachment.filename:
-        validate_extension(
-            attachment.filename, ALLOWED_IMAGE_EXTENSIONS | ALLOWED_PDF_EXTENSIONS
-        )
+        validate_extension(attachment.filename, ALLOWED_IMAGE_EXTENSIONS | ALLOWED_PDF_EXTENSIONS)
         try:
             content = read_upload_limited(attachment, MAX_ATTACHMENT_BYTES)
         except ValueError as exc:

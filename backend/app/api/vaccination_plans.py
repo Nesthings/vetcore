@@ -115,10 +115,12 @@ def _enrich_assignment(db: Session, assignment: PetVaccinationPlan) -> dict:
     starts = (
         dict(
             db.execute(
-                select(PetVaccinationDose.id, Appointment.start_time).join(
+                select(PetVaccinationDose.id, Appointment.start_time)
+                .join(
                     Appointment,
                     Appointment.id == PetVaccinationDose.appointment_id,
-                ).where(PetVaccinationDose.id.in_(dose_ids))
+                )
+                .where(PetVaccinationDose.id.in_(dose_ids))
             ).all()
         )
         if dose_ids
@@ -149,9 +151,7 @@ def _enrich_assignments(db: Session, assignments: list[PetVaccinationPlan]) -> l
     }
     vets = {}
     if vet_ids:
-        vets = {
-            u.id: u for u in db.scalars(select(User).where(User.id.in_(vet_ids))).all()
-        }
+        vets = {u.id: u for u in db.scalars(select(User).where(User.id.in_(vet_ids))).all()}
     steps: dict = {}
     if plan_ids:
         for s in db.scalars(
@@ -340,9 +340,9 @@ def assign_plan(
     db: Session = Depends(get_db),
 ) -> dict:
     clinic_id = ctx.clinic["id"]
-    clinic_tz_name = db.scalar(
-        text("SELECT timezone FROM clinics WHERE id = :cid"), {"cid": clinic_id}
-    ) or "UTC"
+    clinic_tz_name = (
+        db.scalar(text("SELECT timezone FROM clinics WHERE id = :cid"), {"cid": clinic_id}) or "UTC"
+    )
     try:
         clinic_tz = ZoneInfo(clinic_tz_name)
     except Exception:

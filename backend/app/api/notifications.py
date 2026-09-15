@@ -87,9 +87,7 @@ def mark_all_read(
     db: Session = Depends(get_db),
 ) -> None:
     if not me.clinic_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="Sin clínica asociada"
-        )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin clínica asociada")
     # "Leer todas" aplica a TODA la clínica: la campanita se limpia para el
     # usuario actual y para el resto del personal.
     db.execute(

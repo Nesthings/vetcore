@@ -692,9 +692,10 @@ def complete_discharge(
         )
     )
     if existing is None:
-        default_items = hosp_service.get_config(
-            db, ctx.clinic["id"], "discharge_checklist", {}
-        ).get("items") or DEFAULT_DISCHARGE_CHECKLIST
+        default_items = (
+            hosp_service.get_config(db, ctx.clinic["id"], "discharge_checklist", {}).get("items")
+            or DEFAULT_DISCHARGE_CHECKLIST
+        )
         db.add(
             HospitalizationDischarge(
                 clinic_id=ctx.clinic["id"],
@@ -2390,16 +2391,20 @@ def latest_all_vitals(
     hosp_ids = list(db.scalars(select(Hospitalization.id).where(*base)).all())
     if not hosp_ids:
         return {}
-    rows = db.execute(
-        text(
-            "SELECT DISTINCT ON (hospitalization_id, parameter) "
-            "  hospitalization_id, parameter, value, unit, observed_at "
-            "FROM hospitalization_vitals "
-            "WHERE clinic_id = :cid AND hospitalization_id = ANY(:ids) "
-            "ORDER BY hospitalization_id, parameter, observed_at DESC, id DESC"
-        ),
-        {"cid": ctx.clinic["id"], "ids": list(hosp_ids)},
-    ).mappings().all()
+    rows = (
+        db.execute(
+            text(
+                "SELECT DISTINCT ON (hospitalization_id, parameter) "
+                "  hospitalization_id, parameter, value, unit, observed_at "
+                "FROM hospitalization_vitals "
+                "WHERE clinic_id = :cid AND hospitalization_id = ANY(:ids) "
+                "ORDER BY hospitalization_id, parameter, observed_at DESC, id DESC"
+            ),
+            {"cid": ctx.clinic["id"], "ids": list(hosp_ids)},
+        )
+        .mappings()
+        .all()
+    )
     out: dict = {}
     for r in rows:
         out.setdefault(str(r["hospitalization_id"]), {})[r["parameter"]] = {

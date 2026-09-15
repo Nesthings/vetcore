@@ -9,7 +9,7 @@ STAFF_ROLE_VALUES = ("admin", "veterinario", "recepcion")
 class UserCreate(BaseModel):
     full_name: str = Field(min_length=1, max_length=200)
     email: str = Field(min_length=3, max_length=200)
-    password: str = Field(min_length=8, max_length=128)
+    password: str | None = Field(default=None, min_length=8, max_length=128)
     role: str = Field(pattern="^(admin|veterinario|recepcion)$")
     phone: str | None = Field(default=None, max_length=30)
     branch_id: uuid.UUID | None = None
@@ -20,6 +20,14 @@ class UserCreate(BaseModel):
     specialty: str | None = Field(default=None, max_length=150)
     reports_to: uuid.UUID | None = None
     is_visible_on_login: bool = True
+    # Si es true (y password vacío), el usuario se crea inactivo y recibe un
+    # email con enlace para definir su contraseña (invitación).
+    send_invite: bool = False
+
+
+class InviteRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=200)
+    invite_url: str | None = None
 
 
 class UserUpdate(BaseModel):

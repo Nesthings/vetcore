@@ -87,9 +87,7 @@ def _save_files(db: Session, ticket_id, validated: list[tuple[str, bytes]]) -> l
         attachment = SupportTicketAttachment(
             ticket_id=ticket_id,
             file_type=(
-                "image"
-                if filename.lower().endswith(tuple(ALLOWED_IMAGE_EXTENSIONS))
-                else "file"
+                "image" if filename.lower().endswith(tuple(ALLOWED_IMAGE_EXTENSIONS)) else "file"
             ),
             url=public_url(rel),
         )
@@ -114,10 +112,14 @@ def create_ticket(
     user: CurrentUser = Depends(require_staff),
     db: Session = Depends(get_db),
 ) -> dict:
-    reporter = db.execute(
-        text("SELECT full_name, email FROM users WHERE id = :uid"),
-        {"uid": user.sub},
-    ).mappings().first()
+    reporter = (
+        db.execute(
+            text("SELECT full_name, email FROM users WHERE id = :uid"),
+            {"uid": user.sub},
+        )
+        .mappings()
+        .first()
+    )
     if reporter is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuario no encontrado"
@@ -176,9 +178,7 @@ def list_my_tickets(
             }
         )
 
-    return [
-        _ticket_dict(t, attachments=attachments.get(str(t.id), [])) for t in tickets
-    ]
+    return [_ticket_dict(t, attachments=attachments.get(str(t.id), [])) for t in tickets]
 
 
 @router.get("/admin", summary="Todos los tickets (super-admin)")
@@ -187,9 +187,7 @@ def list_all_tickets(
     _: CurrentUser = Depends(_super_admin),
 ) -> list[dict]:
     tickets = list(
-        db.scalars(
-            select(SupportTicket).order_by(SupportTicket.created_at.desc()).limit(200)
-        )
+        db.scalars(select(SupportTicket).order_by(SupportTicket.created_at.desc()).limit(200))
     )
     if not tickets:
         return []

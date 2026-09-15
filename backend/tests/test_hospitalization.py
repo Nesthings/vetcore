@@ -18,12 +18,56 @@ def client():
         yield c
 
 
+def _ensure_user(clinic_id, role="admin") -> str:
+    """Crea (si no existe) un usuario real en la BD de test para el token.
+
+    `require_staff` valida que el usuario exista y esté activo; los tokens con
+    UUID ficticios ya no pasan esa validación.
+    """
+    from app.db.session import SessionLocal
+
+    with SessionLocal() as db:
+        from sqlalchemy import text
+
+        row = db.execute(
+            text("SELECT id FROM users WHERE clinic_id = :c AND role = :r AND is_active = true"),
+            {"c": clinic_id, "r": role},
+        ).mappings().first()
+        if row is not None:
+            return str(row["id"])
+        import uuid as _uuid
+
+        user_id = _uuid.uuid4()
+        db.execute(
+            text(
+                "INSERT INTO users (id, clinic_id, role, full_name, email, password_hash, "
+                "is_active) VALUES (:id, :c, :r, :full_name, :email, :ph, true)"
+            ),
+            {
+                "id": user_id,
+                "c": clinic_id,
+                "r": role,
+                "full_name": f"Test {role}",
+                "email": f"{role}_{_uuid.uuid4().hex}@test.fake",
+                "ph": "x",
+            },
+        )
+        db.commit()
+        return str(user_id)
+
+
 def _admin_token(clinic_id) -> str:
-    return create_access_token(subject=str(uuid4()), role="admin", clinic_id=str(clinic_id))
+    return create_access_token(
+        subject=_ensure_user(clinic_id, "admin"), role="admin", clinic_id=str(clinic_id)
+    )
 
 
 def _recepcion_token(clinic_id) -> str:
-    return create_access_token(subject=str(uuid4()), role="recepcion", clinic_id=str(clinic_id))
+    return create_access_token(
+        subject=_ensure_user(clinic_id, "recepcion"),
+        role="recepcion",
+        clinic_id=str(clinic_id),
+    )
 
 
 def _make_accommodation(client, clinic_id, branch_id, code="J1", capacity=1):

@@ -87,9 +87,7 @@ def list_clinics(
     staff_counts = dict(
         db.execute(select(User.clinic_id, func.count()).group_by(User.clinic_id)).all()
     )
-    pet_counts = dict(
-        db.execute(select(Pet.clinic_id, func.count()).group_by(Pet.clinic_id)).all()
-    )
+    pet_counts = dict(db.execute(select(Pet.clinic_id, func.count()).group_by(Pet.clinic_id)).all())
 
     rows = []
     for clinic in clinics:
@@ -171,9 +169,7 @@ def _get_clinic_or_404(db: Session, clinic_id: str) -> Clinic:
     return clinic
 
 
-def _create_clinic_with_admin(
-    db: Session, data: dict, admin_data: dict
-) -> LoginResponse:
+def _create_clinic_with_admin(db: Session, data: dict, admin_data: dict) -> LoginResponse:
     """Crea el tenant + su primer admin y devuelve un token de sesión."""
     admin_data = {**admin_data, "email": admin_data["email"].strip().lower()}
     clinic = Clinic(**data, setup_completed=False)

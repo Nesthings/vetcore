@@ -4,6 +4,7 @@ Se ejecutan contra Postgres real (tests/conftest.py) para ejercitar el SQL.
 """
 
 from datetime import UTC, date, datetime, timedelta
+from uuid import uuid4
 
 from sqlalchemy import func, select
 
@@ -176,13 +177,25 @@ def test_usuario_sin_permiso_no_accede_a_avisos(
 
     from app.core.security import create_access_token
     from app.main import app
+    from app.models import User
 
     clinic, branch = make_clinic()
     pet = make_pet(clinic, "Max")
     make_vaccination(clinic, branch, pet, due=today() - timedelta(days=3))
 
+    staff = User(
+        clinic_id=clinic.id,
+        branch_id=branch.id,
+        role="recepcion",
+        full_name="Recepcionista Test",
+        email=f"recepcion_{uuid4().hex}@test.fake",
+        password_hash="x",
+    )
+    db_session.add(staff)
+    db_session.commit()
+
     staff_token = create_access_token(
-        subject=str(pet.id), role="recepcion", clinic_id=str(clinic.id)
+        subject=str(staff.id), role="recepcion", clinic_id=str(clinic.id)
     )
     owner_token = create_access_token(subject=str(pet.id), role="owner", clinic_id=str(clinic.id))
 

@@ -129,8 +129,7 @@ def build_carnet(db: Session, pet: Pet) -> dict:
     if assignments:
         completed_doses = list(
             db.scalars(
-                select(PetVaccinationDose)
-                .where(
+                select(PetVaccinationDose).where(
                     PetVaccinationDose.pet_vaccination_plan_id.in_([a.id for a in assignments]),
                     PetVaccinationDose.status == "completed",
                     PetVaccinationDose.date_applied.isnot(None),
@@ -138,11 +137,9 @@ def build_carnet(db: Session, pet: Pet) -> dict:
             )
         )
 
-    user_ids = {
-        str(r.vet_user_id)
-        for r in records
-        if r.vet_user_id
-    } | {str(d.applied_by) for d in completed_doses if d.applied_by}
+    user_ids = {str(r.vet_user_id) for r in records if r.vet_user_id} | {
+        str(d.applied_by) for d in completed_doses if d.applied_by
+    }
     vet_names = (
         {
             str(uid): name
@@ -192,9 +189,7 @@ def build_carnet(db: Session, pet: Pet) -> dict:
         """Siguiente aplicación según el esquema: la dosis real programada si el
         plan está asignado; si no, se infiere de la última aplicación + intervalo."""
         today = date.today()
-        upcoming = [
-            d for d in vaccine_doses if d.status == "scheduled" and d.due_date >= today
-        ]
+        upcoming = [d for d in vaccine_doses if d.status == "scheduled" and d.due_date >= today]
         if upcoming:
             nxt = min(upcoming, key=lambda d: d.due_date)
             return {"label": nxt.label, "due_date": nxt.due_date.isoformat()}
@@ -240,8 +235,7 @@ def build_carnet(db: Session, pet: Pet) -> dict:
                 "brand": plan.brand,
                 "schedule": plan.notes,
                 "steps": [
-                    {"label": s.label, "offset_days": s.offset_days}
-                    for s in (plan.steps or [])
+                    {"label": s.label, "offset_days": s.offset_days} for s in (plan.steps or [])
                 ],
                 "doses": [
                     {

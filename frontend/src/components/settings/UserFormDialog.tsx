@@ -68,6 +68,7 @@ export function UserFormDialog({
   const [cedula, setCedula] = useState('')
   const [jobTitle, setJobTitle] = useState('')
   const [specialty, setSpecialty] = useState('')
+  const [sendInvite, setSendInvite] = useState(true)
   const [components, setComponents] = useState<UserComponents | null>(null)
   const [access, setAccess] = useState<Record<string, AccessValue>>({})
   const [photoFile, setPhotoFile] = useState<File | null>(null)
@@ -105,6 +106,7 @@ export function UserFormDialog({
     setCedula(user?.cedula ?? '')
     setJobTitle(user?.job_title ?? '')
     setSpecialty(user?.specialty ?? '')
+    setSendInvite(!user)
     setVisibleOnLogin(user?.is_visible_on_login ?? true)
     setPhotoFile(null)
     setError(null)
@@ -136,20 +138,25 @@ export function UserFormDialog({
         if (password) body.password = password
         await apiFetch(`/users/${user.id}`, { method: 'PATCH', body: JSON.stringify(body) })
       } else {
+        const body: Record<string, unknown> = {
+          full_name: fullName,
+          email,
+          role,
+          branch_id: branchId || null,
+          professional_title: professionalTitle || null,
+          cedula: cedula || null,
+          job_title: jobTitle || null,
+          specialty: specialty || null,
+          is_visible_on_login: visibleOnLogin,
+        }
+        if (sendInvite) {
+          body.send_invite = true
+        } else {
+          body.password = password
+        }
         const created = await apiFetch<{ id: string }>('/users', {
           method: 'POST',
-          body: JSON.stringify({
-            full_name: fullName,
-            email,
-            password,
-            role,
-            branch_id: branchId || null,
-            professional_title: professionalTitle || null,
-            cedula: cedula || null,
-            job_title: jobTitle || null,
-            specialty: specialty || null,
-            is_visible_on_login: visibleOnLogin,
-          }),
+          body: JSON.stringify(body),
         })
         userId = created.id
       }
@@ -317,15 +324,32 @@ export function UserFormDialog({
             </div>
           </div>
           <div className="space-y-2">
-            <Label>{user ? 'Nueva contraseña (opcional)' : 'Contraseña *'}</Label>
-            <Input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              minLength={user ? undefined : 8}
-              required={!user}
-              placeholder={user ? 'Dejar vacío para no cambiar' : 'Mínimo 8 caracteres'}
-            />
+            <Label>{user ? 'Nueva contraseña (opcional)' : 'Contraseña'}</Label>
+            {!user && (
+              <label className="flex items-center gap-2 rounded-md border border-border/60 px-3 py-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={sendInvite}
+                  onChange={(e) => setSendInvite(e.target.checked)}
+                />
+                Enviar invitación por correo (el staff define su propia contraseña)
+              </label>
+            )}
+            {(!user && !sendInvite) || user ? (
+              <Input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                minLength={user ? undefined : 8}
+                required={!user && !sendInvite}
+                placeholder={user ? 'Dejar vacío para no cambiar' : 'Mínimo 8 caracteres'}
+              />
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                El usuario recibirá un enlace de activación en su correo y podrá definir su
+                contraseña al aceptar la invitación.
+              </p>
+            )}
           </div>
 
           {catalog.length > 0 && (

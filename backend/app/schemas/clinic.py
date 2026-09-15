@@ -39,6 +39,7 @@ class FirstAdminCreate(BaseModel):
 
 class CreateClinicInvited(ClinicCreate):
     """Alta de clínica a través del link único del super-admin."""
+
     token: str = Field(min_length=1)
 
 

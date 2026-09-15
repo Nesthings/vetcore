@@ -56,6 +56,7 @@ async def lifespan(app: FastAPI):
     sweep_enabled = getattr(settings, "smart_alerts_sweep_enabled", True)
     task = None
     if sweep_seconds and sweep_seconds > 0 and sweep_enabled:
+
         async def _sweep() -> None:
             while True:
                 await asyncio.sleep(sweep_seconds)

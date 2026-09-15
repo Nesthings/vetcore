@@ -37,10 +37,9 @@ class User(UUIDPkMixin, Base):
     job_title: Mapped[str | None] = mapped_column(String(150))
     description: Mapped[str | None] = mapped_column(Text)
     specialty: Mapped[str | None] = mapped_column(String(150))
-    reports_to: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id")
-    )
+    reports_to: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     is_visible_on_login: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default="true"
     )
@@ -52,11 +51,33 @@ class User(UUIDPkMixin, Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
-    manager: Mapped["User | None"] = relationship(
-        remote_side="User.id", back_populates="reports"
-    )
+    manager: Mapped["User | None"] = relationship(remote_side="User.id", back_populates="reports")
     reports: Mapped[list["User"]] = relationship(
         back_populates="manager", foreign_keys=[reports_to]
+    )
+
+
+class StaffInvitation(UUIDPkMixin, Base):
+    """Invitación para que un staff defina su contraseña.
+
+    Se genera al crear un usuario sin password (o al reenviar la invitación).
+    El token es de un solo uso y expira (72 h). `email_verified_at` se marca
+    en `users` cuando el staff completa la activación.
+    """
+
+    __tablename__ = "staff_invitations"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    clinic_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("clinics.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    token: Mapped[str] = mapped_column(String(200), nullable=False, unique=True, index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
 

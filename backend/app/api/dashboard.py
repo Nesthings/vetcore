@@ -89,12 +89,7 @@ def dashboard_day(
     }
 
     appts = list(
-        db.scalars(
-            select(Appointment)
-            .where(*base)
-            .order_by(Appointment.start_time)
-            .limit(50)
-        )
+        db.scalars(select(Appointment).where(*base).order_by(Appointment.start_time).limit(50))
     )
 
     # Flujo de pacientes: consultas REALIZADAS por hora/día/período (en vez de
@@ -180,8 +175,9 @@ def dashboard_day(
     # Mascotas distintas con al menos una cita completada en la ventana.
     mascotas_atendidas = (
         db.scalar(
-            select(func.count(func.distinct(Appointment.pet_id)))
-            .where(*base, Appointment.status == "completed", Appointment.pet_id.is_not(None))
+            select(func.count(func.distinct(Appointment.pet_id))).where(
+                *base, Appointment.status == "completed", Appointment.pet_id.is_not(None)
+            )
         )
         or 0
     )

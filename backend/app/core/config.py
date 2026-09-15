@@ -38,8 +38,7 @@ class Settings(BaseSettings):
 
     # CORS: orígenes explícitos separados por coma (env CORS_ORIGINS)
     cors_origins: str = (
-        "http://localhost:5173,http://localhost:5179,"
-        "http://127.0.0.1:5173,http://127.0.0.1:5179"
+        "http://localhost:5173,http://localhost:5179,http://127.0.0.1:5173,http://127.0.0.1:5179"
     )
 
     # Barrido de alertas inteligentes (0 = desactivado; env para un solo worker)
@@ -66,13 +65,19 @@ class Settings(BaseSettings):
     aws_access_key_id: str = ""
     aws_secret_access_key: str = ""
 
-    # SMTP (envío de correos)
+    # SMTP (envío de correos) — canal secundario/fallback
     smtp_host: str = ""
     smtp_port: int = 587
     smtp_user: str = ""
     smtp_password: str = ""
     smtp_from: str = ""
     smtp_starttls: bool = True
+
+    # Email transaccional — Resend (canal principal)
+    resend_api_key: str = ""
+    email_from: str = ""
+    # URL base de la app para enlaces en correos (activación, reset, etc.)
+    app_base_url: str = "http://localhost:5179"
 
     @model_validator(mode="after")
     def _validate_security(self) -> "Settings":

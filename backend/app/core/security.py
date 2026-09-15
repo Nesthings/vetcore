@@ -80,9 +80,7 @@ def share_token_version(qr_token: str | None) -> str:
     return hashlib.sha256((qr_token or "").encode()).hexdigest()[:16]
 
 
-def create_share_token(
-    pet_id: str, version: str | None = None
-) -> tuple[str, datetime]:
+def create_share_token(pet_id: str, version: str | None = None) -> tuple[str, datetime]:
     """Token de acceso a la cartilla para el dueño (sin login).
 
     Expira en `SHARE_TOKEN_EXPIRE_DAYS` y solo da acceso de solo lectura +

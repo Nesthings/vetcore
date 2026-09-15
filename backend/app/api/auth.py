@@ -26,6 +26,8 @@ from app.core.security import (
 from app.core.totp import build_otpauth_uri, generate_secret, qr_data_uri, verify_code
 from app.db.session import get_db
 from app.schemas.auth import (
+    AcceptInviteRequest,
+    AcceptInviteResponse,
     ForgotPasswordRequest,
     ForgotPasswordResponse,
     LoginRequest,
@@ -38,6 +40,7 @@ from app.schemas.auth import (
     TwoFactorStatusResponse,
     TwoFactorVerifyRequest,
 )
+from app.services.email import email_configured
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -65,6 +68,26 @@ def _enforce_login_rate(key: str) -> None:
             detail="Demasiados intentos. Espera un momento y vuelve a intentarlo.",
         )
     _login_attempts[key].append(now)
+
+
+def _fire_login_alert(
+    db: Session, resp: LoginResponse | TwoFactorRequiredResponse, request: Request
+) -> None:
+    """Emite el email de 'nuevo inicio de sesión' tras un login completo.
+
+    Solo actúa cuando el login ya quedó completo (LoginResponse). En el flujo
+    2FA el aviso se dispara en `verify_2fa`, no en el paso 1.
+    """
+    if not isinstance(resp, LoginResponse):
+        return
+    ip = request.client.host if request.client else "desconocida"
+    try:
+        from app.services.security_emails import send_login_alert
+
+        send_login_alert(db, resp.role, resp.sub, ip)
+        db.commit()
+    except Exception:  # noqa: BLE001 - el aviso nunca debe romper el login
+        db.rollback()
 
 
 def _clear_login_rate(key: str) -> None:
@@ -117,9 +140,7 @@ def _staff_login(
         return TwoFactorRequiredResponse(
             challenge_token=create_twofa_challenge_token(str(row["id"]), role=row["role"]),
         )
-    db.execute(
-        text("UPDATE users SET last_login_at = now() WHERE id = :uid"), {"uid": row["id"]}
-    )
+    db.execute(text("UPDATE users SET last_login_at = now() WHERE id = :uid"), {"uid": row["id"]})
     db.commit()
     token = create_access_token(
         subject=str(row["id"]),
@@ -190,12 +211,11 @@ def login(
         try:
             resp = fn(db, body.identifier, body.password)
             _clear_login_rate(key)
+            _fire_login_alert(db, resp, request)
             return resp
         except HTTPException:
             continue
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED, detail="Credenciales inválidas"
-    )
+    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Credenciales inválidas")
 
 
 @router.post(
@@ -209,6 +229,7 @@ def login_super_admin(
     _enforce_login_rate(key)
     resp = _super_admin_login(db, body.identifier, body.password)
     _clear_login_rate(key)
+    _fire_login_alert(db, resp, request)
     return resp
 
 
@@ -218,17 +239,25 @@ def me(user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_
     photo_url = None
     setup_completed = None
     if user.role == "super-admin":
-        row = db.execute(
-            text("SELECT full_name, photo_url FROM super_admins WHERE id = :uid"),
-            {"uid": user.sub},
-        ).mappings().first()
+        row = (
+            db.execute(
+                text("SELECT full_name, photo_url FROM super_admins WHERE id = :uid"),
+                {"uid": user.sub},
+            )
+            .mappings()
+            .first()
+        )
         if row:
             full_name, photo_url = row["full_name"], row["photo_url"]
     elif user.role in ("admin", "veterinario", "recepcion"):
-        row = db.execute(
-            text("SELECT full_name, photo_url FROM users WHERE id = :uid"),
-            {"uid": user.sub},
-        ).mappings().first()
+        row = (
+            db.execute(
+                text("SELECT full_name, photo_url FROM users WHERE id = :uid"),
+                {"uid": user.sub},
+            )
+            .mappings()
+            .first()
+        )
         if row:
             full_name, photo_url = row["full_name"], row["photo_url"]
         if user.clinic_id:
@@ -260,35 +289,75 @@ def forgot_password(
     body: ForgotPasswordRequest,
     db: Session = Depends(get_db),
 ) -> ForgotPasswordResponse:
-    """Solicita recuperación de contraseña para un staff de clínica.
+    """Solicita recuperación de contraseña (staff de clínica y super-admin).
 
-    En dev, el token de reset se devuelve en la respuesta (no hay servicio de
-    email aún). La respuesta es genérica para no revelar emails existentes.
+    Envía el enlace de reset por email. En desarrollo (sin proveedor de email),
+    el token de reset se devuelve en la respuesta para poder probar. La
+    respuesta es genérica para no revelar emails existentes.
     """
     user = (
         db.execute(
             text(
-                "SELECT id FROM users WHERE LOWER(email) = LOWER(:email) AND is_active = true"
+                "SELECT id, full_name, email FROM users "
+                "WHERE LOWER(email) = LOWER(:email) AND is_active = true"
             ),
             {"email": body.email},
         )
         .mappings()
         .first()
     )
+    super_admin = None
+    if user is None:
+        super_admin = (
+            db.execute(
+                text(
+                    "SELECT id, full_name, email FROM super_admins "
+                    "WHERE LOWER(email) = LOWER(:email) AND is_active = true"
+                ),
+                {"email": body.email},
+            )
+            .mappings()
+            .first()
+        )
 
     reset_token = None
-    if user is not None:
+    account: dict | None = user or super_admin
+    if account is not None:
         reset_token = secrets.token_urlsafe(32)
-        db.execute(
-            text(
-                "INSERT INTO password_reset_tokens (user_id, token, expires_at) "
-                "VALUES (:uid, :token, :expires)"
-            ),
-            {
-                "uid": user["id"],
-                "token": reset_token,
-                "expires": datetime.now(UTC) + timedelta(minutes=30),
-            },
+        expires_at = datetime.now(UTC) + timedelta(minutes=30)
+        if user is not None:
+            db.execute(
+                text(
+                    "INSERT INTO password_reset_tokens (user_id, token, expires_at) "
+                    "VALUES (:uid, :token, :expires)"
+                ),
+                {"uid": account["id"], "token": reset_token, "expires": expires_at},
+            )
+        else:
+            # El super-admin reutiliza la misma tabla (user_id es nullable).
+            db.execute(
+                text(
+                    "INSERT INTO password_reset_tokens (user_id, token, expires_at) "
+                    "VALUES (:uid, :token, :expires)"
+                ),
+                {"uid": account["id"], "token": reset_token, "expires": expires_at},
+            )
+        db.commit()
+
+    if reset_token is not None and email_configured():
+        from app.services.email import send_email
+        from app.services.email_templates import password_reset_email
+
+        reset_url = f"{settings.app_base_url}/reset-password?token={reset_token}"
+        send_email(
+            db,
+            None,
+            body.email.strip().lower(),
+            "Recupera tu contraseña",
+            f"Para restablecer tu contraseña de VetCore, abre este enlace: {reset_url}",
+            clinic_name=None,
+            template="password-reset",
+            html=password_reset_email(reset_url),
         )
         db.commit()
 
@@ -325,8 +394,11 @@ def reset_password(
             detail="Token de recuperación inválido o expirado",
         )
 
+    # El token puede pertenecer a un staff (`users`) o a un super-admin.
+    in_users = db.scalar(text("SELECT 1 FROM users WHERE id = :uid"), {"uid": reset["user_id"]})
+    table = "users" if in_users else "super_admins"
     db.execute(
-        text("UPDATE users SET password_hash = :hash WHERE id = :uid"),
+        text(f"UPDATE {table} SET password_hash = :hash WHERE id = :uid"),
         {"hash": hash_password(body.password), "uid": reset["user_id"]},
     )
     db.execute(
@@ -334,6 +406,29 @@ def reset_password(
         {"rid": reset["id"]},
     )
     db.commit()
+
+
+@router.post("/accept-invite", response_model=AcceptInviteResponse)
+def accept_invite(
+    body: AcceptInviteRequest,
+    db: Session = Depends(get_db),
+) -> AcceptInviteResponse:
+    """Acepta la invitación de staff y define la contraseña propia.
+
+    El token lo recibe el staff por email; es de un solo uso y expira en 72 h.
+    Al activarse, la cuenta queda `is_active` y el email verificado.
+    """
+    from app.services.invitations import accept_staff_invitation
+
+    try:
+        result = accept_staff_invitation(db, body.token, body.password)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    email = db.scalar(text("SELECT email FROM users WHERE id = :uid"), {"uid": result["user_id"]})
+    return AcceptInviteResponse(email=email)
 
 
 # ---------------------------------------------------------------------------
@@ -348,6 +443,7 @@ def reset_password(
 )
 def verify_2fa(
     body: TwoFactorVerifyRequest,
+    request: Request,
     db: Session = Depends(get_db),
 ) -> LoginResponse:
     try:
@@ -396,11 +492,13 @@ def verify_2fa(
         )
         db.commit()
         _clear_totp_rate(challenge_sub)
-        return LoginResponse(
+        resp = LoginResponse(
             access_token=create_access_token(subject=str(row["id"]), role="super-admin"),
             role="super-admin",
             sub=str(row["id"]),
         )
+        _fire_login_alert(db, resp, request)
+        return resp
 
     row = (
         db.execute(
@@ -429,7 +527,7 @@ def verify_2fa(
     )
     db.commit()
     _clear_totp_rate(challenge_sub)
-    return LoginResponse(
+    resp = LoginResponse(
         access_token=create_access_token(
             subject=str(row["id"]),
             role=row["role"],
@@ -441,6 +539,8 @@ def verify_2fa(
         clinic_id=str(row["clinic_id"]),
         branch_id=str(row["branch_id"]) if row["branch_id"] else None,
     )
+    _fire_login_alert(db, resp, request)
+    return resp
 
 
 @router.get(
@@ -562,7 +662,6 @@ def super_admin_2fa_disable(
     return TwoFactorStatusResponse(totp_enabled=False)
 
 
-
 # ---------------------------------------------------------------------------
 # 2FA del staff de clínica (TOTP) — solo para el rol admin
 # ---------------------------------------------------------------------------
@@ -647,10 +746,14 @@ def me_2fa_confirm(
     db: Session = Depends(get_db),
 ) -> TwoFactorStatusResponse:
     if user.role == "super-admin":
-        row = db.execute(
-            text("SELECT totp_secret FROM super_admins WHERE id = :uid"),
-            {"uid": user.sub},
-        ).mappings().first()
+        row = (
+            db.execute(
+                text("SELECT totp_secret FROM super_admins WHERE id = :uid"),
+                {"uid": user.sub},
+            )
+            .mappings()
+            .first()
+        )
     else:
         row = _require_admin_staff(user, db)
     if row is None or not row["totp_secret"]:
@@ -683,10 +786,14 @@ def me_2fa_disable(
     db: Session = Depends(get_db),
 ) -> TwoFactorStatusResponse:
     if user.role == "super-admin":
-        row = db.execute(
-            text("SELECT totp_secret, totp_enabled FROM super_admins WHERE id = :uid"),
-            {"uid": user.sub},
-        ).mappings().first()
+        row = (
+            db.execute(
+                text("SELECT totp_secret, totp_enabled FROM super_admins WHERE id = :uid"),
+                {"uid": user.sub},
+            )
+            .mappings()
+            .first()
+        )
     else:
         row = _require_admin_staff(user, db)
     if row is None or not row["totp_enabled"]:

@@ -3,7 +3,8 @@
 # ----------------------------------------------------------------------------
 # Se dispara SOLO cuando cambian archivos del frontend ('frontend/**') o el
 # propio workflow. Ejecuta control de calidad y pruebas. El despliegue lo hace
-# Vercel por su propia integración con GitHub (no depende de este workflow).
+# Vercel por su propia integración con GitHub (no depende de este workflow);
+# AWS/ECS se despliega manualmente con Terraform.
 # ============================================================================
 
 name: QA Frontend
@@ -13,12 +14,12 @@ on:
     branches: [main]
     paths:
       - 'frontend/**'
-      - '.github/workflows/deploy-frontend.yml'
+      - '.github/workflows/qa-frontend.yml'
   pull_request:
     branches: [main]
     paths:
       - 'frontend/**'
-      - '.github/workflows/deploy-frontend.yml'
+      - '.github/workflows/qa-frontend.yml'
 
 # Cancelar ejecuciones anteriores de la misma rama/PR si llega un commit nuevo:
 # evita gastar minutos de GitHub Actions y desplegar builds obsoletos.

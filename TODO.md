@@ -6,7 +6,7 @@ Lista de trabajo diferido. Cada ítem se mueve a una subfase cuando se decide im
 
 > La infra de AWS se apagó por completo (`terraform destroy`, 2026-09-09) para no generar costos.
 > El estado queda en `infra/terraform.tfstate` (local, 0 recursos). Recrear NO pierde la BD (Supabase) ni R2.
-> Desarrollo local mientras tanto: backend `uvicorn` en `:8001`, frontend `vite` en `:5173`.
+> Desarrollo local mientras tanto: Postgres docker en `:5439`, backend `uvicorn` en `:8009`, frontend `vite` en `:5179` (2026-09-14).
 
 ### ⚠️ Antes de empezar — credenciales AWS
 La key admin anterior (con prefijo `AKIA...`) **ya no es válida**. La única funcional es `vetcore-adm`
@@ -58,6 +58,27 @@ destroy solo funcionó con `-refresh=false`. Para un apply nuevo se necesita un 
 
 ## Envío de recibos (lógica diferida)
 
-- [ ] **Envío de recibo por WhatsApp y por correo.** En el checkout de "Nueva consulta" ya se guardan los flags `invoices.send_receipt_whatsapp` y `invoices.send_receipt_email` (migraciones 0018/0019); falta la lógica real de envío.
-  - Destinos: WhatsApp al teléfono del dueño y correo a `owners.email` (el dueño queda vinculado en `invoices.owner_id`).
-  - Implicaciones: credenciales del proveedor (WhatsApp/SMTP), adjuntar el recibo PDF (`/invoices/{id}/receipt`), estado/reintentos del envío y respeto al opt-in del dueño (principio 10).
+- [x] **Envío de recibo por correo (lógica backend).** Implementado (2026-09-14): `invoices.send_receipt_email`, `sales.send_receipt_email` y `consultations.send_receipt_email` ya envían el recibo PDF adjunto por Resend/SMTP (`_send_receipt_email` en cada router).
+- [ ] **Envío de recibo por WhatsApp en producción.** La lógica `send_receipt_summary` ya existe; falta configurar las credenciales de Meta Cloud API (WhatsApp Business) en la clínica para envíos reales.
+- [ ] **Reintentos y estado del envío.** Hoy `outbound_notifications` registra `sent/failed` sin reintentos. Diferir cola de reintentos hasta tener proveedor en producción.
+
+## Servicio de email (Resend) — pendientes
+
+> Infraestructura base implementada (2026-09-14): `services/email.py` con Resend como canal principal + SMTP fallback, plantillas HTML en `services/email_templates.py`, migraciones `0060_staff_invitations` y `0061_password_reset_super_admin`, invitación de staff, reset de contraseña real y aviso de login por email.
+
+- [ ] **Configurar `RESEND_API_KEY` en producción.** En `.env`/ECS (var `RESEND_API_KEY`) y reiniciar el backend. Sin ella, `send_email` devuelve `not_configured` y los correos no salen.
+- [ ] **Verificar el dominio emisor en Resend** (`EMAIL_FROM`, DNS SPF/DKIM) para entregabilidad, y ajustar `APP_BASE_URL` al dominio real de producción.
+- [ ] **Infra Terraform:** pasar `RESEND_API_KEY`, `EMAIL_FROM` y `APP_BASE_URL` al ECS (hoy solo están en `.env` local; `infra/variables.tf`/`terraform.tfvars` no los incluyen).
+- [ ] **Botón "Reenviar invitación" en la UI.** El endpoint `POST /users/{id}/invite` ya existe; falta exponerlo en el diálogo de usuarios (Settings) para reenviar el correo a un staff que no activó su cuenta.
+- [ ] **Recordatorios de citas automáticos.** El envío por email ya respeta `owner_preferences.preferred_channel`; falta el scheduler (hoy se dispara manualmente desde Automation).
+- [ ] **Registro del email del dueño en el alta de mascota.** Confirmar que el formulario de mascotas pide/captura el correo del dueño (hoy `_get_or_create_owner` lo guarda si se envía, pero la UI lo expone como opcional). Decidido: el correo es SOLO contacto para avisos (sin login del dueño).
+- [ ] **Aviso de login: geolocalización por IP.** Hoy el correo muestra "IP <ip>"; conectar un servicio de geolocalización (o `x-forwarded-for` real tras el ALB) para mostrar ubicación.
+- [ ] **Cumpleaños/recibos por email:** verificar entrega con `RESEND_API_KEY` real y ajustar plantillas según feedback del dueño (principio 10: respetar opt-in).
+
+## Facturación REAL (CFDI / facturación fiscal)
+
+- [ ] **Crear módulo de facturación REAL.** La facturación actual genera solo recibos internos (`invoices`) y PDFs de recibo, pero no emite facturas fiscales (CFDI en México). Pendiente de definir:
+  - Proveedor/emisor: PAC (p. ej. Facturapi, CONTPAQi, SAT) o facturación propia con timbrado.
+  - Datos fiscales: RFC de la clínica (`clinics.rfc` y `clinics.fiscal_name` ya existen), régimen fiscal, CFDI de uso, serie/folio.
+  - Emisión de CFDI por venta/consulta, cancelación, complemento de pago y envío del XML/PDF por email y WhatsApp.
+  - Reporte y reconciliación de facturas emitidas.

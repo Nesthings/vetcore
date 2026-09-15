@@ -106,9 +106,7 @@ def require_staff(
     # Valida que el usuario siga existiendo y activo: un empleado desactivado
     # no debe conservar acceso aunque su token aún no haya expirado.
     active = db.execute(
-        text(
-            "SELECT 1 FROM users WHERE id = :uid AND clinic_id = :cid AND is_active = true"
-        ),
+        text("SELECT 1 FROM users WHERE id = :uid AND clinic_id = :cid AND is_active = true"),
         {"uid": user.sub, "cid": user.clinic_id},
     ).scalar()
     if not active:

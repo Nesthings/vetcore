@@ -10,7 +10,7 @@ Al facturar un producto, se descuenta stock (movimiento de venta).
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import CurrentClinic, get_current_clinic, require_component
@@ -255,24 +255,28 @@ def create_invoice(
     db.add(invoice)
     db.commit()
 
-    if body.send_receipt_whatsapp:
+    if body.send_receipt_whatsapp or body.send_receipt_email:
         pet_name = "Venta mostrador"
         if body.pet_id:
             pet = db.get(Pet, body.pet_id)
             pet_name = pet.name if pet else pet_name
         clinic = db.get(Clinic, ctx.clinic["id"])
+        clinic_name = clinic.name if clinic else ""
         receipt_url = _receipt_pdf_url(db, invoice)
-        send_receipt_summary(
-            db,
-            ctx.clinic["id"],
-            body.owner_id,
-            pet_name,
-            float(invoice.total),
-            clinic.name if clinic else "",
-            str(invoice.id)[:8].upper(),
-            invoice.id,
-            receipt_pdf_url=receipt_url,
-        )
+        if body.send_receipt_whatsapp:
+            send_receipt_summary(
+                db,
+                ctx.clinic["id"],
+                body.owner_id,
+                pet_name,
+                float(invoice.total),
+                clinic_name,
+                str(invoice.id)[:8].upper(),
+                invoice.id,
+                receipt_pdf_url=receipt_url,
+            )
+        if body.send_receipt_email:
+            _send_receipt_email(db, ctx.clinic["id"], body.owner_id, pet_name, invoice, clinic_name)
         db.commit()
     return _with_names(db, [_get_invoice_or_404(db, ctx.clinic["id"], str(invoice.id))])[0]
 
@@ -323,6 +327,60 @@ def _receipt_pdf_url(db: Session, invoice: Invoice) -> str:
     pdf = build_invoice_receipt_pdf(_receipt_data(db, invoice))
     rel = save_media("receipts", f"recibo_{invoice.id}.pdf", pdf)
     return public_url(rel)
+
+
+def _send_receipt_email(
+    db: Session, clinic_id, owner_id, pet_name: str, invoice: Invoice, clinic_name: str
+) -> None:
+    """Envía el recibo por correo (PDF adjunto) al dueño de la mascota."""
+    import base64
+
+    from app.services.email import send_email
+
+    if owner_id is None:
+        return None
+    owner = (
+        db.execute(text("SELECT email FROM owners WHERE id = :o"), {"o": owner_id})
+        .mappings()
+        .first()
+    )
+    to = owner["email"] if owner else None
+    if not to:
+        return None
+
+    pdf = build_invoice_receipt_pdf(_receipt_data(db, invoice))
+    attachment_name = f"recibo_{str(invoice.id)[:8].upper()}.pdf"
+
+    total = float(invoice.total)
+    body_html = (
+        '<p style="margin:0 0 12px;font-size:14px;color:#374151;">'
+        f"Hola: te adjuntamos el recibo de <strong>{pet_name}</strong> en "
+        f"<strong>{clinic_name}</strong> por <strong>${total:.2f}</strong>.</p>"
+        '<p style="margin:0 0 12px;font-size:14px;color:#374151;">'
+        f"Referencia: {str(invoice.id)[:8].upper()}</p>"
+    )
+    html = (
+        "<!DOCTYPE html><html lang='es'><body "
+        "style='margin:0;padding:0;background:#f4f5f7;font-family:sans-serif;'>"
+        "<table role='presentation' width='100%' cellpadding='0' cellspacing='0' "
+        "style='padding:24px;'>"
+        "<tr><td align='center'><table role='presentation' cellpadding='0' cellspacing='0' "
+        "style='max-width:560px;background:#fff;border:1px solid #e5e7eb;border-radius:12px;'>"
+        f"<tr><td style='padding:32px;'>{body_html}</td></tr>"
+        "</table></td></tr></table></body></html>"
+    )
+    return send_email(
+        db,
+        clinic_id,
+        to,
+        f"Recibo de {pet_name} · {clinic_name}",
+        f"Recibo de {pet_name} en {clinic_name} por ${total:.2f}.",
+        clinic_name=clinic_name,
+        template=f"receipt-email:{invoice.id}",
+        owner_id=owner_id,
+        html=html,
+        attachments=[{"filename": attachment_name, "content": base64.b64encode(pdf).decode()}],
+    )
 
 
 def receipt_response(db: Session, invoice: Invoice) -> Response:

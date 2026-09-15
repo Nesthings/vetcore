@@ -25,15 +25,19 @@ def search_owners(
     if not term:
         return []
     like = f"%{term}%"
-    rows = db.execute(
-        text(
-            "SELECT DISTINCT o.id, o.full_name, o.phone, o.email "
-            "FROM owners o "
-            "JOIN owner_pet_links l ON l.owner_id = o.id AND l.clinic_id = :cid "
-            "WHERE o.full_name ILIKE :q OR o.phone ILIKE :q OR o.email ILIKE :q "
-            "ORDER BY o.full_name "
-            "LIMIT 10"
-        ),
-        {"cid": ctx.clinic["id"], "q": like},
-    ).mappings().all()
+    rows = (
+        db.execute(
+            text(
+                "SELECT DISTINCT o.id, o.full_name, o.phone, o.email "
+                "FROM owners o "
+                "JOIN owner_pet_links l ON l.owner_id = o.id AND l.clinic_id = :cid "
+                "WHERE o.full_name ILIKE :q OR o.phone ILIKE :q OR o.email ILIKE :q "
+                "ORDER BY o.full_name "
+                "LIMIT 10"
+            ),
+            {"cid": ctx.clinic["id"], "q": like},
+        )
+        .mappings()
+        .all()
+    )
     return [dict(r) for r in rows]

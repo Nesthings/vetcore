@@ -11,6 +11,7 @@ import { CreateClinic } from '@/pages/auth/CreateClinic'
 import { ForgotPassword } from '@/pages/auth/ForgotPassword'
 import { Login } from '@/pages/auth/Login'
 import { ResetPassword } from '@/pages/auth/ResetPassword'
+import { AcceptInvite } from '@/pages/auth/AcceptInvite'
 import { Agenda } from '@/pages/Agenda'
 import { Audit } from '@/pages/Audit'
 import { Automation } from '@/pages/Automation'
@@ -56,6 +57,7 @@ function App() {
                   <Route path="/create-clinic" element={<CreateClinic />} />
                   <Route path="/forgot-password" element={<ForgotPassword />} />
                   <Route path="/reset-password" element={<ResetPassword />} />
+                  <Route path="/accept-invite" element={<AcceptInvite />} />
                   <Route path="/cartilla" element={<CartillaShare />} />
                   <Route
                     path="/design-system"

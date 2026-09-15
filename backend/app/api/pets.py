@@ -226,16 +226,20 @@ def list_pets(
     weights: dict = {pet_id: weight_kg for pet_id, weight_kg in weight_rows}
 
     # dueños en batch (1 consulta, en vez de 1 por mascota)
-    owner_rows = db.execute(
-        text(
-            "SELECT l.pet_id AS pet_id, o.id AS owner_id, o.full_name, o.phone, o.email, "
-            "o.profile_photo_url, o.alt_contact_name, o.alt_phone, l.linked_at, l.is_active "
-            "FROM owner_pet_links l JOIN owners o ON o.id = l.owner_id "
-            "WHERE l.pet_id = ANY(:pids) AND l.clinic_id = :cid "
-            "ORDER BY l.linked_at DESC"
-        ),
-        {"pids": list(pet_ids), "cid": ctx.clinic["id"]},
-    ).mappings().all()
+    owner_rows = (
+        db.execute(
+            text(
+                "SELECT l.pet_id AS pet_id, o.id AS owner_id, o.full_name, o.phone, o.email, "
+                "o.profile_photo_url, o.alt_contact_name, o.alt_phone, l.linked_at, l.is_active "
+                "FROM owner_pet_links l JOIN owners o ON o.id = l.owner_id "
+                "WHERE l.pet_id = ANY(:pids) AND l.clinic_id = :cid "
+                "ORDER BY l.linked_at DESC"
+            ),
+            {"pids": list(pet_ids), "cid": ctx.clinic["id"]},
+        )
+        .mappings()
+        .all()
+    )
     owners_by_pet: dict = {}
     for r in owner_rows:
         owners_by_pet.setdefault(r["pet_id"], []).append(OwnerLinkRead(**dict(r)))
@@ -497,14 +501,11 @@ def create_pet(
     db.flush()
 
     if body.owner is not None and (body.owner.phone or body.owner.email):
-        owner = _get_or_create_owner(
-            db, body.owner.phone, body.owner.email, body.owner.full_name
-        )
+        owner = _get_or_create_owner(db, body.owner.phone, body.owner.email, body.owner.full_name)
         if owner is not None and body.owner.alt_contact_name:
             db.execute(
                 text(
-                    "UPDATE owners SET alt_contact_name = :alt, alt_phone = :altp "
-                    "WHERE id = :oid"
+                    "UPDATE owners SET alt_contact_name = :alt, alt_phone = :altp WHERE id = :oid"
                 ),
                 {
                     "alt": body.owner.alt_contact_name,
@@ -803,19 +804,23 @@ def pet_family(
     placeholders = ",".join(f":nm{i}" for i in range(len(owner_names)))
     params: dict = {"cid": ctx.clinic["id"], "pid": pet.id}
     params.update({f"nm{i}": n for i, n in enumerate(owner_names)})
-    rows = db.execute(
-        text(
-            "SELECT DISTINCT p.id, p.name, p.species, p.breed, p.sex, "
-            "p.clinical_photo_url AS photo_url "
-            "FROM owner_pet_links l "
-            "JOIN owners o ON o.id = l.owner_id "
-            "JOIN pets p ON p.id = l.pet_id "
-            "WHERE l.clinic_id = :cid AND l.is_active = true "
-            "AND p.id <> :pid AND p.is_active = true "
-            f"AND trim(coalesce(o.full_name, '')) IN ({placeholders})"
-        ),
-        params,
-    ).mappings().all()
+    rows = (
+        db.execute(
+            text(
+                "SELECT DISTINCT p.id, p.name, p.species, p.breed, p.sex, "
+                "p.clinical_photo_url AS photo_url "
+                "FROM owner_pet_links l "
+                "JOIN owners o ON o.id = l.owner_id "
+                "JOIN pets p ON p.id = l.pet_id "
+                "WHERE l.clinic_id = :cid AND l.is_active = true "
+                "AND p.id <> :pid AND p.is_active = true "
+                f"AND trim(coalesce(o.full_name, '')) IN ({placeholders})"
+            ),
+            params,
+        )
+        .mappings()
+        .all()
+    )
 
     out = []
     for r in rows:
@@ -823,7 +828,9 @@ def pet_family(
         relation = (
             "hermano"
             if sex in ("M", "macho", "Macho")
-            else "hermana" if sex in ("H", "hembra", "Hembra") else "hermano(a)"
+            else "hermana"
+            if sex in ("H", "hembra", "Hembra")
+            else "hermano(a)"
         )
         out.append(
             {
@@ -997,14 +1004,18 @@ def pet_timeline(
         else {}
     )
 
-    photo_vets = db.execute(
-        text(
-            "SELECT p.id, p.label, p.url, p.taken_at, u.full_name AS vet_name "
-            "FROM pet_photos p LEFT JOIN users u ON u.id = p.vet_user_id "
-            "WHERE p.pet_id = :pid AND p.clinic_id = :cid"
-        ),
-        {"pid": pet.id, "cid": ctx.clinic["id"]},
-    ).mappings().all()
+    photo_vets = (
+        db.execute(
+            text(
+                "SELECT p.id, p.label, p.url, p.taken_at, u.full_name AS vet_name "
+                "FROM pet_photos p LEFT JOIN users u ON u.id = p.vet_user_id "
+                "WHERE p.pet_id = :pid AND p.clinic_id = :cid"
+            ),
+            {"pid": pet.id, "cid": ctx.clinic["id"]},
+        )
+        .mappings()
+        .all()
+    )
 
     events: list[dict] = []
     for c in consultations:

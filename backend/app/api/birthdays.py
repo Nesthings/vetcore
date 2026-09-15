@@ -35,13 +35,17 @@ class CelebrateBody(BaseModel):
 
 
 def _settings(db: Session, clinic_id: str) -> dict:
-    row = db.execute(
-        text(
-            "SELECT name, birthday_message, birthday_send_email, birthday_send_whatsapp "
-            "FROM clinics WHERE id = :cid"
-        ),
-        {"cid": clinic_id},
-    ).mappings().first()
+    row = (
+        db.execute(
+            text(
+                "SELECT name, birthday_message, birthday_send_email, birthday_send_whatsapp "
+                "FROM clinics WHERE id = :cid"
+            ),
+            {"cid": clinic_id},
+        )
+        .mappings()
+        .first()
+    )
     return {
         "clinic_name": row["name"] if row else "",
         "message": (row["birthday_message"] if row else None) or DEFAULT_BIRTHDAY_MESSAGE,
@@ -75,21 +79,26 @@ def birthdays_today(
 ) -> dict:
     today = date.today()
     settings = _settings(db, ctx.clinic["id"])
-    rows = db.execute(
-        text(
-            "SELECT p.id AS pet_id, p.name AS pet_name, p.clinical_photo_url AS pet_photo, "
-            "p.birth_date, o.id AS owner_id, o.full_name AS owner_name, o.phone AS owner_phone, "
-            "o.email AS owner_email "
-            "FROM pets p "
-            "LEFT JOIN owner_pet_links l ON l.pet_id = p.id AND l.clinic_id = p.clinic_id "
-            "  AND l.is_active = true "
-            "LEFT JOIN owners o ON o.id = l.owner_id "
-            "WHERE p.clinic_id = :cid AND p.is_active = true AND p.birth_date IS NOT NULL "
-            "  AND EXTRACT(MONTH FROM p.birth_date) = :m AND EXTRACT(DAY FROM p.birth_date) = :d "
-            "ORDER BY p.name"
-        ),
-        {"cid": ctx.clinic["id"], "m": today.month, "d": today.day},
-    ).mappings().all()
+    rows = (
+        db.execute(
+            text(
+                "SELECT p.id AS pet_id, p.name AS pet_name, p.clinical_photo_url AS pet_photo, "
+                "p.birth_date, o.id AS owner_id, o.full_name AS owner_name, "
+                "o.phone AS owner_phone, o.email AS owner_email "
+                "FROM pets p "
+                "LEFT JOIN owner_pet_links l ON l.pet_id = p.id AND l.clinic_id = p.clinic_id "
+                "  AND l.is_active = true "
+                "LEFT JOIN owners o ON o.id = l.owner_id "
+                "WHERE p.clinic_id = :cid AND p.is_active = true AND p.birth_date IS NOT NULL "
+                "  AND EXTRACT(MONTH FROM p.birth_date) = :m "
+                "  AND EXTRACT(DAY FROM p.birth_date) = :d "
+                "ORDER BY p.name"
+            ),
+            {"cid": ctx.clinic["id"], "m": today.month, "d": today.day},
+        )
+        .mappings()
+        .all()
+    )
 
     day_token = today.isoformat()
     templates = [f"bday:{r['pet_id']}:{day_token}" for r in rows]
@@ -102,7 +111,9 @@ def birthdays_today(
                     "WHERE clinic_id = :c AND template = ANY(:templates)"
                 ),
                 {"c": ctx.clinic["id"], "templates": templates},
-            ).scalars().all()
+            )
+            .scalars()
+            .all()
         )
     pets = [
         {
@@ -138,25 +149,33 @@ def celebrate(
             "Configúralos en Configuración de la clínica.",
         )
 
-    pet = db.execute(
-        text(
-            "SELECT id, name, birth_date, clinical_photo_url FROM pets "
-            "WHERE id = :pid AND clinic_id = :cid AND is_active = true"
-        ),
-        {"pid": pet_id, "cid": ctx.clinic["id"]},
-    ).mappings().first()
+    pet = (
+        db.execute(
+            text(
+                "SELECT id, name, birth_date, clinical_photo_url FROM pets "
+                "WHERE id = :pid AND clinic_id = :cid AND is_active = true"
+            ),
+            {"pid": pet_id, "cid": ctx.clinic["id"]},
+        )
+        .mappings()
+        .first()
+    )
     if pet is None:
         raise HTTPException(status_code=404, detail="Mascota no encontrada")
 
-    owner = db.execute(
-        text(
-            "SELECT o.id, o.full_name, o.email, o.phone FROM owner_pet_links l "
-            "JOIN owners o ON o.id = l.owner_id "
-            "WHERE l.pet_id = :pid AND l.clinic_id = :cid AND l.is_active = true "
-            "ORDER BY l.linked_at DESC LIMIT 1"
-        ),
-        {"pid": pet_id, "cid": ctx.clinic["id"]},
-    ).mappings().first()
+    owner = (
+        db.execute(
+            text(
+                "SELECT o.id, o.full_name, o.email, o.phone FROM owner_pet_links l "
+                "JOIN owners o ON o.id = l.owner_id "
+                "WHERE l.pet_id = :pid AND l.clinic_id = :cid AND l.is_active = true "
+                "ORDER BY l.linked_at DESC LIMIT 1"
+            ),
+            {"pid": pet_id, "cid": ctx.clinic["id"]},
+        )
+        .mappings()
+        .first()
+    )
 
     settings = _settings(db, ctx.clinic["id"])
     today = date.today()
@@ -221,17 +240,42 @@ def celebrate(
             else:
                 failed.append(ch)
         else:
-            # email: sin proveedor configurado todavía (stub registrado como sent)
-            db.add(
-                OutboundNotification(
-                    clinic_id=ctx.clinic["id"],
-                    owner_id=(owner["id"] if owner else None),
-                    channel=ch,
-                    template=template,
-                    status="sent",
+            # email: se envía por el proveedor de correo (Resend/SMTP).
+            to_email = (owner["email"] if owner else None) or None
+            if not to_email:
+                not_configured.append(ch)
+                db.add(
+                    OutboundNotification(
+                        clinic_id=ctx.clinic["id"],
+                        owner_id=(owner["id"] if owner else None),
+                        channel=ch,
+                        template=template,
+                        recipient=None,
+                        error="sin correo del dueño",
+                        status="failed",
+                    )
                 )
+                continue
+            from app.services.email import send_email
+            from app.services.email_templates import birthday_email
+
+            res = send_email(
+                db,
+                ctx.clinic["id"],
+                to_email,
+                f"¡Feliz cumpleaños, {pet['name']}! 🎂",
+                message,
+                clinic_name=settings["clinic_name"],
+                template=template,
+                owner_id=(owner["id"] if owner else None),
+                html=birthday_email(pet["name"], settings["clinic_name"]),
             )
-            sent.append(ch)
+            if res["ok"]:
+                sent.append(ch)
+            elif res["error"] == "not_configured":
+                not_configured.append(ch)
+            else:
+                failed.append(ch)
     db.commit()
     return {
         "sent": sent,

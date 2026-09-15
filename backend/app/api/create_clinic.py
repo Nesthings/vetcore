@@ -29,9 +29,7 @@ def _valid_invite(db: Session, token: str) -> ClinicInvite:
             detail="Este enlace ya fue utilizado o revocado",
         )
     if invite.expires_at < datetime.now(UTC):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Este enlace expiró"
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Este enlace expiró")
     return invite
 
 

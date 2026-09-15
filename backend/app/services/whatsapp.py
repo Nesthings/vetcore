@@ -229,12 +229,7 @@ def send_automation(
     plantilla configurada o texto libre."""
     clinic = db.get(Clinic, clinic_id)
     # Recibo con PDF: prioridad a la plantilla con cabecera de documento.
-    if (
-        kind == "receipt"
-        and document_url
-        and clinic
-        and clinic.whatsapp_receipt_document_template
-    ):
+    if kind == "receipt" and document_url and clinic and clinic.whatsapp_receipt_document_template:
         language = (clinic.whatsapp_template_language if clinic else None) or "es_MX"
         return send_template(
             db,
@@ -281,6 +276,34 @@ def record_outbound(
     return row
 
 
+def record_outbound_optional_clinic(
+    db: Session,
+    clinic_id,
+    channel: str,
+    template: str,
+    status: str,
+    owner_id=None,
+    recipient=None,
+    external_id=None,
+    error=None,
+) -> OutboundNotification | None:
+    """Registra una notificación saliente; si no hay clínica (emails de
+    seguridad del super-admin) se omite el registro en BD."""
+    if clinic_id is None:
+        return None
+    return record_outbound(
+        db,
+        clinic_id,
+        channel,
+        template,
+        status,
+        owner_id=owner_id,
+        recipient=recipient,
+        external_id=external_id,
+        error=error,
+    )
+
+
 def send_receipt_summary(
     db: Session,
     clinic_id,
@@ -295,9 +318,11 @@ def send_receipt_summary(
     """Envía el recibo por WhatsApp: PDF adjunto si hay URL, si no texto/plantilla."""
     owner = None
     if owner_id:
-        owner = db.execute(
-            text("SELECT phone FROM owners WHERE id = :o"), {"o": owner_id}
-        ).mappings().first()
+        owner = (
+            db.execute(text("SELECT phone FROM owners WHERE id = :o"), {"o": owner_id})
+            .mappings()
+            .first()
+        )
     to = normalize_mx(owner["phone"] if owner else None)
     if not to:
         return None

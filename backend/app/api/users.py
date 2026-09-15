@@ -35,7 +35,7 @@ from app.core.storage import (
     validate_extension,
 )
 from app.db.session import get_db
-from app.models import ClinicBranch, User, UserComponentPermission
+from app.models import Clinic, ClinicBranch, User, UserComponentPermission
 from app.schemas.staff import ProfileUpdate, UserCreate, UserRead, UserUpdate
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -211,19 +211,28 @@ def create_user(
     db: Session = Depends(get_db),
 ) -> User:
     email = body.email.strip().lower()
-    exists = db.scalar(
-        select(User).where(User.clinic_id == ctx.clinic["id"], User.email == email)
-    )
+    exists = db.scalar(select(User).where(User.clinic_id == ctx.clinic["id"], User.email == email))
     if exists:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Ya existe un usuario con ese email en la clínica",
         )
-    data = body.model_dump(exclude={"password"})
+    data = body.model_dump(exclude={"password", "send_invite"})
     data["email"] = email
-    data["password_hash"] = hash_password(body.password)
     if data.get("reports_to"):
         _validate_reports_to(db, ctx.clinic["id"], str(data["reports_to"]))
+
+    wants_invite = body.send_invite and not body.password
+    if wants_invite:
+        # Sin contraseña: el usuario queda inactivo hasta que defina su
+        # contraseña desde el email de invitación.
+        from app.services.invitations import UNUSABLE_PASSWORD_HASH, create_staff_invitation
+
+        data["password_hash"] = UNUSABLE_PASSWORD_HASH
+        data["is_active"] = False
+    else:
+        data["password_hash"] = hash_password(body.password or "sin-contrasena")
+
     user = User(clinic_id=ctx.clinic["id"], **data)
     db.add(user)
     try:
@@ -232,6 +241,18 @@ def create_user(
         db.rollback()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email duplicado") from exc
     db.refresh(user)
+
+    if wants_invite:
+        clinic = db.get(Clinic, ctx.clinic["id"])
+        create_staff_invitation(
+            db,
+            ctx.clinic["id"],
+            user.id,
+            user.email,
+            user.full_name,
+            clinic.name if clinic else "",
+            commit=True,
+        )
     return _with_branch_names(db, [user])[0]
 
 
@@ -258,6 +279,37 @@ def update_user(
         db.rollback()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email duplicado") from exc
     db.refresh(user)
+    return _with_branch_names(db, [user])[0]
+
+
+@router.post(
+    "/{user_id}/invite",
+    response_model=UserRead,
+    summary="Reenvía la invitación para definir la contraseña",
+)
+def resend_invitation(
+    user_id: str,
+    ctx: CurrentClinic = Depends(require_component("settings")),
+    db: Session = Depends(get_db),
+) -> dict:
+    user = _get_user_or_404(db, ctx.clinic["id"], user_id)
+    if user.email_verified_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El usuario ya activó su cuenta",
+        )
+    from app.services.invitations import create_staff_invitation
+
+    clinic = db.get(Clinic, ctx.clinic["id"])
+    create_staff_invitation(
+        db,
+        ctx.clinic["id"],
+        user.id,
+        user.email,
+        user.full_name,
+        clinic.name if clinic else "",
+        commit=True,
+    )
     return _with_branch_names(db, [user])[0]
 
 
@@ -393,13 +445,9 @@ def update_user_components(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Componente desconocido: {component}",
             )
-    db.execute(
-        delete(UserComponentPermission).where(UserComponentPermission.user_id == user.id)
-    )
+    db.execute(delete(UserComponentPermission).where(UserComponentPermission.user_id == user.id))
     for component, allowed in body.overrides.items():
-        db.add(
-            UserComponentPermission(user_id=user.id, component=component, allowed=allowed)
-        )
+        db.add(UserComponentPermission(user_id=user.id, component=component, allowed=allowed))
     db.commit()
     db.refresh(user)
     return _user_components_row(db, user)

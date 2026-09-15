@@ -24,8 +24,7 @@ PERRO_CARNET: list[dict] = [
         "brand": "Canigen DHPPi/L",
         "prevents": "Moquillo, hepatitis infecciosa (adenovirus), parvovirus, "
         "parainfluenza y leptospirosis",
-        "schedule": "1ª a las 6-8 semanas, refuerzos a las 10-12 y 14-16 semanas; "
-        "refuerzo anual",
+        "schedule": "1ª a las 6-8 semanas, refuerzos a las 10-12 y 14-16 semanas; refuerzo anual",
         "steps": [
             {"label": "1ª dosis", "offset_days": 0},
             {"label": "Refuerzo", "offset_days": 28},

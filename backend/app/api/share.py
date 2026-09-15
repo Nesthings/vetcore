@@ -143,14 +143,18 @@ def _hospitalization_payload(db: Session, pet: Pet) -> dict | None:
         else None
     )
 
-    vital_rows = db.execute(
-        text(
-            "SELECT DISTINCT ON (parameter) parameter, value, unit, observed_at "
-            "FROM hospitalization_vitals WHERE hospitalization_id = :hid "
-            "ORDER BY parameter, observed_at DESC"
-        ),
-        {"hid": hosp.id},
-    ).mappings().all()
+    vital_rows = (
+        db.execute(
+            text(
+                "SELECT DISTINCT ON (parameter) parameter, value, unit, observed_at "
+                "FROM hospitalization_vitals WHERE hospitalization_id = :hid "
+                "ORDER BY parameter, observed_at DESC"
+            ),
+            {"hid": hosp.id},
+        )
+        .mappings()
+        .all()
+    )
     vitals: dict = {}
     for r in vital_rows:
         vitals[r["parameter"]] = {
@@ -159,16 +163,20 @@ def _hospitalization_payload(db: Session, pet: Pet) -> dict | None:
             "observed_at": r["observed_at"].isoformat(),
         }
 
-    note = db.execute(
-        text(
-            "SELECT n.user_id, u.full_name, u.photo_url, n.created_at "
-            "FROM hospitalization_notes n "
-            "LEFT JOIN users u ON u.id = n.user_id "
-            "WHERE n.hospitalization_id = :hid "
-            "ORDER BY n.created_at DESC LIMIT 1"
-        ),
-        {"hid": hosp.id},
-    ).mappings().first()
+    note = (
+        db.execute(
+            text(
+                "SELECT n.user_id, u.full_name, u.photo_url, n.created_at "
+                "FROM hospitalization_notes n "
+                "LEFT JOIN users u ON u.id = n.user_id "
+                "WHERE n.hospitalization_id = :hid "
+                "ORDER BY n.created_at DESC LIMIT 1"
+            ),
+            {"hid": hosp.id},
+        )
+        .mappings()
+        .first()
+    )
     vet = db.get(User, hosp.vet_user_id) if hosp.vet_user_id else None
     last_vet = None
     if note and note["full_name"]:
@@ -195,9 +203,7 @@ def _hospitalization_payload(db: Session, pet: Pet) -> dict | None:
         "expected_discharge_at": (
             hosp.expected_discharge_at.isoformat() if hosp.expected_discharge_at else None
         ),
-        "accommodation": (
-            {"code": acc.code, "name": acc.name, "type": acc.type} if acc else None
-        ),
+        "accommodation": ({"code": acc.code, "name": acc.name, "type": acc.type} if acc else None),
         "vitals": vitals,
         "last_vet": last_vet,
     }
@@ -292,13 +298,17 @@ def share_cartilla(
                 "status": a.status,
             }
         )
-    photo_rows = db.execute(
-        text(
-            "SELECT p.id, p.label, p.url, p.taken_at FROM pet_photos p "
-            "WHERE p.pet_id = :pid AND p.clinic_id = :cid"
-        ),
-        {"pid": pet.id, "cid": clinic_id},
-    ).mappings().all()
+    photo_rows = (
+        db.execute(
+            text(
+                "SELECT p.id, p.label, p.url, p.taken_at FROM pet_photos p "
+                "WHERE p.pet_id = :pid AND p.clinic_id = :cid"
+            ),
+            {"pid": pet.id, "cid": clinic_id},
+        )
+        .mappings()
+        .all()
+    )
     for p in photo_rows:
         timeline.append(
             {
@@ -374,24 +384,30 @@ def share_cartilla(
         placeholders = ",".join(f":oid{i}" for i in range(len(owner_ids)))
         params: dict = {"cid": clinic_id, "pid": pet.id}
         params.update({f"oid{i}": str(o) for i, o in enumerate(owner_ids)})
-        rows = db.execute(
-            text(
-                "SELECT DISTINCT p.id, p.name, p.species, p.breed, p.sex, "
-                "p.clinical_photo_url AS photo_url "
-                "FROM owner_pet_links l "
-                "JOIN pets p ON p.id = l.pet_id "
-                "WHERE l.clinic_id = :cid AND l.is_active = true "
-                "AND p.id <> :pid AND p.is_active = true "
-                f"AND l.owner_id IN ({placeholders})"
-            ),
-            params,
-        ).mappings().all()
+        rows = (
+            db.execute(
+                text(
+                    "SELECT DISTINCT p.id, p.name, p.species, p.breed, p.sex, "
+                    "p.clinical_photo_url AS photo_url "
+                    "FROM owner_pet_links l "
+                    "JOIN pets p ON p.id = l.pet_id "
+                    "WHERE l.clinic_id = :cid AND l.is_active = true "
+                    "AND p.id <> :pid AND p.is_active = true "
+                    f"AND l.owner_id IN ({placeholders})"
+                ),
+                params,
+            )
+            .mappings()
+            .all()
+        )
         for r in rows:
             sex = r["sex"]
             relation = (
                 "hermano"
                 if sex in ("M", "macho", "Macho")
-                else "hermana" if sex in ("H", "hembra", "Hembra") else "hermano(a)"
+                else "hermana"
+                if sex in ("H", "hembra", "Hembra")
+                else "hermano(a)"
             )
             family.append(
                 {
@@ -412,9 +428,7 @@ def share_cartilla(
         "clinic": {"name": clinic.name, "logo_url": clinic.logo_url},
         "branches": [
             {"id": str(b.id), "name": b.name}
-            for b in db.scalars(
-                select(ClinicBranch).where(ClinicBranch.clinic_id == pet.clinic_id)
-            )
+            for b in db.scalars(select(ClinicBranch).where(ClinicBranch.clinic_id == pet.clinic_id))
         ],
         "qr_url": f"/cartilla?token={ensure_qr_token(db, pet)}",
         "alerts": [
@@ -484,9 +498,7 @@ def share_request_waitlist(
         )
     )
     if branch is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Sucursal no encontrada"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sucursal no encontrada")
     # Tope anti-spam: máximo 5 solicitudes por mascota en las últimas 24 h.
     # Se permiten varias solicitudes activas a la vez (no se bloquea por una
     # sola "en espera", como antes).
@@ -582,9 +594,7 @@ def share_cancel_waitlist(
         )
     )
     if row is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Solicitud no encontrada"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Solicitud no encontrada")
     if row.status not in ("waiting", "offered"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -645,15 +655,19 @@ def share_upload_owner_photo(
     db: Session = Depends(get_db),
 ) -> dict:
     pet = _pet_from_token(token, db)
-    row = db.execute(
-        text(
-            "SELECT o.id, o.profile_photo_url FROM owner_pet_links l "
-            "JOIN owners o ON o.id = l.owner_id "
-            "WHERE l.pet_id = :pid AND l.clinic_id = :cid AND l.is_active = true "
-            "ORDER BY l.linked_at DESC LIMIT 1"
-        ),
-        {"pid": pet.id, "cid": pet.clinic_id},
-    ).mappings().first()
+    row = (
+        db.execute(
+            text(
+                "SELECT o.id, o.profile_photo_url FROM owner_pet_links l "
+                "JOIN owners o ON o.id = l.owner_id "
+                "WHERE l.pet_id = :pid AND l.clinic_id = :cid AND l.is_active = true "
+                "ORDER BY l.linked_at DESC LIMIT 1"
+            ),
+            {"pid": pet.id, "cid": pet.clinic_id},
+        )
+        .mappings()
+        .first()
+    )
     if row is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="La mascota no tiene un dueño activo"
@@ -693,15 +707,19 @@ def share_upload_owner_photo(
 
 
 def _active_owner_row(db: Session, pet: Pet) -> dict:
-    row = db.execute(
-        text(
-            "SELECT o.id, o.full_name, o.signature_url FROM owner_pet_links l "
-            "JOIN owners o ON o.id = l.owner_id "
-            "WHERE l.pet_id = :pid AND l.clinic_id = :cid AND l.is_active = true "
-            "ORDER BY l.linked_at DESC LIMIT 1"
-        ),
-        {"pid": pet.id, "cid": pet.clinic_id},
-    ).mappings().first()
+    row = (
+        db.execute(
+            text(
+                "SELECT o.id, o.full_name, o.signature_url FROM owner_pet_links l "
+                "JOIN owners o ON o.id = l.owner_id "
+                "WHERE l.pet_id = :pid AND l.clinic_id = :cid AND l.is_active = true "
+                "ORDER BY l.linked_at DESC LIMIT 1"
+            ),
+            {"pid": pet.id, "cid": pet.clinic_id},
+        )
+        .mappings()
+        .first()
+    )
     if row is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="La mascota no tiene un dueño activo"
@@ -799,11 +817,12 @@ def share_create_alert(
     db: Session = Depends(get_db),
 ) -> dict:
     pet = _pet_from_token(token, db)
-    count = db.scalar(
-        select(func.count())
-        .select_from(ClinicalAlert)
-        .where(ClinicalAlert.pet_id == pet.id)
-    ) or 0
+    count = (
+        db.scalar(
+            select(func.count()).select_from(ClinicalAlert).where(ClinicalAlert.pet_id == pet.id)
+        )
+        or 0
+    )
     if count >= ALERT_LIMIT:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

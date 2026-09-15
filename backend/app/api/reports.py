@@ -99,9 +99,7 @@ def financial_report(
     ticket_promedio = db.scalar(select(func.avg(Invoice.total)).where(*paid_base)) or 0
 
     line_total = (
-        InvoiceItem.quantity
-        * InvoiceItem.unit_price
-        * (1 - InvoiceItem.discount_percent / 100)
+        InvoiceItem.quantity * InvoiceItem.unit_price * (1 - InvoiceItem.discount_percent / 100)
     )
     service_cond = InvoiceItem.service_id.isnot(None)
     product_cond = InvoiceItem.service_id.is_(None)
@@ -251,8 +249,10 @@ def _build_movements(
         s_total = Decimal("0")
         p_total = Decimal("0")
         for item in inv.items:
-            amount = Decimal(str(item.quantity)) * Decimal(str(item.unit_price)) * (
-                Decimal("1") - Decimal(str(item.discount_percent)) / Decimal("100")
+            amount = (
+                Decimal(str(item.quantity))
+                * Decimal(str(item.unit_price))
+                * (Decimal("1") - Decimal(str(item.discount_percent)) / Decimal("100"))
             )
             if item.service_id is not None:
                 servicios.append(item.description)
@@ -395,9 +395,7 @@ def delete_expense(
         )
     )
     if expense is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Gasto no encontrado"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Gasto no encontrado")
     record_audit(
         db,
         clinic_id=ctx.clinic["id"],

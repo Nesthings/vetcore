@@ -12,10 +12,10 @@ from sqlalchemy import create_engine, text
 
 ADMIN_URL = os.environ.get(
     "VETCORE_TEST_ADMIN_URL",
-    "postgresql+psycopg://vetcore:vetcore_dev@localhost:5433/postgres",
+    "postgresql+psycopg://vetcore:vetcore_dev@localhost:5439/postgres",
 )
 TEST_DB = os.environ.get("VETCORE_TEST_DB", "vetcore_test")
-TEST_URL = f"postgresql+psycopg://vetcore:vetcore_dev@localhost:5433/{TEST_DB}?sslmode=disable"
+TEST_URL = f"postgresql+psycopg://vetcore:vetcore_dev@localhost:5439/{TEST_DB}?sslmode=disable"
 
 # El settings del backend se lee del entorno al importar; apuntamos a la BD de
 # prueba ANTES de importar cualquier módulo de la app.

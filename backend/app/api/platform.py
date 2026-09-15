@@ -39,14 +39,18 @@ def list_staff(
     if clinic_id:
         where += " AND u.clinic_id = :cid"
         params["cid"] = clinic_id
-    rows = db.execute(
-        text(
-            "SELECT u.id, u.full_name, u.email, u.role, c.name AS clinic_name "
-            "FROM users u JOIN clinics c ON c.id = u.clinic_id "
-            f"WHERE {where} ORDER BY c.name, u.full_name LIMIT 100"
-        ),
-        params,
-    ).mappings().all()
+    rows = (
+        db.execute(
+            text(
+                "SELECT u.id, u.full_name, u.email, u.role, c.name AS clinic_name "
+                "FROM users u JOIN clinics c ON c.id = u.clinic_id "
+                f"WHERE {where} ORDER BY c.name, u.full_name LIMIT 100"
+            ),
+            params,
+        )
+        .mappings()
+        .all()
+    )
     return [
         {
             "id": str(r["id"]),
@@ -65,9 +69,7 @@ def list_invites(
     _: CurrentUser = Depends(_super_admin),
 ) -> list[ClinicInvite]:
     return list(
-        db.scalars(
-            select(ClinicInvite).order_by(ClinicInvite.created_at.desc()).limit(200)
-        )
+        db.scalars(select(ClinicInvite).order_by(ClinicInvite.created_at.desc()).limit(200))
     )
 
 

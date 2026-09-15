@@ -199,8 +199,10 @@ def checkout_consultation(
             )
         discount = float(service.discount_percent or 0)
         qty = Decimal(str(s.quantity))
-        line_total = qty * Decimal(str(service.price)) * (
-            Decimal("1") - Decimal(str(discount)) / Decimal("100")
+        line_total = (
+            qty
+            * Decimal(str(service.price))
+            * (Decimal("1") - Decimal(str(discount)) / Decimal("100"))
         )
         total += line_total
         invoice_items.append(
@@ -212,9 +214,7 @@ def checkout_consultation(
                 discount_percent=discount,
             )
         )
-        consultation_items.append(
-            ConsultationItem(description=service.name, quantity=float(qty))
-        )
+        consultation_items.append(ConsultationItem(description=service.name, quantity=float(qty)))
 
     for p in body.products:
         product = db.get(SaleProduct, p.product_id)
@@ -269,9 +269,7 @@ def checkout_consultation(
                 discount_percent=0,
             )
         )
-        consultation_items.append(
-            ConsultationItem(description=product.name, quantity=float(qty))
-        )
+        consultation_items.append(ConsultationItem(description=product.name, quantity=float(qty)))
 
     owner_id = None
     if body.pet_id is not None:
@@ -424,7 +422,22 @@ def checkout_consultation(
         except Exception:  # noqa: BLE001 - el envío es best-effort
             db.rollback()
             logger.warning(
-                "No se pudo enviar el recibo por WhatsApp de la factura %s", invoice.id,
+                "No se pudo enviar el recibo por WhatsApp de la factura %s",
+                invoice.id,
+                exc_info=True,
+            )
+
+    if body.send_receipt_email:
+        try:
+            _send_consultation_receipt_email(
+                db, clinic_id, owner_id, receipt_data, receipt_bytes, clinic.name
+            )
+            db.commit()
+        except Exception:  # noqa: BLE001 - el envío es best-effort
+            db.rollback()
+            logger.warning(
+                "No se pudo enviar el recibo por correo de la factura %s",
+                invoice.id,
                 exc_info=True,
             )
 
@@ -434,6 +447,48 @@ def checkout_consultation(
         summary_pdf_url=summary_url,
         receipt_pdf_url=receipt_url,
         total=float(invoice.total),
+    )
+
+
+def _send_consultation_receipt_email(
+    db, clinic_id, owner_id, receipt_data: dict, receipt_bytes: bytes, clinic_name: str
+) -> None:
+    """Envía el recibo de la consulta por correo (PDF adjunto)."""
+    import base64
+
+    from app.services.email import send_email
+
+    if owner_id is None:
+        return None
+    owner = (
+        db.execute(text("SELECT email FROM owners WHERE id = :o"), {"o": owner_id})
+        .mappings()
+        .first()
+    )
+    to = owner["email"] if owner else None
+    if not to:
+        return None
+
+    total = float(receipt_data["total"])
+    attachment_name = f"recibo_{receipt_data['invoice_id']}.pdf"
+    body_html = (
+        f'<p style="margin:0 0 12px;font-size:14px;color:#374151;">'
+        f"Hola: te adjuntamos el recibo de <strong>{receipt_data['pet_name']}</strong> en "
+        f"<strong>{clinic_name}</strong> por <strong>${total:.2f}</strong>.</p>"
+    )
+    return send_email(
+        db,
+        clinic_id,
+        to,
+        f"Recibo de {receipt_data['pet_name']} · {clinic_name}",
+        f"Recibo de {receipt_data['pet_name']} en {clinic_name} por ${total:.2f}.",
+        clinic_name=clinic_name,
+        template=f"receipt-email:{receipt_data['invoice_id']}",
+        owner_id=owner_id,
+        html=body_html,
+        attachments=[
+            {"filename": attachment_name, "content": base64.b64encode(receipt_bytes).decode()}
+        ],
     )
 
 
