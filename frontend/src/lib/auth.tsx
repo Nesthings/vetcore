@@ -46,9 +46,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const value = useMemo<AuthContextValue>(() => {
+    // "isAuthenticated" solo es true si hay una sesión VÁLIDA: un token
+    // vencido (o con payload inválido) se trata como no autenticado para
+    // evitar bucles de redirección entre Login y las rutas protegidas.
+    const user = sessionFromToken(token)
     return {
-      user: sessionFromToken(token),
-      isAuthenticated: Boolean(token),
+      user,
+      isAuthenticated: Boolean(user),
       login: (newToken: string) => {
         setToken(newToken)
         setTokenState(newToken)
